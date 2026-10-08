@@ -13,8 +13,16 @@ def test_workers_produce_evidence():
     assert all(item.simulated for item in evidence)
 
 
-def test_decision_goes_to_prototype():
+def test_empty_evidence_is_demo_only():
     decision = evaluate("AI RPG", [])
-    assert decision.recommendation == "GO_TO_PROTOTYPE"
-    assert decision.confidence == 78
-    assert decision.next_step == "AI Game Prototype Sprint"
+    assert decision.recommendation == "DEMO_GO_TO_PROTOTYPE"
+    assert decision.confidence == 50
+
+
+def test_simulated_evidence_does_not_pass_real_gate():
+    evidence = []
+    for worker, capability in WORKERS:
+        evidence.extend(run_worker(worker, capability, "AI RPG"))
+    decision = evaluate("AI RPG", evidence)
+    assert decision.recommendation == "HOLD_FOR_EVIDENCE"
+    assert decision.confidence == 42
