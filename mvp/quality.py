@@ -1,51 +1,70 @@
-#!/usr/bin/env python3
-"""Evidence quality gate for JARVIS research outputs."""
+"""Evidence quality gates for JARVIS v0.6."""
 from __future__ import annotations
 
-from collections import defaultdict
+from dataclasses import dataclass
 
 
-def gate(evidence: list[object]) -> dict:
-    if not evidence:
-        return {
-            "status": "BLOCKED",
-            "score": 0,
-            "accepted": 0,
-            "rejected": 0,
-            "reasons": ["No research evidence was returned."],
-        }
+@dataclass
+class EvidenceQuality:
+    score: float
+    accepted: bool
+    reasons: list[str]
 
-    seen: set[tuple[str, str]] = set()
-    accepted = []
-    rejected = []
+
+def score_evidence(evidence: dict) -> EvidenceQuality:
+    """Score evidence conservatively and explain the decision.
+
+    Source-backed findings receive credit for provenance; simulated findings
+    are retained for demo continuity but never pass the real-research gate.
+    """
+    reasons: list[str] = []
+    score = 0.0
+
+    confidence = float(evidence.get("confidence", 0.0))
+    score += min(confidence, 1.0) * 50
+
+    source = evidence.get("source")
+    if source and source.get("url"):
+        score += 30
+    else:
+        reasons.append("missing source URL")
+
+    snippet = str((source or {}).get("snippet", "")).strip()
+    if snippet:
+        score += 10
+    else:
+        reasons.append("missing source excerpt")
+
+    if evidence.get("simulated", False):
+        reasons.append("simulated evidence cannot pass the real-research gate")
+        return EvidenceQuality(round(score, 1), False, reasons)
+
+    if confidence < 0.6:
+        reasons.append("confidence below 0.60")
+
+    accepted = score >= 70 and confidence >= 0.6 and bool(source and source.get("url"))
+    if accepted:
+        reasons.append("source, excerpt and confidence thresholds passed")
+
+    return EvidenceQuality(round(score, 1), accepted, reasons)
+
+
+def evaluate_evidence(evidence: list[dict]) -> dict:
+    results = []
+    accepted = 0
     for item in evidence:
-        url = str(getattr(item, "source_url", ""))
-        finding = str(getattr(item, "finding", ""))
-        score = float(getattr(item, "quality_score", getattr(item, "confidence", 0)))
-        key = (url, finding[:120])
-        if not url or score < 0.55 or key in seen:
-            rejected.append(item)
-            continue
-        seen.add(key)
-        accepted.append(item)
-
-    worker_counts = defaultdict(int)
-    for item in accepted:
-        worker_counts[getattr(item, "worker", "unknown")] += 1
-
-    score = round(sum(float(getattr(x, "quality_score", 0)) for x in accepted) / max(len(accepted), 1) * 100)
-    status = "PASS" if len(accepted) >= 3 and score >= 60 else "REVIEW"
-    reasons = [
-        f"{len(accepted)} evidence items passed the source-quality threshold.",
-        f"{len(worker_counts)} worker perspectives contributed accepted evidence.",
-    ]
-    if status != "PASS":
-        reasons.append("Decision confidence should remain constrained until evidence coverage improves.")
+        quality = score_evidence(item)
+        row = dict(item)
+        row["quality_score"] = quality.score
+        row["quality_accepted"] = quality.accepted
+        row["quality_reasons"] = quality.reasons
+        results.append(row)
+        accepted += int(quality.accepted)
 
     return {
-        "status": status,
-        "score": score,
-        "accepted": len(accepted),
-        "rejected": len(rejected),
-        "reasons": reasons,
+        "total": len(results),
+        "accepted": accepted,
+        "rejected": len(results) - accepted,
+        "coverage": round(accepted / len(results), 2) if results else 0.0,
+        "items": results,
     }
