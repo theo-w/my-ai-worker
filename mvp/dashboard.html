@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS · Digital Workforce Operations</title>
+<style>
+:root{--bg:#0b1020;--panel:#11182b;--panel2:#151e35;--line:#273452;--text:#e8eefb;--muted:#8f9db8;--accent:#65d9ff;--good:#58e39b;--warn:#ffd166;--bad:#ff7b8a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#17264a 0,#0b1020 38%);color:var(--text);font:14px/1.55 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+.app{max-width:1450px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.brand{font-size:20px;font-weight:800;letter-spacing:.08em}.sub{color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:1.1fr 1.8fr 1.1fr;gap:14px}.panel{background:rgba(17,24,43,.9);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 35px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.section-title{display:flex;justify-content:space-between;margin-bottom:12px;font-weight:750}.status{color:var(--accent);font-family:ui-monospace,monospace;font-size:11px}
+.input{display:flex;gap:8px}.input input{flex:1;background:#0c1325;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:11px}.btn{background:var(--accent);color:#06101a;border:0;border-radius:9px;padding:0 16px;font-weight:800;cursor:pointer}.btn:disabled{opacity:.45;cursor:not-allowed}.flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.node{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0d1427;color:var(--muted);font-size:12px}.node.active{border-color:var(--accent);color:var(--text);box-shadow:0 0 0 1px rgba(101,217,255,.15)}.arrow{color:#51617f}.agents{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.agent{padding:12px;border:1px solid var(--line);border-radius:10px;background:#0d1427;cursor:pointer}.agent.selected{border-color:var(--accent)}.agent-head{display:flex;justify-content:space-between;font-weight:750}.pill{font-size:10px;padding:2px 7px;border-radius:999px;background:#1b2742;color:var(--muted)}.running{color:var(--accent)}.completed{color:var(--good)}.queued,.ready{color:var(--muted)}.bar{height:4px;background:#202b45;border-radius:4px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.kv{display:grid;grid-template-columns:72px 1fr;gap:6px;margin:8px 0}.kv b{color:var(--muted);font-size:11px}.kv div{font-size:12px}.evidence{max-height:250px;overflow:auto}.ev{padding:9px 0;border-bottom:1px solid #202a42}.ev:last-child{border:0}.confidence{color:var(--good);font-family:ui-monospace,monospace;font-size:11px}.decision{border-left:3px solid var(--good);padding-left:12px}.decision h2{margin:0 0 4px;color:var(--good)}.risk{color:var(--warn);margin:5px 0}.footer{margin-top:14px;color:var(--muted);font-size:11px;text-align:center}@media(max-width:1000px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:600px){.agents{grid-template-columns:1fr}.app{padding:12px}}
+</style>
+</head>
+<body><div class="app">
+<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="sub">Digital Twin → Digital Workers → Evidence → Decision</div></div><div id="status" class="status">IDLE</div></div>
+<div class="panel wide"><div class="section-title"><span>任务输入 / Digital Twin Intent</span><span class="sub">自然语言入口</span></div><div class="input"><input id="goal" value="评估一款玩家可以与长期记忆 NPC 建立关系的 AI 原生 RPG 是否值得进入 Prototype"><button id="run" class="btn">启动 JARVIS</button></div></div>
+<div class="panel wide" style="margin-top:14px"><div class="section-title"><span>Workflow</span><span id="phase" class="status">IDLE</span></div><div id="flow" class="flow"></div></div>
+<div class="grid" style="margin-top:14px">
+<div class="panel"><div class="section-title">Agent Board <span class="sub" id="agentCount">0</span></div><div id="agents" class="agents"></div></div>
+<div class="panel"><div class="section-title">Agent Detail</div><div id="detail" class="sub">选择一个 Digital Worker 查看任务、输入、输出与证据。</div></div>
+<div class="panel"><div class="section-title">Decision</div><div id="decision" class="sub">等待评估结果。</div></div>
+<div class="panel wide"><div class="section-title">Evidence Stream <span class="sub">SIMULATED · MVP</span></div><div id="evidence" class="evidence"></div></div>
+</div>
+<div class="footer">MVP intentionally uses simulated workers. 下一阶段：真实 Web Research + LLM Synthesis + Prototype Sprint。</div>
+</div>
+<script>
+let state=null,selected=0;
+const phases=["planning","team","evaluation","decision"];
+const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision"};
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function render(){
+ if(!state)return; document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
+ const idx=Math.max(0,phases.indexOf(state.phase));
+ document.getElementById("flow").innerHTML=["Goal","Planning","Team","Workers","Evidence","Evaluation","Decision"].map((x,i)=>{let active=i===0?true:(i===1&&idx>=0)||(i===2&&idx>=1)||(i===3&&idx>=1)||(i===4&&idx>=1)||(i===5&&idx>=2)||(i===6&&idx>=3);return '<span class="node '+(active?'active':'')+'">'+x+'</span>'+((i<6)?'<span class="arrow">→</span>':'')}).join("");
+ document.getElementById("agentCount").textContent=(state.agents||[]).filter(a=>a.status==="completed").length+"/"+(state.agents||[]).length+" completed";
+ document.getElementById("agents").innerHTML=(state.agents||[]).map((a,i)=>'<div class="agent '+(i===selected?'selected':'')+'" onclick="selected='+i+';render()"><div class="agent-head"><span>'+esc(a.worker)+'</span><span class="pill '+a.status+'">'+esc(a.status)+'</span></div><div class="sub">'+esc(a.task)+'</div><div class="bar"><i style="width:'+a.progress+'%"></i></div></div>').join("");
+ const a=(state.agents||[])[selected];
+ document.getElementById("detail").innerHTML=a?'<div class="kv"><b>Worker</b><div>'+esc(a.worker)+'</div><b>Status</b><div>'+esc(a.status)+' · '+a.progress+'%</div><b>Input</b><div>'+esc(a.input)+'</div><b>Output</b><div>'+esc(a.output||"工作中…")+'</div><b>Evidence</b><div>'+((a.evidence||[]).length)+' items</div></div>':'No worker";
+ document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
+ const d=state.decision; document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待决策…';
+}
+async function poll(){try{const r=await fetch("/api/state");state=await r.json();render();}catch(e){}}
+document.getElementById("run").onclick=async()=>{const btn=document.getElementById("run");btn.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});btn.disabled=false;};
+setInterval(poll,300);poll();
+</script></body></html>
