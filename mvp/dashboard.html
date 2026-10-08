@@ -25,21 +25,25 @@
 </div>
 <script>
 let state=null,selected=0;
-const phases=["planning","team","evaluation","decision"];
-const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision"};
+const phases=["planning","team","evaluation","decision","prototype"];
+const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Prototype Sprint"};
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
 function render(){
  if(!state)return; document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
  const idx=Math.max(0,phases.indexOf(state.phase));
  document.getElementById("flow").innerHTML=["Goal","Planning","Team","Workers","Evidence","Evaluation","Decision"].map((x,i)=>{let active=i===0?true:(i===1&&idx>=0)||(i===2&&idx>=1)||(i===3&&idx>=1)||(i===4&&idx>=1)||(i===5&&idx>=2)||(i===6&&idx>=3);return '<span class="node '+(active?'active':'')+'">'+x+'</span>'+((i<6)?'<span class="arrow">→</span>':'')}).join("");
+ document.getElementById("twin").innerHTML=state.twin?`<div><b>${esc(state.twin.name)}</b></div><div style="margin-top:6px">${esc(state.twin.objective)}</div><div style="margin-top:8px">Autonomy: <b>${esc(state.twin.policy.autonomy_level)}</b> · Decision: <b>${esc(state.twin.decision_style)}</b></div>`:"等待目标...";
+ document.getElementById("teamSummary").innerHTML=state.twin?`<b>${state.twin.team_size} Digital Workers</b><div style="margin-top:6px">由 Digital Twin 根据目标动态形成任务团队。</div>`:"等待团队形成...";
  document.getElementById("agentCount").textContent=(state.agents||[]).filter(a=>a.status==="completed").length+"/"+(state.agents||[]).length+" completed";
  document.getElementById("agents").innerHTML=(state.agents||[]).map((a,i)=>'<div class="agent '+(i===selected?'selected':'')+'" onclick="selected='+i+';render()"><div class="agent-head"><span>'+esc(a.worker)+'</span><span class="pill '+a.status+'">'+esc(a.status)+'</span></div><div class="sub">'+esc(a.task)+'</div><div class="bar"><i style="width:'+a.progress+'%"></i></div></div>').join("");
  const a=(state.agents||[])[selected];
  document.getElementById("detail").innerHTML=a?'<div class="kv"><b>Worker</b><div>'+esc(a.worker)+'</div><b>Status</b><div>'+esc(a.status)+' · '+a.progress+'%</div><b>Input</b><div>'+esc(a.input)+'</div><b>Output</b><div>'+esc(a.output||"工作中…")+'</div><b>Evidence</b><div>'+((a.evidence||[]).length)+' items</div></div>':'No worker";
  document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
  const d=state.decision; document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待决策…';
+ const p=state.prototype; document.getElementById("prototype").innerHTML=p?`<b>${esc(p.name)}</b><div style="margin-top:6px">${p.steps.map((s,i)=>`<div>${i+1}. ${esc(s)}</div>`).join("")}</div>`:(d&&d.recommendation==="GO_TO_PROTOTYPE"?'<button class="btn" style="padding:9px 12px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'决策后可启动 Prototype Sprint。');
 }
 async function poll(){try{const r=await fetch("/api/state");state=await r.json();render();}catch(e){}}
 document.getElementById("run").onclick=async()=>{const btn=document.getElementById("run");btn.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});btn.disabled=false;};
+async function startPrototype(){const r=await fetch("/api/prototype",{method:"POST"});if(r.ok)poll();}
 setInterval(poll,300);poll();
 </script></body></html>
