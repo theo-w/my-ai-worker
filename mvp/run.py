@@ -53,14 +53,14 @@ def run_worker(worker: str, capability: str, goal: str) -> list[Evidence]:
 
 def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
     return Decision(
-        recommendation="GO_TO_PROTOTYPE",
-        confidence=78,
+        recommendation=recommendation,
+        confidence=78 if recommendation == "GO_TO_PROTOTYPE" else 42,
         risks=[
             "AI interaction may feel novel but not replayable",
             "NPC memory and behavior can drift",
             "Inference cost and latency may limit production economics",
         ],
-        next_step="AI Game Prototype Sprint",
+        next_step="AI Game Prototype Sprint" if recommendation == "GO_TO_PROTOTYPE" else "Evidence Collection Sprint",
     )
 
 
