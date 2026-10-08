@@ -1,0 +1,2401 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+JARVIS AI Game Operation Copilot V4
+</title>
+
+
+<style>
+
+
+/* =========================
+   基础系统
+========================= */
+
+
+*{
+
+margin:0;
+padding:0;
+box-sizing:border-box;
+
+font-family:
+
+"Microsoft YaHei",
+Arial,
+sans-serif;
+
+}
+
+
+
+body{
+
+
+height:100vh;
+
+overflow:hidden;
+
+
+background:
+
+radial-gradient(
+circle at center,
+#10283d 0%,
+#02050c 70%
+);
+
+
+color:#dff8ff;
+
+
+}
+
+
+
+/* =========================
+   启动界面
+========================= */
+
+
+.boot{
+
+
+position:fixed;
+
+left:0;
+top:0;
+
+
+width:100%;
+height:100%;
+
+
+background:#02050c;
+
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+
+flex-direction:column;
+
+
+z-index:999;
+
+
+}
+
+
+
+.boot-core{
+
+
+font-size:55px;
+
+
+letter-spacing:12px;
+
+
+color:#55eaff;
+
+
+text-shadow:
+
+0 0 35px #00c8ff;
+
+
+}
+
+
+
+.boot-text{
+
+
+margin-top:40px;
+
+
+line-height:2.2;
+
+
+color:#70ffbb;
+
+
+text-align:center;
+
+
+animation:
+blink 1.5s infinite;
+
+
+}
+
+
+
+@keyframes blink{
+
+
+50%{
+
+opacity:.35;
+
+}
+
+
+}
+
+
+
+
+
+
+/* =========================
+   HUD扫描
+========================= */
+
+
+.scan{
+
+
+position:absolute;
+
+
+width:100%;
+
+height:2px;
+
+
+background:#3ee8ff;
+
+
+opacity:.2;
+
+
+animation:
+
+scanMove 5s linear infinite;
+
+
+}
+
+
+
+@keyframes scanMove{
+
+
+from{
+
+top:0;
+
+}
+
+
+to{
+
+top:100%;
+
+}
+
+
+}
+
+
+
+
+
+
+
+/* =========================
+   顶部系统栏
+========================= */
+
+
+.header{
+
+
+height:70px;
+
+
+display:flex;
+
+
+align-items:center;
+
+
+justify-content:space-between;
+
+
+padding:
+
+0 35px;
+
+
+
+border-bottom:
+
+1px solid rgba(80,220,255,.25);
+
+
+
+background:
+
+rgba(4,15,28,.8);
+
+
+
+}
+
+
+
+.logo{
+
+
+font-size:24px;
+
+
+letter-spacing:5px;
+
+
+color:#61eaff;
+
+
+
+}
+
+
+
+.status{
+
+
+color:#64ffaf;
+
+
+font-size:14px;
+
+
+}
+
+
+
+
+
+
+
+/* =========================
+   主工作区
+========================= */
+
+
+.workspace{
+
+
+height:
+
+calc(100vh - 70px);
+
+
+display:grid;
+
+
+grid-template-columns:
+
+260px
+1fr
+360px;
+
+
+
+}
+
+
+
+
+
+
+
+/* =========================
+   左侧AI团队
+========================= */
+
+
+.agent-panel{
+
+
+border-right:
+
+1px solid rgba(80,220,255,.2);
+
+
+
+padding:25px;
+
+
+background:
+
+rgba(3,12,25,.45);
+
+
+}
+
+
+
+.title{
+
+
+font-size:18px;
+
+
+color:#61eaff;
+
+
+margin-bottom:20px;
+
+
+}
+
+
+
+
+.agent{
+
+
+padding:18px;
+
+
+margin-bottom:15px;
+
+
+border-radius:15px;
+
+
+background:
+
+rgba(10,30,50,.75);
+
+
+
+border:
+
+1px solid rgba(90,220,255,.25);
+
+
+
+}
+
+
+
+.agent span{
+
+
+color:#65ffaf;
+
+
+font-size:12px;
+
+
+}
+
+
+
+
+
+
+
+/* =========================
+   中央动态空间
+========================= */
+
+
+.center-panel{
+
+
+padding:25px;
+
+
+overflow:auto;
+
+
+}
+
+
+
+.jarvis-report{
+
+
+padding:25px;
+
+
+border-radius:22px;
+
+
+background:
+
+linear-gradient(
+135deg,
+rgba(12,38,62,.95),
+rgba(3,15,30,.95)
+);
+
+
+
+border:
+
+1px solid rgba(90,220,255,.35);
+
+
+
+box-shadow:
+
+0 0 30px rgba(0,200,255,.15);
+
+
+
+}
+
+
+
+.report-title{
+
+
+font-size:23px;
+
+
+color:#60eaff;
+
+
+margin-bottom:20px;
+
+
+}
+
+
+
+
+
+.analysis-space{
+
+
+margin-top:25px;
+
+
+padding:25px;
+
+
+min-height:350px;
+
+
+
+border-radius:22px;
+
+
+background:
+
+rgba(3,15,28,.85);
+
+
+
+border:
+
+1px solid rgba(80,220,255,.25);
+
+
+}
+
+
+
+.placeholder{
+
+
+height:300px;
+
+
+display:flex;
+
+
+align-items:center;
+
+
+justify-content:center;
+
+
+color:#50798b;
+
+
+font-size:20px;
+
+
+}
+
+
+
+
+
+
+
+/* =========================
+   右侧AI对话
+========================= */
+
+
+.chat-panel{
+
+
+border-left:
+
+1px solid rgba(80,220,255,.2);
+
+
+
+display:flex;
+
+
+flex-direction:column;
+
+
+
+padding:25px;
+
+
+}
+
+
+
+.chat-title{
+
+
+color:#61eaff;
+
+
+font-size:20px;
+
+
+margin-bottom:20px;
+
+
+}
+
+
+
+
+.chat-box{
+
+
+flex:1;
+
+
+background:
+
+rgba(4,18,32,.9);
+
+
+
+border-radius:20px;
+
+
+padding:20px;
+
+
+overflow:auto;
+
+
+line-height:1.8;
+
+
+}
+
+
+
+.user-input{
+
+
+margin-top:15px;
+
+
+display:flex;
+
+
+gap:10px;
+
+
+}
+
+
+
+.user-input input{
+
+
+flex:1;
+
+
+padding:13px;
+
+
+background:#061522;
+
+
+border:
+
+1px solid #1d7fa8;
+
+
+border-radius:20px;
+
+
+color:white;
+
+
+outline:none;
+
+
+}
+
+
+
+button{
+
+
+padding:
+
+12px 25px;
+
+
+border:none;
+
+
+border-radius:25px;
+
+
+background:
+
+linear-gradient(
+90deg,
+#008cff,
+#00e5ff
+);
+
+
+color:white;
+
+
+cursor:pointer;
+
+
+}
+
+
+
+
+
+/* =========================
+   数据标签
+========================= */
+
+
+.tag{
+
+
+display:inline-block;
+
+
+padding:
+
+5px 12px;
+
+
+border-radius:15px;
+
+
+background:
+
+rgba(0,160,255,.15);
+
+
+border:
+
+1px solid #1689bb;
+
+
+margin:5px;
+
+
+}
+
+
+
+.danger{
+
+
+color:#ff7070;
+
+
+}
+
+
+.success{
+
+
+color:#65ffaf;
+
+
+}
+
+
+
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+
+<!-- =====================
+     JARVIS启动
+===================== -->
+
+
+<div class="boot" id="boot">
+
+
+<div class="boot-core">
+
+JARVIS
+
+</div>
+
+
+
+<div class="boot-text">
+
+
+SYSTEM ONLINE
+
+<br>
+
+正在连接游戏运营数据...
+
+<br>
+
+正在读取玩家生态...
+
+<br>
+
+正在启动AI Agent集群...
+
+<br><br>
+
+READY
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="scan"></div>
+
+
+
+
+
+<!-- =====================
+     顶部
+===================== -->
+
+
+<div class="header">
+
+
+<div class="logo">
+
+AI GAME OPERATION COPILOT
+
+</div>
+
+
+<div class="status">
+
+● JARVIS ONLINE
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+<!-- =====================
+     三栏工作台
+===================== -->
+
+
+<div class="workspace">
+
+
+
+<!-- 左侧 -->
+
+
+<div class="agent-panel">
+
+
+<div class="title">
+
+AI TEAM
+
+</div>
+
+
+
+<div class="agent">
+
+🧠 舆情Agent
+
+<br>
+
+<span>
+
+分析玩家情绪
+
+● 在线
+
+</span>
+
+</div>
+
+
+
+
+<div class="agent">
+
+🎮 产品Agent
+
+<br>
+
+<span>
+
+分析版本影响
+
+● 在线
+
+</span>
+
+</div>
+
+
+
+
+
+<div class="agent">
+
+📈 商业Agent
+
+<br>
+
+<span>
+
+预测收入影响
+
+● 在线
+
+</span>
+
+</div>
+
+
+
+
+
+<div class="agent">
+
+🚨 公关Agent
+
+<br>
+
+<span>
+
+生成回应策略
+
+● 在线
+
+</span>
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+<!-- 中间 -->
+
+
+<div class="center-panel">
+
+
+
+<div class="jarvis-report">
+
+
+<div class="report-title">
+
+JARVIS 今日主动分析
+
+</div>
+
+
+
+<div id="reportContent">
+
+
+正在生成运营报告...
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+<div class="analysis-space" id="analysisSpace">
+
+
+<div class="placeholder">
+
+等待AI生成分析空间
+
+</div>
+
+
+
+</div>
+
+
+
+
+</div>
+
+
+
+
+
+
+
+<!-- 右侧 -->
+
+
+<div class="chat-panel">
+
+
+<div class="chat-title">
+
+🤖 与JARVIS交流
+
+</div>
+
+
+
+<div class="chat-box" id="chatBox">
+
+
+JARVIS:
+
+<br>
+
+早上好。
+
+<br><br>
+
+我正在监控当前游戏状态。
+
+</div>
+
+
+
+<div class="user-input">
+
+
+<input
+
+id="userInput"
+
+placeholder="询问，例如：为什么玩家不满意？"
+
+
+
+>
+
+
+<button onclick="sendMessage()">
+
+发送
+
+</button>
+
+
+</div>
+
+
+
+</div>
+
+
+
+</div>
+<script>
+
+
+    /* ============================
+       JARVIS主动汇报
+    ============================ */
+    
+    
+    let report = `
+    
+    
+    <div>
+    
+    
+    <span class="tag">
+    过去24小时扫描完成
+    </span>
+    
+    
+    <span class="tag">
+    128,432条反馈
+    </span>
+    
+    
+    <span class="tag">
+    56个社区
+    </span>
+    
+    
+    
+    <br><br>
+    
+    
+    
+    JARVIS发现：
+    
+    <br><br>
+    
+    
+    <div class="danger">
+    
+    🔴 高风险事件：
+    
+    新角色上线后玩家价值感下降
+    
+    </div>
+    
+    
+    
+    <br>
+    
+    
+    AI判断：
+    
+    <br>
+    
+    
+    玩家并非反对角色设计。
+    
+    <br>
+    
+    
+    核心问题：
+    
+    <b>
+    
+    投入价值感下降。
+    
+    </b>
+    
+    
+    
+    <br><br>
+    
+    
+    主要影响：
+    
+    <br>
+    
+    
+    ① 核心付费玩家
+    
+    <br>
+    
+    ② 长期活跃用户
+    
+    <br>
+    
+    ③ 社区意见节点
+    
+    
+    <br><br>
+    
+    
+    
+    建议：
+    
+    <br>
+    
+    
+    优先分析玩家心理和商业影响。
+    
+    
+    </div>
+    
+    
+    
+    `;
+    
+    
+    
+    setTimeout(()=>{
+    
+    
+    document.getElementById(
+    "reportContent"
+    ).innerHTML=report;
+    
+    
+    
+    },4500);
+    
+    
+    
+    
+    
+    
+    
+    /* ============================
+       动态生成分析Workspace
+    ============================ */
+    
+    
+    
+    function generateAnalysis(){
+    
+    
+    
+    let space=document.getElementById(
+    "analysisSpace"
+    );
+    
+    
+    
+    space.innerHTML=`
+    
+    
+    <div class="report-title">
+    
+    新角色争议 · AI深度分析
+    
+    </div>
+    
+    
+    
+    <div>
+    
+    
+    <span class="tag">
+    情绪分析
+    </span>
+    
+    
+    <span class="tag">
+    玩家画像
+    </span>
+    
+    
+    <span class="tag">
+    商业预测
+    </span>
+    
+    
+    </div>
+    
+    
+    
+    <br><br>
+    
+    
+    
+    <h3>
+    一、玩家情绪变化
+    </h3>
+    
+    
+    <br>
+    
+    
+    <div>
+    
+    
+    过去7天：
+    
+    <br><br>
+    
+    
+    😊 正面
+    
+    35%
+    
+    
+    <br>
+    
+    
+    😐 中性
+    
+    30%
+    
+    
+    <br>
+    
+    
+    😡 负面
+    
+    35%
+    
+    
+    <br><br>
+    
+    
+    
+    趋势：
+    
+    负面情绪增长：
+    
+    <span class="danger">
+    
+    +240%
+    
+    </span>
+    
+    
+    </div>
+    
+    
+    
+    
+    
+    
+    <hr style="margin:25px 0;border-color:#17455d;">
+    
+    
+    
+    
+    
+    
+    <h3>
+    
+    二、原因树分析
+    
+    </h3>
+    
+    
+    <br>
+    
+    
+    
+    <div>
+    
+    
+    玩家不满
+    
+    
+    <br>
+    
+    
+    ⬇
+    
+    
+    <br>
+    
+    
+    
+    ├── 获取成本过高
+    
+    <br>
+    
+    &nbsp;&nbsp;&nbsp;&nbsp;影响：
+    
+    45%
+    
+    
+    <br><br>
+    
+    
+    
+    ├── 强度争议
+    
+    <br>
+    
+    &nbsp;&nbsp;&nbsp;&nbsp;影响：
+    
+    32%
+    
+    
+    <br><br>
+    
+    
+    
+    └── 期待落差
+    
+    <br>
+    
+    &nbsp;&nbsp;&nbsp;&nbsp;影响：
+    
+    23%
+    
+    
+    
+    </div>
+    
+    
+    
+    
+    
+    
+    <hr style="margin:25px 0;border-color:#17455d;">
+    
+    
+    
+    
+    
+    
+    
+    <h3>
+    
+    三、AI判断
+    
+    </h3>
+    
+    
+    <br>
+    
+    
+    <div class="success">
+    
+    
+    核心问题：
+    
+    不是角色本身。
+    
+    
+    而是：
+    
+    玩家认为投入收益降低。
+    
+    </div>
+    
+    
+    
+    
+    <hr style="margin:25px 0;border-color:#17455d;">
+    
+    
+    
+    
+    
+    
+    <h3>
+    
+    四、未来风险预测
+    
+    </h3>
+    
+    
+    <br>
+    
+    
+    
+    <div>
+    
+    
+    7日预测：
+    
+    
+    <br><br>
+    
+    
+    评分：
+    
+    8.2
+    
+    
+    &nbsp;→&nbsp;
+    
+    
+    <span class="danger">
+    
+    7.5
+    
+    </span>
+    
+    
+    
+    <br><br>
+    
+    
+    核心玩家流失概率：
+    
+    <span class="danger">
+    
+    +18%
+    
+    </span>
+    
+    
+    
+    <br><br>
+    
+    
+    收入影响：
+    
+    中风险
+    
+    
+    </div>
+    
+    
+    
+    
+    
+    
+    <hr style="margin:25px 0;border-color:#17455d;">
+    
+    
+    
+    
+    
+    <h3>
+    
+    五、策略模拟
+    
+    </h3>
+    
+    
+    
+    <br>
+    
+    
+    
+    
+    <button onclick="simulate('A')">
+    
+    立即削弱角色
+    
+    </button>
+    
+    
+    <br><br>
+    
+    
+    <button onclick="simulate('B')">
+    
+    发布开发者说明
+    
+    </button>
+    
+    
+    
+    <br><br>
+    
+    
+    <button onclick="simulate('C')">
+    
+    保持观察
+    
+    </button>
+    
+    
+    
+    
+    <div id="simulationResult">
+    
+    
+    </div>
+    
+    
+    
+    
+    
+    `;
+    
+    
+    
+    }
+    
+    
+    
+    
+    
+    /* 5秒后AI自动生成 */
+    
+    setTimeout(()=>{
+    
+    
+    generateAnalysis();
+    
+    
+    },6000);
+    
+    
+    
+    
+    
+    
+    
+    /* ============================
+       策略模拟
+    ============================ */
+    
+    
+    
+    function simulate(type){
+    
+    
+    
+    let result=document.getElementById(
+    "simulationResult"
+    );
+    
+    
+    
+    let text="";
+    
+    
+    
+    if(type=="A"){
+    
+    
+    text=`
+    
+    <br><br>
+    
+    方案A：
+    
+    <br>
+    
+    
+    短期：
+    
+    玩家情绪下降。
+    
+    
+    <br>
+    
+    
+    长期：
+    
+    付费玩家价值感进一步下降。
+    
+    
+    <br>
+    
+    
+    AI评分：
+    
+    ★★★☆☆
+    
+    
+    `;
+    
+    
+    
+    }
+    
+    
+    
+    
+    if(type=="B"){
+    
+    
+    text=`
+    
+    <br><br>
+    
+    
+    方案B：
+    
+    开发者说明 + 玩家沟通。
+    
+    
+    <br>
+    
+    
+    预测：
+    
+    信任恢复概率：
+    
+    <span class="success">
+    
+    78%
+    
+    </span>
+    
+    
+    <br>
+    
+    
+    推荐：
+    
+    ★★★★★
+    
+    
+    `;
+    
+    }
+    
+    
+    
+    if(type=="C"){
+    
+    
+    text=`
+    
+    <br><br>
+    
+    
+    方案C：
+    
+    保持观察。
+    
+    
+    <br>
+    
+    
+    风险：
+    
+    48小时后传播扩大概率：
+    
+    72%
+    
+    
+    <br>
+    
+    
+    推荐：
+    
+    ★☆☆☆☆
+    
+    
+    `;
+    
+    }
+    
+    
+    
+    result.innerHTML=text;
+    
+    
+    
+    }
+    
+    <script>
+
+
+/* ===============================
+   JARVIS上下文记忆
+================================ */
+
+
+let conversationContext={
+
+
+topic:
+"新角色争议",
+
+
+focus:
+"玩家价值感下降",
+
+
+stage:
+"原因分析"
+
+
+};
+
+
+
+
+
+
+/* ===============================
+   用户提问入口
+================================ */
+
+
+
+function sendMessage(){
+
+
+let input=document.getElementById(
+"userInput"
+);
+
+
+let chat=document.getElementById(
+"chatBox"
+);
+
+
+let question=input.value;
+
+
+
+if(!question.trim()){
+
+return;
+
+}
+
+
+
+chat.innerHTML+=`
+
+<br><br>
+
+<span style="color:#60eaff">
+
+你：
+
+</span>
+
+${question}
+
+`;
+
+
+
+
+input.value="";
+
+
+
+think(question);
+
+
+
+}
+
+
+
+
+
+
+
+/* ===============================
+   JARVIS理解问题
+================================ */
+
+
+
+function think(question){
+
+
+
+let chat=document.getElementById(
+"chatBox"
+);
+
+
+
+chat.innerHTML+=`
+
+<br><br>
+
+
+JARVIS：
+
+<br>
+
+
+正在理解你的问题...
+
+<br>
+
+
+调用：
+
+<br>
+
+🧠 舆情Agent
+
+<br>
+
+🎮 产品Agent
+
+<br>
+
+📈 商业Agent
+
+
+`;
+
+
+
+
+
+setTimeout(()=>{
+
+
+generateAnswer(question);
+
+
+
+},1800);
+
+
+
+}
+
+
+
+
+
+
+
+/* ===============================
+   动态生成回答
+================================ */
+
+
+
+function generateAnswer(question){
+
+
+
+let chat=document.getElementById(
+"chatBox"
+);
+
+
+
+let answer="";
+
+
+
+
+
+if(
+question.includes("收入")
+||
+question.includes("商业")
+){
+
+
+conversationContext.focus=
+"商业影响";
+
+
+
+answer=`
+
+
+我重新生成商业影响分析。
+
+
+<br><br>
+
+
+AI预测：
+
+<br>
+
+
+短期：
+
+收入影响有限。
+
+
+<br><br>
+
+
+长期：
+
+核心付费用户价值下降。
+
+
+<br><br>
+
+
+建议：
+
+不要立即削弱角色。
+
+优先修复玩家价值认知。
+
+
+<br><br>
+
+
+我建议继续分析：
+
+<br>
+
+
+“哪些玩家群体影响最大？”
+
+
+`;
+
+
+
+}
+
+
+
+else if(
+
+question.includes("为什么")
+
+){
+
+
+
+conversationContext.focus=
+"玩家心理";
+
+
+answer=`
+
+
+我重新拆解原因。
+
+
+<br><br>
+
+AI发现：
+
+<br>
+
+
+表面：
+
+角色强度争议。
+
+
+<br>
+
+
+深层：
+
+玩家认为：
+
+投入与收益不匹配。
+
+
+<br><br>
+
+
+需要进一步确认：
+
+<br>
+
+
+是价格问题？
+
+还是长期数值问题？
+
+
+`;
+
+
+
+}
+
+
+
+else{
+
+
+answer=`
+
+
+我已经理解你的问题。
+
+
+<br><br>
+
+
+当前事件：
+
+新角色争议。
+
+
+<br>
+
+
+我的建议：
+
+进一步进行：
+
+<br>
+
+
+① 玩家分层分析
+
+<br>
+
+
+② 收入影响模拟
+
+<br>
+
+
+③ 应对方案比较
+
+
+`;
+
+}
+
+
+
+chat.innerHTML+=`
+
+<br><br>
+
+
+<span style="color:#65ffaf">
+
+JARVIS：
+
+</span>
+
+
+<br>
+
+${answer}
+
+
+`;
+
+
+
+chat.scrollTop=
+chat.scrollHeight;
+
+
+
+}
+
+
+
+
+
+
+
+
+/* ===============================
+   AI主动追问
+================================ */
+
+
+function proactiveQuestion(){
+
+
+
+let chat=document.getElementById(
+"chatBox"
+);
+
+
+
+chat.innerHTML+=`
+
+
+<br><br>
+
+
+<span style="color:#55eaff">
+
+JARVIS主动提醒：
+
+</span>
+
+
+<br>
+
+
+我发现：
+
+当前问题存在两个目标冲突。
+
+
+<br><br>
+
+
+目标A：
+
+降低社区负面情绪。
+
+
+<br>
+
+
+目标B：
+
+保持角色商业价值。
+
+
+<br><br>
+
+
+请选择：
+
+<br>
+
+
+1.
+优先维护玩家信任
+
+
+<br>
+
+
+2.
+优先保护商业收益
+
+
+<br>
+
+
+3.
+寻找平衡方案
+
+
+
+`;
+
+
+
+}
+
+
+
+setTimeout(()=>{
+
+
+proactiveQuestion();
+
+
+},12000);
+
+
+
+
+
+
+
+
+
+/* ===============================
+   AI会议模式
+================================ */
+
+
+
+function startAIMeeting(){
+
+
+
+let space=document.getElementById(
+"analysisSpace"
+);
+
+
+
+space.innerHTML=`
+
+
+<div class="report-title">
+
+
+🤖 JARVIS运营会议模式
+
+
+</div>
+
+
+<br>
+
+
+
+JARVIS：
+
+正在召集专家Agent...
+
+
+<br><br>
+
+
+----------------
+
+
+<br>
+
+
+🧠 舆情Agent：
+
+<br>
+
+
+玩家核心矛盾：
+
+价值感下降。
+
+
+<br><br>
+
+
+
+🎮 产品Agent：
+
+<br>
+
+
+建议：
+
+增加获取价值反馈。
+
+
+<br><br>
+
+
+
+📈 商业Agent：
+
+<br>
+
+
+预计：
+
+短期收入影响有限。
+
+
+<br><br>
+
+
+
+🚨 公关Agent：
+
+<br>
+
+
+建议：
+
+48小时内完成玩家沟通。
+
+
+<br><br>
+
+
+
+----------------
+
+
+<br>
+
+
+JARVIS总结：
+
+<br><br>
+
+
+推荐方案：
+
+<br>
+
+
+开发者说明
+
++
+
+玩家互动活动
+
++
+
+后续平衡观察
+
+
+
+<br><br>
+
+
+方案成功概率：
+
+<span class="success">
+
+82%
+
+</span>
+
+
+`;
+
+
+
+}
+
+
+
+
+
+
+
+/* ===============================
+   20秒进入会议模式
+================================ */
+
+
+
+setTimeout(()=>{
+
+
+startAIMeeting();
+
+
+},20000);
+
+
+
+
+
+</script>   
+    
+    
+    </script>
