@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free local JARVIS Operations Dashboard server."""
+"""Dependency-free local JARVIS Digital Workforce dashboard server."""
 from __future__ import annotations
 
 import json
@@ -9,28 +9,36 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from run import WORKERS, evaluate, run_worker
+from twin import DigitalTwin
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
+TWIN = DigitalTwin()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
+    "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
     "phase": "idle",
     "agents": [],
     "evidence": [],
     "decision": None,
+    "twin": TWIN.snapshot("评估一个 AI 原生游戏机会", WORKERS),
+    "prototype": None,
 }
 
 def reset(goal: str):
+    team = TWIN.form_team(goal, WORKERS)
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
         STATE["agents"] = [
             {"id": i, "worker": w, "capability": c, "status": "queued",
              "progress": 0, "task": c, "input": goal, "output": "", "evidence": []}
-            for i, (w, c) in enumerate(WORKERS)
+            for i, (w, c) in enumerate(team)
         ]
         STATE["evidence"] = []
         STATE["decision"] = None
+        STATE["prototype"] = None
+        STATE["twin"] = TWIN.snapshot(goal, team)
 
 def execute(goal: str):
     reset(goal)
@@ -39,7 +47,9 @@ def execute(goal: str):
         STATE["phase"] = "team"
         for a in STATE["agents"]:
             a["status"] = "ready"
-    for idx, (worker, capability) in enumerate(WORKERS):
+    for idx, (worker, capability) in enumerate(
+        (tuple((a["worker"], a["capability"]) for a in STATE["agents"]))
+    ):
         with LOCK:
             a = STATE["agents"][idx]
             a["status"] = "running"
@@ -74,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api/state":
             with LOCK:
-                self._json(STATE.copy())
+                self._json(dict(STATE))
             return
         if self.path in ("/", "/index.html"):
             data = (ROOT / "dashboard.html").read_bytes()
@@ -87,8 +97,27 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path != "/api/run":
+        if self.path not in ("/api/run", "/api/prototype"):
             self.send_error(404)
+            return
+        if self.path == "/api/prototype":
+            with LOCK:
+                if not STATE["decision"] or STATE["decision"]["recommendation"] != "GO_TO_PROTOTYPE":
+                    self._json({"ok": False, "error": "Prototype requires a GO_TO_PROTOTYPE decision."}, 409)
+                    return
+                STATE["prototype"] = {
+                    "status": "planned",
+                    "name": "AI Game Prototype Sprint",
+                    "steps": [
+                        "Define business success criteria",
+                        "Design the smallest playable AI-native loop",
+                        "Implement the AI interaction prototype",
+                        "Run simulated player playtest",
+                        "Evaluate, learn, and iterate",
+                    ],
+                }
+                STATE["phase"] = "prototype"
+            self._json({"ok": True, "prototype": STATE["prototype"]})
             return
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length) or b"{}")
