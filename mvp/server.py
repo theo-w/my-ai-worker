@@ -136,7 +136,7 @@ def execute(goal: str):
                 agent["progress"] = 100
                 agent["output"] = "执行失败：" + type(exc).__name__
                 agent["execution"] = {
-                    "mode": "llm" if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else "simulation",
+                    "mode": "hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor) else ("llm" if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else "simulation"),
                     "status": "failed",
                     "error_type": type(exc).__name__,
                 }
@@ -298,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(exc)}, 400)
                 return
             goal = request["goal"]
-            planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else None
+            planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
             planning = request["planning"]
             if request["tasks"] is not None:
                 tasks = request["tasks"]
