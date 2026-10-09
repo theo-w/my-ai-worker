@@ -13,7 +13,7 @@ from pathlib import Path
 try:
     from .run import WORKERS, evaluate, run_worker
     from .twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
-    from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor
+    from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
     from .research import run_live_research, research_environment_status
     from .planning import plan_project, replan_failed_tasks, validate_plan
@@ -21,7 +21,7 @@ try:
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
-    from executor import SimulatedWorkerExecutor, LLMWorkerExecutor
+    from executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
     from research import run_live_research, research_environment_status
     from planning import plan_project, replan_failed_tasks, validate_plan
@@ -33,13 +33,19 @@ TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
 PROJECT_LOOP = AutonomousProjectLoop()
 def _build_worker_executor():
+    llm_executor = None
     if all(os.getenv(key, "").strip() for key in (
         "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"
     )):
         try:
-            return LLMWorkerExecutor(OpenAICompatibleLLM.from_environment())
+            llm_executor = LLMWorkerExecutor(OpenAICompatibleLLM.from_environment())
         except (ValueError, LLMConfigurationError):
-            return SimulatedWorkerExecutor()
+            llm_executor = None
+    # Use a capability router whenever either live integration is configured.
+    # It fails closed for missing research/LLM providers; simulation is used only
+    # when neither live integration is configured.
+    if llm_executor is not None or os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip():
+        return HybridWorkerExecutor(llm_executor)
     return SimulatedWorkerExecutor()
 
 
@@ -245,12 +251,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(research_environment_status())
             return
         if self.path == "/api/llm/status":
-            configured = isinstance(WORKER_EXECUTOR, LLMWorkerExecutor)
+            configured = isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor))
             self._json({
                 "configured": configured,
-                "mode": "llm" if configured else "simulated",
+                "mode": ("hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor) else "llm") if configured else "simulated",
                 "model": getattr(getattr(WORKER_EXECUTOR, "client", None), "model", None),
-                "message": "LLM worker configured; outputs are not independently verified evidence."
+                "message": "Live worker routing configured; LLM outputs and search snippets are not independently verified facts."
                     if configured else
                     "LLM not configured; autonomous tasks use simulated execution.",
             })
