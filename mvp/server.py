@@ -16,6 +16,7 @@ try:
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
     from .research import run_live_research, research_environment_status
     from .planning import plan_project, replan_failed_tasks
+    from .accuracy import classify_output
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -23,6 +24,7 @@ except ImportError:  # Direct script execution from mvp/
     from llm import OpenAICompatibleLLM, LLMConfigurationError
     from research import run_live_research, research_environment_status
     from planning import plan_project, replan_failed_tasks
+    from accuracy import classify_output
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -258,7 +260,26 @@ class Handler(BaseHTTPRequestHandler):
             )
             if report["status"] == "completed" and report.get("recommendation"):
                 MEMORY.record_decision(goal, report["recommendation"], report.get("options", []))
-            self._json({"ok": True, "planning": planning, "report": report, "memory": {
+            task_rows = report.get("tasks", tasks)
+            trust_counts = {}
+            for task in task_rows:
+                execution = task.get("execution") or {}
+                metadata = execution.get("metadata") or {}
+                level = metadata.get("trust_level")
+                if not level:
+                    level = "simulated" if execution.get("simulated", True) else "tool_output_unverified"
+                trust_counts[level] = trust_counts.get(level, 0) + 1
+            unverified_count = sum(
+                count for level, count in trust_counts.items()
+                if level != "quality_gated_source"
+            )
+            accuracy = {
+                "trust_counts": trust_counts,
+                "unverified_task_outputs": unverified_count,
+                "factual_decision_authorized": False,
+                "note": "Task completion is not proof of factual correctness. LLM and tool outputs require independent evidence checks; this endpoint does not authorize consequential business decisions.",
+            }
+            self._json({"ok": True, "planning": planning, "report": report, "accuracy": accuracy, "memory": {
                 "decision_count": len(MEMORY.decisions),
                 "lesson_count": len(MEMORY.lessons),
                 "preference_count": len(MEMORY.preferences),
