@@ -11,6 +11,7 @@ from pathlib import Path
 from run import WORKERS, evaluate, run_worker
 from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
 from executor import SimulatedWorkerExecutor
+from research import run_live_research, research_environment_status
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -90,6 +91,9 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 self._json(dict(STATE))
             return
+        if self.path == "/api/research/status":
+            self._json(research_environment_status())
+            return
         if self.path in ("/", "/index.html"):
             data = (ROOT / "dashboard.html").read_bytes()
             self.send_response(200)
@@ -101,8 +105,20 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous"):
+        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research"):
             self.send_error(404)
+            return
+        if self.path == "/api/research":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            query = str(body.get("query", body.get("goal", ""))).strip()
+            try:
+                limit = max(1, min(int(body.get("limit", 5)), 10))
+            except (TypeError, ValueError):
+                limit = 5
+            result = run_live_research(query, limit)
+            code = 400 if result.get("status") == "invalid_request" else 200
+            self._json(result, code)
             return
         if self.path == "/api/autonomous":
             length = int(self.headers.get("Content-Length", "0"))
