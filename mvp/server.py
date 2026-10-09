@@ -18,6 +18,7 @@ try:
     from .research import run_live_research, research_environment_status
     from .planning import plan_project, replan_failed_tasks, validate_plan
     from .accuracy import classify_output
+    from .experience_design import create_design_brief
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -26,6 +27,7 @@ except ImportError:  # Direct script execution from mvp/
     from research import run_live_research, research_environment_status
     from planning import plan_project, replan_failed_tasks, validate_plan
     from accuracy import classify_output
+    from experience_design import create_design_brief
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -297,8 +299,38 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research"):
+        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design"):
             self.send_error(404)
+            return
+        if self.path == "/api/experience-design":
+            body = self._read_json(max_bytes=65536)
+            if body is None:
+                return
+            source_game = body.get("source_game", "塞尔达传说：王国之泪")
+            concept_name = body.get("concept_name", "潮痕档案馆")
+            if not isinstance(source_game, str) or not isinstance(concept_name, str):
+                self._json({"ok": False, "error": "source_game and concept_name must be strings."}, 400)
+                return
+            if len(source_game) > 160 or len(concept_name) > 160:
+                self._json({"ok": False, "error": "source_game and concept_name must be at most 160 characters."}, 400)
+                return
+            llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+            try:
+                brief = create_design_brief(source_game, concept_name, llm_client)
+            except (ValueError, RuntimeError, OSError) as exc:
+                self._json({"ok": False, "error": "Design brief generation failed: " + type(exc).__name__}, 502)
+                return
+            self._json({
+                "ok": True,
+                "brief": brief,
+                "trust": {
+                    "generation_mode": brief.get("generation", {}).get("mode", "unknown"),
+                    "model_output_is_verified_research": False,
+                    "player_perspectives_are_hypotheses": True,
+                    "market_validated": False,
+                    "playtested": False,
+                },
+            })
             return
         if self.path == "/api/research":
             body = self._read_json()
