@@ -108,3 +108,21 @@ worker adapter is deliberately configured.
 The Dashboard invokes the evaluation function with `demo_mode=True` so a user can exercise the prototype handoff in a clearly labeled demo. When all findings are simulated, the decision is `DEMO_GO_TO_PROTOTYPE`, and the prototype endpoint labels the handoff as demo-only. This is not a real business approval. Calls to `evaluate()` default to strict evidence mode and keep simulated-only findings at `HOLD_FOR_EVIDENCE`; only source-backed non-simulated evidence can yield `GO_TO_PROTOTYPE`.
 
 The canonical autonomous project loop is `mvp/twin.py`. The duplicate `mvp/autonomous.py` has been removed, and its tests now exercise the canonical implementation. `.gitignore` excludes local environment files, Python caches, and local data; `pyproject.toml` declares Python 3.12+ and the optional pytest development dependency.
+
+
+## Configurable LLM Worker runtime (v0.8 foundation)
+
+The autonomous project loop can use an OpenAI-compatible chat-completions endpoint for task execution. Configure these environment variables before starting the server:
+
+```bash
+export JARVIS_LLM_BASE_URL="https://your-llm-provider.example/v1"
+export JARVIS_LLM_API_KEY="your-api-key"
+export JARVIS_LLM_MODEL="your-model-name"
+python -m mvp.server
+```
+
+The adapter expects `POST {JARVIS_LLM_BASE_URL}/chat/completions` (or a base URL already ending in `/chat/completions`) and a response with `choices[0].message.content`. The endpoint must use HTTPS. Keep keys in environment variables or a secret manager; never commit them.
+
+Check `GET /api/llm/status` to see whether the server started in `llm` or `simulated` mode. If the required variables are absent or configuration is invalid, the server stays in explicitly reported simulated mode. The LLM executor returns auditable task outputs, but it does not browse the web, verify claims, or create source-backed evidence. Do not treat a model response as a verified research finding or a business approval.
+
+The default Dashboard research pipeline remains separate: configure `JARVIS_SEARCH_ENDPOINT` to use the JSON search adapter. LLM execution and live search are distinct integrations and must both be configured to provide a real research-and-synthesis workflow.
