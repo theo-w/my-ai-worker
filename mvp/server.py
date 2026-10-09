@@ -288,8 +288,9 @@ class Handler(BaseHTTPRequestHandler):
                     "LLM not configured; autonomous tasks use simulated execution.",
             })
             return
-        if self.path in ("/", "/index.html"):
-            data = (ROOT / "dashboard.html").read_bytes()
+        if self.path in ("/", "/index.html", "/playtest"):
+            page = "loophole.html" if self.path == "/playtest" else "dashboard.html"
+            data = (ROOT / page).read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
