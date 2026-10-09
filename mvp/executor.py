@@ -106,6 +106,11 @@ class LLMWorkerExecutor:
         )
         if not isinstance(output, str) or not output.strip():
             raise ValueError("LLM returned no usable output for task: " + task_id)
+        try:
+            from .accuracy import classify_output
+        except ImportError:
+            from accuracy import classify_output
+        trust = classify_output("llm")
         return WorkerExecutionResult(
             task_id=task_id,
             capability=capability,
@@ -118,5 +123,6 @@ class LLMWorkerExecutor:
                 "model": getattr(self.client, "model", "configured"),
                 "external_tools_used": False,
                 "output_is_verified_evidence": False,
+                **trust,
             },
         )
