@@ -34,6 +34,16 @@
  <div id="researchResult" class="sub" style="margin-top:12px">真实搜索需要配置 JARVIS_SEARCH_ENDPOINT；LLM 综合需要另外配置模型环境变量。未配置时会明确显示不可用状态。</div>
 </div>
 
+<div class="panel wide" style="margin-top:14px">
+ <div class="section-title"><span>Game Experience Lab · Reference Game → Original Concept</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
+ <div class="input">
+  <input id="sourceGame" value="塞尔达传说：王国之泪" aria-label="Reference game">
+  <input id="conceptName" value="潮痕档案馆" aria-label="New game concept name">
+  <button id="designRun" class="btn">生成游戏创意</button>
+ </div>
+ <div id="designResult" class="sub" style="margin-top:12px">分析体验机制、迁移设计原则、生成原创概念、多视角玩家假设与最小原型验证计划。未配置 LLM 时会返回明确标记的模板方案。</div>
+</div>
+
 <div class="grid">
  <div class="panel">
   <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
@@ -129,6 +139,35 @@ document.getElementById("researchRun").onclick=async function(){
    (llm.text?'<div class="outcome" style="margin-top:10px;white-space:pre-wrap">'+esc(llm.text)+'</div>':"")+
    (sources||'<div class="sub">No source results returned. Check provider configuration and API response.</div>');
  }catch(e){out.textContent="Research request failed: "+e.name;}
+ finally{button.disabled=false;}
+};
+document.getElementById("designRun").onclick=async function(){
+ const button=document.getElementById("designRun");
+ const out=document.getElementById("designResult");
+ button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
+ try{
+  const response=await fetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
+  const result=await response.json();
+  if(!response.ok||!result.ok){out.textContent="生成失败："+(result.error||response.status);return;}
+  const b=result.brief||{}, concept=b.original_concept||{}, trust=result.trust||{};
+  const list=(items,fn)=>'<ul>'+((items||[]).map(fn).join(""))+'</ul>';
+  const perspectives=list(b.player_perspectives,p=>'<li><b>'+esc(p.segment||"玩家视角")+'</b>：可能吸引 '+esc(p.likely_attraction||"未说明")+'；潜在排斥 '+esc(p.possible_rejection||"未说明")+'。<div class="sub">验证问题：'+esc(p.validation_question||"待定义")+'</div></li>');
+  const hypotheses=list(b.falsifiable_hypotheses,h=>'<li><b>'+esc(h.hypothesis||"假设")+'</b><div class="sub">失败信号：'+esc(h.failure_signal||"待定义")+'；指标：'+esc(h.metric||"待定义")+'</div></li>');
+  const systems=list(concept.core_systems,s=>'<li>'+esc(s)+'</li>');
+  const loop=list(concept.core_loop,s=>'<li>'+esc(s)+'</li>');
+  const principles=list(b.transferable_principles,s=>'<li>'+esc(s)+'</li>');
+  const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
+  const plan=concept.prototype_plan||b.prototype_plan||{};
+  out.innerHTML='<div class="outcome"><div class="kicker">NEW CONCEPT</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"")+'</div><b>生成模式</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div>'+
+  '<h3>从参考游戏提炼的机制</h3>'+mechanisms+
+  '<h3>可迁移原则</h3>'+principles+
+  '<h3>新游戏核心系统</h3>'+systems+
+  '<h3>核心循环</h3>'+loop+
+  '<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+
+  '<h3>可证伪假设</h3>'+hypotheses+
+  '<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+
+  '<div class="sub">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div>';
+ }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
 };
 async function startPrototype(){const r=await fetch("/api/prototype",{method:"POST"});if(r.ok)poll()}
