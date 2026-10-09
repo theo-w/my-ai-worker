@@ -52,6 +52,15 @@ def run_worker(worker: str, capability: str, goal: str) -> list[Evidence]:
 
 
 def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
+    if not evidence:
+        recommendation = "DEMO_GO_TO_PROTOTYPE"
+        demo_fallback = True
+    elif all(item.simulated for item in evidence):
+        recommendation = "HOLD_FOR_EVIDENCE"
+        demo_fallback = False
+    else:
+        recommendation = "GO_TO_PROTOTYPE"
+        demo_fallback = False
     return Decision(
         recommendation=recommendation,
         confidence=78 if recommendation == "GO_TO_PROTOTYPE" else (50 if demo_fallback else 42),
