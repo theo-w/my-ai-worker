@@ -82,7 +82,9 @@ class AutonomousProjectLoop:
 
     def run(self, goal: str, tasks: list[dict], executor,
             options: list[dict] | None = None,
-            requested_actions: list[str] | None = None) -> dict:
+            requested_actions: list[str] | None = None,
+            replanner=None) -> dict:
+        """Run bounded task iterations; an optional replanner can replace failed tasks."""
         options = self.rank_options(options or [])
         gated = sorted(set(requested_actions or []) & self.approval_required_for)
         events = [{"type": "goal_accepted", "goal": goal},
@@ -100,7 +102,8 @@ class AutonomousProjectLoop:
 
         for iteration in range(1, self.max_iterations + 1):
             events.append({"type": "iteration_started", "iteration": iteration})
-            pending = [task for task in tasks if task.get("status", "queued") not in ("completed", "blocked")]
+            pending = [task for task in tasks if task.get("status", "queued")
+                       not in ("completed", "blocked", "superseded")]
             if not pending:
                 break
             for task in pending:
@@ -113,23 +116,45 @@ class AutonomousProjectLoop:
                     task["status"] = "blocked"
                     task["output"] = "Execution failed: " + type(exc).__name__
                 events.append({"type": "task_finished", "task_id": task.get("id"), "status": task["status"]})
-            if all(task.get("status") in ("completed", "blocked") for task in tasks):
+
+            failed = [task for task in tasks if task.get("status") == "blocked"
+                      and not task.get("replan_attempted")]
+            if failed and replanner and iteration < self.max_iterations:
+                try:
+                    replacements = replanner(goal, failed, iteration) or []
+                except Exception as exc:
+                    replacements = []
+                    events.append({"type": "replan_failed", "error": type(exc).__name__})
+                if replacements:
+                    for task in failed:
+                        task["status"] = "superseded"
+                        task["replan_attempted"] = True
+                    tasks.extend(replacements)
+                    events.append({
+                        "type": "plan_revised", "iteration": iteration,
+                        "superseded_task_ids": [task.get("id") for task in failed],
+                        "replacement_task_ids": [task.get("id") for task in replacements],
+                    })
+                    continue
+
+            if all(task.get("status") in ("completed", "blocked", "superseded") for task in tasks):
                 break
             events.append({"type": "plan_re_evaluated", "iteration": iteration})
 
-        completed = sum(task.get("status") == "completed" for task in tasks)
-        blocked = sum(task.get("status") == "blocked" for task in tasks)
-        status = "completed" if completed == len(tasks) else ("blocked" if completed else "failed")
+        active = [task for task in tasks if task.get("status") != "superseded"]
+        completed = sum(task.get("status") == "completed" for task in active)
+        blocked = sum(task.get("status") == "blocked" for task in active)
+        status = "completed" if active and completed == len(active) else ("blocked" if completed else "failed")
         questions = []
         if blocked:
             questions.append("部分任务受阻；请补充缺失输入或批准调整后的计划。")
-        if not tasks:
+        if not active:
             status = "completed"
         events.append({"type": "checkpoint_created", "completed": completed, "blocked": blocked})
         return {
             "goal": goal, "status": status, "completed_tasks": completed,
-            "total_tasks": len(tasks), "options": options,
-            "recommendation": options[0]["name"] if options else None,
+            "total_tasks": len(active), "superseded_tasks": len(tasks) - len(active),
+            "options": options, "recommendation": options[0]["name"] if options else None,
             "questions_for_human": questions, "events": events,
         }
 
