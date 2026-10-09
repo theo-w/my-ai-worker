@@ -148,8 +148,12 @@ def research_environment_status() -> dict:
 def run_live_research(query: str, limit: int = 5) -> dict:
     """Run configured provider, quality-gate results, then synthesize."""
     import os
-    from quality import evaluate_evidence
-    from synthesis import synthesize
+    try:
+        from .quality import evaluate_evidence
+        from .synthesis import synthesize
+    except ImportError:  # Direct-script compatibility
+        from quality import evaluate_evidence
+        from synthesis import synthesize
 
     query = str(query).strip()
     if not query:
