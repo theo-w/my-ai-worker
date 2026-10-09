@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import threading
 import time
@@ -15,7 +16,7 @@ try:
     from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
     from .research import run_live_research, research_environment_status
-    from .planning import plan_project, replan_failed_tasks
+    from .planning import plan_project, replan_failed_tasks, validate_plan
     from .accuracy import classify_output
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
@@ -23,7 +24,7 @@ except ImportError:  # Direct script execution from mvp/
     from executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
     from research import run_live_research, research_environment_status
-    from planning import plan_project, replan_failed_tasks
+    from planning import plan_project, replan_failed_tasks, validate_plan
     from accuracy import classify_output
 
 ROOT = Path(__file__).parent
@@ -147,6 +148,63 @@ def execute(goal: str):
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
 
+def validate_autonomous_request(body: dict) -> dict:
+    """Validate untrusted API fields before planning or execution."""
+    goal = body.get("goal")
+    if not isinstance(goal, str) or not goal.strip():
+        raise ValueError("A project goal is required.")
+    goal = goal.strip()
+    if len(goal) > 2000:
+        raise ValueError("Project goal must be at most 2000 characters.")
+
+    supplied_tasks = body.get("tasks")
+    if supplied_tasks is not None:
+        if not isinstance(supplied_tasks, list) or not supplied_tasks:
+            raise ValueError("tasks must be a non-empty array when supplied.")
+        validated = validate_plan(json.dumps({"tasks": supplied_tasks}, ensure_ascii=False))
+        tasks = validated["tasks"]
+        planning = {"mode": "user_supplied", "warnings": ["User-supplied tasks were schema-validated; execution outputs still require independent verification."]}
+    else:
+        tasks = None
+        planning = None
+
+    options = body.get("options", [])
+    if not isinstance(options, list) or len(options) > 10:
+        raise ValueError("options must be an array containing at most 10 items.")
+    normalized_options = []
+    for item in options:
+        if not isinstance(item, dict):
+            raise ValueError("Each option must be an object.")
+        name = item.get("name")
+        score = item.get("score", 0)
+        if not isinstance(name, str) or not name.strip() or len(name) > 160:
+            raise ValueError("Each option needs a non-empty name under 160 characters.")
+        if isinstance(score, bool):
+            raise ValueError("Option score must be a finite number.")
+        try:
+            score = float(score)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Option score must be a finite number.") from exc
+        if not math.isfinite(score):
+            raise ValueError("Option score must be a finite number.")
+        normalized_options.append({**item, "name": name.strip(), "score": score})
+
+    actions = body.get("requested_actions", [])
+    if not isinstance(actions, list) or len(actions) > 20 or any(
+        not isinstance(action, str) or not action.strip() or len(action) > 100
+        for action in actions
+    ):
+        raise ValueError("requested_actions must be an array of at most 20 non-empty action names.")
+
+    return {
+        "goal": goal,
+        "tasks": tasks,
+        "planning": planning,
+        "options": normalized_options,
+        "requested_actions": [action.strip() for action in actions],
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, payload, code=200):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -228,21 +286,21 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_json()
             if body is None:
                 return
-            goal = str(body.get("goal", "")).strip()
-            if not goal:
-                self._json({"ok": False, "error": "A project goal is required."}, 400)
+            try:
+                request = validate_autonomous_request(body)
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
                 return
+            goal = request["goal"]
             planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else None
-            planning = None
-            supplied_tasks = body.get("tasks")
-            if isinstance(supplied_tasks, list) and supplied_tasks:
-                tasks = supplied_tasks
-                planning = {"mode": "user_supplied", "warnings": []}
+            planning = request["planning"]
+            if request["tasks"] is not None:
+                tasks = request["tasks"]
             else:
                 planning = plan_project(goal, planner_client)
                 tasks = planning["tasks"]
-            options = body.get("options") or []
-            actions = body.get("requested_actions") or []
+            options = request["options"]
+            actions = request["requested_actions"]
             # The default executor is explicitly simulated. A real capability
             # adapter can replace it without changing the project-loop contract.
             def executor(task):
