@@ -145,8 +145,78 @@ def research_environment_status() -> dict:
     }
 
 
+def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
+    """Optional LLM synthesis over accepted, source-backed findings only."""
+    import os
+    if not accepted_items:
+        return {
+            "status": "skipped_no_accepted_evidence",
+            "text": None,
+            "source_urls": [],
+            "message": "LLM synthesis skipped because no evidence passed the quality gate.",
+        }
+    if not all(os.getenv(key, "").strip() for key in (
+        "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"
+    )):
+        return {
+            "status": "not_configured",
+            "text": None,
+            "source_urls": [],
+            "message": "LLM synthesis is not configured; deterministic synthesis is retained.",
+        }
+    try:
+        try:
+            from .llm import OpenAICompatibleLLM
+        except ImportError:
+            from llm import OpenAICompatibleLLM
+        client = OpenAICompatibleLLM.from_environment()
+        rows = []
+        for index, item in enumerate(accepted_items, start=1):
+            source = item.get("source") or {}
+            rows.append({
+                "source_id": "S" + str(index),
+                "title": source.get("title"),
+                "url": source.get("url"),
+                "excerpt": source.get("snippet"),
+                "finding": item.get("finding"),
+                "confidence": item.get("confidence"),
+            })
+        prompt = {
+            "question": query,
+            "accepted_source_backed_findings": rows,
+            "instructions": [
+                "Synthesize only the supplied findings.",
+                "Cite claims using the supplied source IDs (for example [S1]).",
+                "Never invent URLs, citations, data, or facts not present in the input.",
+                "Distinguish evidence from inference and explicitly note gaps or conflicts.",
+                "If the evidence is insufficient, say so instead of guessing.",
+            ],
+        }
+        result = client.complete(
+            "You are a cautious research analyst. Every factual claim must be traceable "
+            "to the supplied source IDs. Do not claim to have browsed or independently "
+            "verified pages; only supplied excerpts have been evaluated.",
+            json.dumps(prompt, ensure_ascii=False),
+        )
+        return {
+            "status": "completed",
+            "text": result,
+            "source_urls": [row["url"] for row in rows],
+            "model": client.model,
+            "message": "LLM synthesis is based only on quality-accepted excerpts; source pages are not independently verified here.",
+        }
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "text": None,
+            "source_urls": [],
+            "error": type(exc).__name__ + ": " + str(exc),
+            "message": "LLM synthesis failed; deterministic synthesis remains available.",
+        }
+
+
 def run_live_research(query: str, limit: int = 5) -> dict:
-    """Run configured provider, quality-gate results, then synthesize."""
+    """Search configured provider, deduplicate, quality-gate and optionally synthesize."""
     import os
     try:
         from .quality import evaluate_evidence
@@ -160,13 +230,55 @@ def run_live_research(query: str, limit: int = 5) -> dict:
         return {"ok": False, "status": "invalid_request", "error": "A research query is required."}
     endpoint = os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip()
     if not endpoint:
-        return {"ok": False, "status": "provider_unconfigured", "message": "No live search provider configured; no real research was performed.", "sources": [], "evidence": [], "quality": evaluate_evidence([]), "synthesis": synthesize(query, []).to_dict()}
+        return {
+            "ok": False, "status": "provider_unconfigured",
+            "message": "No live search provider configured; no real research was performed.",
+            "sources": [], "evidence": [], "quality": evaluate_evidence([]),
+            "synthesis": synthesize(query, []).to_dict(),
+            "llm_synthesis": _synthesize_with_llm(query, []),
+        }
     try:
-        provider = JsonHttpSearchProvider(endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None)
-        sources = provider.search(query, limit)
-        evidence = [{"worker": "Live Research Adapter", "finding": source.snippet, "confidence": 0.75, "simulated": False, "source": source.to_dict()} for source in sources]
+        provider = JsonHttpSearchProvider(
+            endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None
+        )
+        found = provider.search(query, limit)
+        sources = []
+        seen = set()
+        for source in found:
+            normalized_url = source.url.split("#", 1)[0].rstrip("/")
+            if normalized_url in seen:
+                continue
+            seen.add(normalized_url)
+            sources.append(source)
+        evidence = [{
+            "worker": "Live Research Adapter",
+            "finding": source.snippet,
+            "confidence": 0.75,
+            "simulated": False,
+            "source": source.to_dict(),
+        } for source in sources]
         quality = evaluate_evidence(evidence)
-        synthesis = synthesize(query, quality["items"])
-        return {"ok": bool(sources), "status": "completed" if sources else "no_results", "query": query, "sources": [source.to_dict() for source in sources], "evidence": quality["items"], "quality": quality, "synthesis": synthesis.to_dict()}
+        deterministic = synthesize(query, quality["items"])
+        llm_synthesis = _synthesize_with_llm(
+            query, [item for item in quality["items"] if item.get("quality_accepted")]
+        )
+        return {
+            "ok": bool(sources),
+            "status": "completed" if sources else "no_results",
+            "query": query,
+            "sources": [source.to_dict() for source in sources],
+            "evidence": quality["items"],
+            "quality": quality,
+            "synthesis": deterministic.to_dict(),
+            "llm_synthesis": llm_synthesis,
+        }
     except Exception as exc:
-        return {"ok": False, "status": "provider_error", "error": type(exc).__name__ + ": " + str(exc), "query": query, "sources": [], "evidence": [], "quality": evaluate_evidence([]), "synthesis": synthesize(query, []).to_dict()}
+        return {
+            "ok": False,
+            "status": "provider_error",
+            "error": type(exc).__name__ + ": " + str(exc),
+            "query": query,
+            "sources": [], "evidence": [], "quality": evaluate_evidence([]),
+            "synthesis": synthesize(query, []).to_dict(),
+            "llm_synthesis": _synthesize_with_llm(query, []),
+        }
