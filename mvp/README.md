@@ -101,3 +101,10 @@ explicitly; they are not treated as successful research.
 These endpoints are an API integration, not yet a dedicated Dashboard research
 panel. The default autonomous task executor remains simulated until a real
 worker adapter is deliberately configured.
+
+
+## Demo handoff versus evidence-backed decisions
+
+The Dashboard invokes the evaluation function with `demo_mode=True` so a user can exercise the prototype handoff in a clearly labeled demo. When all findings are simulated, the decision is `DEMO_GO_TO_PROTOTYPE`, and the prototype endpoint labels the handoff as demo-only. This is not a real business approval. Calls to `evaluate()` default to strict evidence mode and keep simulated-only findings at `HOLD_FOR_EVIDENCE`; only source-backed non-simulated evidence can yield `GO_TO_PROTOTYPE`.
+
+The canonical autonomous project loop is `mvp/twin.py`. The duplicate `mvp/autonomous.py` has been removed, and its tests now exercise the canonical implementation. `.gitignore` excludes local environment files, Python caches, and local data; `pyproject.toml` declares Python 3.12+ and the optional pytest development dependency.
