@@ -126,3 +126,19 @@ The adapter expects `POST {JARVIS_LLM_BASE_URL}/chat/completions` (or a base URL
 Check `GET /api/llm/status` to see whether the server started in `llm` or `simulated` mode. If the required variables are absent or configuration is invalid, the server stays in explicitly reported simulated mode. The LLM executor returns auditable task outputs, but it does not browse the web, verify claims, or create source-backed evidence. Do not treat a model response as a verified research finding or a business approval.
 
 The default Dashboard research pipeline remains separate: configure `JARVIS_SEARCH_ENDPOINT` to use the JSON search adapter. LLM execution and live search are distinct integrations and must both be configured to provide a real research-and-synthesis workflow.
+
+
+### Dashboard research workflow
+
+The local Dashboard now includes a research panel wired to `POST /api/research`. It displays provider status, returned source links, evidence quality counts, deterministic baseline synthesis, and the optional LLM synthesis result. It does not fabricate results when the search provider is absent or fails.
+
+Configure a search service that implements the documented JSON HTTP contract:
+
+```bash
+export JARVIS_SEARCH_ENDPOINT="https://your-search-provider.example/search"
+export JARVIS_SEARCH_API_KEY="your-search-api-key" # if required by your provider
+```
+
+The endpoint is called with `?q=<query>&limit=<n>` and should return either a JSON list or an object containing `results`. Each result should include `title`, an HTTPS `url`, and a `snippet` (or `description`). Provider-specific authentication and schema translation belong in the adapter. The Dashboard status indicators are configuration checks, not proof that credentials or the remote service are valid; run a research request to verify the integration.
+
+When both search and LLM are configured, JARVIS deduplicates returned URLs and sends only quality-accepted source excerpts to LLM synthesis. The synthesis must cite supplied source IDs and may not invent links. This pipeline validates the supplied excerpts and URL shape, not the truth of the full pages; human review and stronger source verification remain necessary before high-impact decisions.
