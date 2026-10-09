@@ -15,14 +15,14 @@ try:
     from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
     from .research import run_live_research, research_environment_status
-    from .planning import plan_project
+    from .planning import plan_project, replan_failed_tasks
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
     from research import run_live_research, research_environment_status
-    from planning import plan_project
+    from planning import plan_project, replan_failed_tasks
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -230,13 +230,13 @@ class Handler(BaseHTTPRequestHandler):
             if not goal:
                 self._json({"ok": False, "error": "A project goal is required."}, 400)
                 return
+            planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else None
             planning = None
             supplied_tasks = body.get("tasks")
             if isinstance(supplied_tasks, list) and supplied_tasks:
                 tasks = supplied_tasks
                 planning = {"mode": "user_supplied", "warnings": []}
             else:
-                planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else None
                 planning = plan_project(goal, planner_client)
                 tasks = planning["tasks"]
             options = body.get("options") or []
@@ -247,7 +247,15 @@ class Handler(BaseHTTPRequestHandler):
                 result = WORKER_EXECUTOR.execute(task, goal)
                 task["execution"] = result.to_dict()
                 return result.output
-            report = PROJECT_LOOP.run(goal, tasks, executor, options, actions)
+            def replanner(replan_goal, failed_tasks, iteration):
+                existing_ids = {str(task.get("id")) for task in tasks}
+                return replan_failed_tasks(
+                    replan_goal, failed_tasks, iteration, planner_client, existing_ids
+                )
+            report = PROJECT_LOOP.run(
+                goal, tasks, executor, options, actions,
+                replanner=replanner if planner_client is not None else None,
+            )
             if report["status"] == "completed" and report.get("recommendation"):
                 MEMORY.record_decision(goal, report["recommendation"], report.get("options", []))
             self._json({"ok": True, "planning": planning, "report": report, "memory": {
