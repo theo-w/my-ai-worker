@@ -92,7 +92,7 @@ function render(){
  const d=state.decision;
  document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待数字分身完成判断…';
  const p=state.prototype;
- document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">Business decision 已转化为可执行的下一阶段工作。</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&d.recommendation==="GO_TO_PROTOTYPE"?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
+ document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
 }
 async function poll(){try{const r=await fetch("/api/state");state=await r.json();render()}catch(e){}}
 document.getElementById("run").onclick=async()=>{const b=document.getElementById("run");b.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});b.disabled=false};
