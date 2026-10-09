@@ -87,3 +87,42 @@ def test_demo_mode_allows_labeled_handoff_without_real_evidence():
     decision = evaluate("AI RPG", evidence, demo_mode=True)
     assert decision.recommendation == "DEMO_GO_TO_PROTOTYPE"
     assert "demo only" in decision.next_step.lower()
+
+
+def test_dashboard_executor_does_not_turn_llm_output_into_evidence():
+    from mvp import server
+    from mvp.executor import LLMWorkerExecutor, WorkerExecutionResult
+
+    class FakeLLM:
+        model = "fake-test-model"
+        def complete(self, system_prompt, user_prompt):
+            return "LLM analysis artifact; not verified evidence."
+
+    original = server.WORKER_EXECUTOR
+    try:
+        server.WORKER_EXECUTOR = LLMWorkerExecutor(FakeLLM())
+        server.reset("Test an AI-native game")
+        server.execute("Test an AI-native game")
+        assert server.STATE["phase"] == "decision"
+        assert all(a["status"] == "completed" for a in server.STATE["agents"])
+        assert all("LLM analysis artifact" in a["output"] for a in server.STATE["agents"])
+        assert server.STATE["evidence"] == []
+        assert server.STATE["decision"]["recommendation"] == "HOLD_FOR_EVIDENCE"
+    finally:
+        server.WORKER_EXECUTOR = original
+
+
+def test_dashboard_simulated_executor_is_explicit_demo_mode():
+    from mvp import server
+    from mvp.executor import SimulatedWorkerExecutor
+
+    original = server.WORKER_EXECUTOR
+    try:
+        server.WORKER_EXECUTOR = SimulatedWorkerExecutor()
+        server.reset("Evaluate an AI-native game")
+        server.execute("Evaluate an AI-native game")
+        assert server.STATE["phase"] == "decision"
+        assert server.STATE["decision"]["recommendation"] == "DEMO_GO_TO_PROTOTYPE"
+        assert all(a.get("execution", {}).get("simulated") is True for a in server.STATE["agents"])
+    finally:
+        server.WORKER_EXECUTOR = original
