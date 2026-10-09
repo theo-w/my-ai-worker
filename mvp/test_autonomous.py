@@ -3,7 +3,7 @@ import json
 from mvp.autonomous import (
     ApprovalPolicy, AutonomousProjectLoop, DecisionOption, ProjectStatus, ProjectTask,
 )
-from mvp.memory import TwinMemory
+from mvp.memory import TwinMemory, DecisionRecord
 
 
 def test_loop_executes_tasks_and_compares_options():
@@ -34,13 +34,18 @@ def test_sensitive_action_pauses_for_approval():
     assert report.questions_for_human
 
 
-def test_twin_memory_persists_preferences_decisions_and_lessons(tmp_path):
+def test_twin_memory_persists_decisions_and_lessons(tmp_path):
     path = tmp_path / "memory.json"
     memory = TwinMemory(path=str(path))
-    memory.remember_preference("decision_style", "evidence_first")
-    memory.record_decision("Validate product", "Prototype", [{"name": "A"}])
-    memory.record_lesson("Test retention before scaling", "prototype")
+    memory.remember("decision_style=evidence_first", kind="preference")
+    memory.record_decision(DecisionRecord(
+        goal="Validate product",
+        recommendation="Prototype",
+        confidence=70,
+        rationale="Test demand cheaply",
+    ))
+    memory.remember("Test retention before scaling", kind="lesson")
     loaded = TwinMemory(path=str(path))
-    assert loaded.preferences["decision_style"] == "evidence_first"
-    assert loaded.decisions[0]["recommendation"] == "Prototype"
-    assert loaded.lessons[0]["lesson"].startswith("Test retention")
+    assert loaded.recall("decision_style")[0].content == "decision_style=evidence_first"
+    assert loaded.recent_decisions()[0].recommendation == "Prototype"
+    assert "retention" in loaded.recall("retention")[0].content
