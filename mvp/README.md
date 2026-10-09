@@ -157,3 +157,32 @@ JARVIS separates language-model reasoning from deterministic controls and extern
 `mvp/accuracy.py` provides explicit trust labels, conservative HTTPS source-record checks, and a fail-closed evidence decision helper. The helper is not a replacement for domain-specific review and must be integrated into each consequential decision path before production use.
 
 Recommended validation layers for any new capability: (1) unit tests for rules, (2) contract tests for provider responses, (3) adversarial/invalid-output tests for LLM results, (4) integration tests with mocked external services, (5) controlled real-provider smoke tests, and (6) human review of sampled outputs. Track factual error rate, unsupported-claim rate, source citation precision, task success rate, and escalation rate separately; do not use model self-confidence as a correctness metric.
+
+## Hybrid Worker Executor and trust boundaries
+
+When a search endpoint and/or LLM credentials are configured, the server uses
+a capability-aware executor router. It does not treat an LLM response as proof
+that a research task actually searched the web.
+
+- Research capabilities require `JARVIS_SEARCH_ENDPOINT`. If it is missing,
+  research tasks are blocked rather than silently answered by the LLM.
+- Analysis/design tasks require the configured OpenAI-compatible LLM. If it is
+  missing in hybrid mode, those tasks are blocked rather than reported complete.
+- A research task is only considered completed when at least one result passes
+  the mechanical evidence-quality gate. That gate checks provenance structure,
+  excerpts and confidence thresholds; it does **not** prove that a source is
+  truthful or semantically supports every claim.
+- LLM-generated content is labeled as unverified. Search snippets are also not
+  automatically treated as verified truth.
+- Code implementation and test execution are not yet wired to a real sandbox
+  or test-runner adapter. The executor status endpoint reports these gaps.
+
+Check the current capability configuration at:
+
+```
+GET /api/executor/status
+```
+
+The response reports the executor mode, whether search/LLM are configured,
+which capabilities are available, and explicit trust-policy flags. Never place
+API keys in source control; configure them in the runtime environment.
