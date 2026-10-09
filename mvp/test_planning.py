@@ -66,3 +66,21 @@ def test_autonomous_api_returns_planning_provenance():
         assert report["status"] == "completed"
     finally:
         server.WORKER_EXECUTOR = original
+def test_failed_task_replanning_returns_only_valid_new_task_ids():
+    from mvp.planning import replan_failed_tasks
+    class FakeLLM:
+        def complete(self, system_prompt, user_prompt):
+            return json.dumps({"tasks": [{"id": "alternate_research", "title": "Use a different evidence source", "capability": "research"}]})
+    tasks = replan_failed_tasks("Assess the market", [{"id": "research", "title": "Search web", "output": "Execution failed: TimeoutError"}], 1, FakeLLM(), {"research", "analysis"})
+    assert len(tasks) == 1
+    assert tasks[0]["id"] == "alternate_research"
+    assert tasks[0]["status"] == "queued"
+
+def test_failed_task_replanning_rejects_existing_ids_and_has_safe_fallback():
+    from mvp.planning import replan_failed_tasks
+    class DuplicateLLM:
+        def complete(self, system_prompt, user_prompt):
+            return json.dumps({"tasks": [{"id": "research", "title": "Repeat failed search", "capability": "research"}]})
+    result = replan_failed_tasks("Assess the market", [{"id": "research", "output": "failed"}], 1, DuplicateLLM(), {"research"})
+    assert result == []
+    assert replan_failed_tasks("Assess the market", [{"id": "research"}], 1, None, {"research"}) == []
