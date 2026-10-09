@@ -151,11 +151,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/prototype":
             with LOCK:
-                if not STATE["decision"] or STATE["decision"]["recommendation"] != "GO_TO_PROTOTYPE":
-                    self._json({"ok": False, "error": "Prototype requires a GO_TO_PROTOTYPE decision."}, 409)
+                if not STATE["decision"] or STATE["decision"]["recommendation"] not in {"GO_TO_PROTOTYPE", "DEMO_GO_TO_PROTOTYPE"}:
+                    self._json({"ok": False, "error": "Prototype requires a GO_TO_PROTOTYPE or DEMO_GO_TO_PROTOTYPE decision."}, 409)
                     return
+                demo_mode = STATE["decision"]["recommendation"] == "DEMO_GO_TO_PROTOTYPE"
                 STATE["prototype"] = {
                     "status": "planned",
+                    "mode": "demo" if demo_mode else "evidence-backed",
+                    "notice": "Demo handoff only; simulated evidence is not a business approval." if demo_mode else "Evidence-backed prototype handoff.",
                     "name": "AI Game Prototype Sprint",
                     "steps": [
                         "Define business success criteria",
