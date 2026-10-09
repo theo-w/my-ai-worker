@@ -10,12 +10,14 @@ from pathlib import Path
 
 from run import WORKERS, evaluate, run_worker
 from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
+from executor import SimulatedWorkerExecutor
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
 PROJECT_LOOP = AutonomousProjectLoop()
+WORKER_EXECUTOR = SimulatedWorkerExecutor()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
@@ -116,10 +118,12 @@ class Handler(BaseHTTPRequestHandler):
             ]
             options = body.get("options") or []
             actions = body.get("requested_actions") or []
-            # The executor contract is intentionally explicit: this MVP does not
-            # pretend to perform external research or tool calls.
+            # The default executor is explicitly simulated. A real capability
+            # adapter can replace it without changing the project-loop contract.
             def executor(task):
-                return "Simulated execution only; connect a real worker/tool adapter to perform this task."
+                result = WORKER_EXECUTOR.execute(task, goal)
+                task["execution"] = result.to_dict()
+                return result.output
             report = PROJECT_LOOP.run(goal, tasks, executor, options, actions)
             if report["status"] == "completed" and report.get("recommendation"):
                 MEMORY.record_decision(goal, report["recommendation"], report.get("options", []))
