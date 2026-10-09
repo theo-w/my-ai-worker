@@ -3,22 +3,42 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from run import WORKERS, evaluate, run_worker
-from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
-from executor import SimulatedWorkerExecutor
-from research import run_live_research, research_environment_status
+try:
+    from .run import WORKERS, evaluate, run_worker
+    from .twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
+    from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor
+    from .llm import OpenAICompatibleLLM, LLMConfigurationError
+    from .research import run_live_research, research_environment_status
+except ImportError:  # Direct script execution from mvp/
+    from run import WORKERS, evaluate, run_worker
+    from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
+    from executor import SimulatedWorkerExecutor, LLMWorkerExecutor
+    from llm import OpenAICompatibleLLM, LLMConfigurationError
+    from research import run_live_research, research_environment_status
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
 PROJECT_LOOP = AutonomousProjectLoop()
-WORKER_EXECUTOR = SimulatedWorkerExecutor()
+def _build_worker_executor():
+    if all(os.getenv(key, "").strip() for key in (
+        "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"
+    )):
+        try:
+            return LLMWorkerExecutor(OpenAICompatibleLLM.from_environment())
+        except (ValueError, LLMConfigurationError):
+            return SimulatedWorkerExecutor()
+    return SimulatedWorkerExecutor()
+
+
+WORKER_EXECUTOR = _build_worker_executor()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
@@ -115,6 +135,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/research/status":
             self._json(research_environment_status())
+            return
+        if self.path == "/api/llm/status":
+            configured = isinstance(WORKER_EXECUTOR, LLMWorkerExecutor)
+            self._json({
+                "configured": configured,
+                "mode": "llm" if configured else "simulated",
+                "model": getattr(getattr(WORKER_EXECUTOR, "client", None), "model", None),
+                "message": "LLM worker configured; outputs are not independently verified evidence."
+                    if configured else
+                    "LLM not configured; autonomous tasks use simulated execution.",
+            })
             return
         if self.path in ("/", "/index.html"):
             data = (ROOT / "dashboard.html").read_bytes()
