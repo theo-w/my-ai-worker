@@ -2,7 +2,7 @@
 from __future__ import annotations
 import re
 
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+_SENTENCE_SPLIT = re.compile(r"(?<=[。！？])|(?<=[.!?])\s+|\n+")
 _CITATION = re.compile(r"\[(S\d+)\]")
 
 def audit_synthesis(text: str, sources: list[dict]) -> dict:
