@@ -87,3 +87,17 @@ as a Bearer token. Never commit API keys to the repository.
 This is the provider adapter and its test contract, not a claim that live
 research is already enabled in the dashboard. Without a configured provider,
 the adapter reports that live research is unavailable and returns no sources.
+
+
+## Live research API
+
+The local server exposes `GET /api/research/status` to check whether
+`JARVIS_SEARCH_ENDPOINT` is configured, and `POST /api/research` with JSON
+`{"query":"AI native games","limit":5}` to run the configured search provider.
+The response includes source records, evidence-quality decisions, and a
+deterministic synthesis. Provider failures and unconfigured state are returned
+explicitly; they are not treated as successful research.
+
+These endpoints are an API integration, not yet a dedicated Dashboard research
+panel. The default autonomous task executor remains simulated until a real
+worker adapter is deliberately configured.
