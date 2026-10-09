@@ -155,6 +155,7 @@ class AutonomousProjectLoop:
             "goal": goal, "status": status, "completed_tasks": completed,
             "total_tasks": len(active), "superseded_tasks": len(tasks) - len(active),
             "options": options, "recommendation": options[0]["name"] if options else None,
+            "tasks": tasks,
             "questions_for_human": questions, "events": events,
         }
 
