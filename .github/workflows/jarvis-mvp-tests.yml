@@ -1,0 +1,27 @@
+name: JARVIS MVP tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feat/v0.5-game-validation-mvp
+  push:
+    branches:
+      - feat/autonomous-twin-project-loop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run MVP tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q mvp
+      - name: Compile Python modules
+        run: python -m compileall -q mvp
