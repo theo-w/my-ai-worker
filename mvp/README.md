@@ -142,3 +142,18 @@ export JARVIS_SEARCH_API_KEY="your-search-api-key" # if required by your provide
 The endpoint is called with `?q=<query>&limit=<n>` and should return either a JSON list or an object containing `results`. Each result should include `title`, an HTTPS `url`, and a `snippet` (or `description`). Provider-specific authentication and schema translation belong in the adapter. The Dashboard status indicators are configuration checks, not proof that credentials or the remote service are valid; run a research request to verify the integration.
 
 When both search and LLM are configured, JARVIS deduplicates returned URLs and sends only quality-accepted source excerpts to LLM synthesis. The synthesis must cite supplied source IDs and may not invent links. This pipeline validates the supplied excerpts and URL shape, not the truth of the full pages; human review and stronger source verification remain necessary before high-impact decisions.
+
+
+## Accuracy and trust policy
+
+JARVIS separates language-model reasoning from deterministic controls and external-tool execution:
+
+- **LLM**: proposes plans, summarizes supplied material, drafts options, and explains uncertainty. Its text is marked `model_generated_unverified` and is never automatically treated as factual evidence.
+- **Rules/code**: validate schemas, allowed capabilities, task limits, approval boundaries, and decision state transitions. These controls are deterministic when correctly implemented, but still require tests and code review.
+- **External tools**: provide traceable outputs such as search results or test logs. Traceability does not guarantee freshness, completeness, or truth.
+- **Evidence gate**: checks source structure, excerpts, confidence thresholds, and simulated status. Passing the gate means the configured mechanical checks passed; it is not proof that a claim is true.
+- **Human review**: remains required for high-impact decisions and actions covered by approval policy.
+
+`mvp/accuracy.py` provides explicit trust labels, conservative HTTPS source-record checks, and a fail-closed evidence decision helper. The helper is not a replacement for domain-specific review and must be integrated into each consequential decision path before production use.
+
+Recommended validation layers for any new capability: (1) unit tests for rules, (2) contract tests for provider responses, (3) adversarial/invalid-output tests for LLM results, (4) integration tests with mocked external services, (5) controlled real-provider smoke tests, and (6) human review of sampled outputs. Track factual error rate, unsupported-claim rate, source citation precision, task success rate, and escalation rate separately; do not use model self-confidence as a correctness metric.
