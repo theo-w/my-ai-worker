@@ -84,3 +84,32 @@ def test_failed_task_replanning_rejects_existing_ids_and_has_safe_fallback():
     result = replan_failed_tasks("Assess the market", [{"id": "research", "output": "failed"}], 1, DuplicateLLM(), {"research"})
     assert result == []
     assert replan_failed_tasks("Assess the market", [{"id": "research"}], 1, None, {"research"}) == []
+
+def test_autonomous_request_validation_rejects_malformed_fields():
+    from mvp.server import validate_autonomous_request
+    invalid_requests = [
+        {},
+        {"goal": "x" * 2001},
+        {"goal": "valid", "tasks": []},
+        {"goal": "valid", "tasks": [{"id": "x", "title": "Run arbitrary shell", "capability": "shell"}]},
+        {"goal": "valid", "options": [{"name": "A", "score": float("nan")}]},
+        {"goal": "valid", "options": "not-an-array"},
+        {"goal": "valid", "requested_actions": "production_release"},
+    ]
+    for body in invalid_requests:
+        with pytest.raises(ValueError):
+            validate_autonomous_request(body)
+
+
+def test_autonomous_request_validation_normalizes_valid_payload():
+    from mvp.server import validate_autonomous_request
+    request = validate_autonomous_request({
+        "goal": "  Evaluate a game concept  ",
+        "tasks": [{"id": "research", "title": "Collect evidence", "capability": "research"}],
+        "options": [{"name": "Prototype", "score": 2}],
+        "requested_actions": ["production_release"],
+    })
+    assert request["goal"] == "Evaluate a game concept"
+    assert request["tasks"][0]["id"] == "research"
+    assert request["options"][0]["score"] == 2.0
+    assert request["requested_actions"] == ["production_release"]
