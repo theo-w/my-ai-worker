@@ -70,3 +70,33 @@ def test_twin_memory_survives_reload(tmp_path):
     assert restored.preferences["decision_style"] == "evidence_first"
     assert restored.decisions[0]["recommendation"] == "Lean prototype"
     assert "Validate demand" in restored.lessons[0]["lesson"]
+
+
+
+def test_replanner_replaces_failed_task_and_completes():
+    tasks = [{"id": "research", "title": "Search web", "status": "queued"}]
+    attempts = []
+
+    def executor(task):
+        attempts.append(task["id"])
+        if task["id"] == "research":
+            raise RuntimeError("search unavailable")
+        return "source-backed research artifact"
+
+    def replanner(goal, failed_tasks, iteration):
+        assert goal == "Find market evidence"
+        assert failed_tasks[0]["id"] == "research"
+        return [{
+            "id": "manual_research_fallback",
+            "title": "Use an alternate evidence source",
+            "status": "queued",
+        }]
+
+    report = AutonomousProjectLoop(max_iterations=3).run(
+        "Find market evidence", tasks, executor, replanner=replanner
+    )
+    assert report["status"] == "completed"
+    assert report["completed_tasks"] == 1
+    assert report["superseded_tasks"] == 1
+    assert attempts == ["research", "manual_research_fallback"]
+    assert any(event["type"] == "plan_revised" for event in report["events"])
