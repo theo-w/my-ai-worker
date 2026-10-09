@@ -1,37 +1,36 @@
-import json
-
-from mvp.autonomous import (
-    ApprovalPolicy, AutonomousProjectLoop, DecisionOption, ProjectStatus, ProjectTask,
-)
+from mvp.twin import AutonomousProjectLoop
 from mvp.memory import TwinMemory, DecisionRecord
 
 
 def test_loop_executes_tasks_and_compares_options():
-    tasks = [ProjectTask("t1", "Research", "research"),
-             ProjectTask("t2", "Synthesize", "analysis")]
-    options = [DecisionOption("A", "Fast prototype", score=0.8),
-               DecisionOption("B", "Broader research", score=0.6)]
+    tasks = [
+        {"id": "t1", "title": "Research", "status": "queued"},
+        {"id": "t2", "title": "Synthesize", "status": "queued"},
+    ]
     report = AutonomousProjectLoop().run(
         "Validate an AI-native game",
         tasks,
-        lambda task: f"done: {task.title}",
-        options,
+        lambda task: "done: " + task["title"],
+        options=[
+            {"name": "A", "summary": "Fast prototype", "score": 0.8},
+            {"name": "B", "summary": "Broader research", "score": 0.6},
+        ],
     )
-    assert report.status == ProjectStatus.COMPLETED.value
-    assert report.completed_tasks == 2
-    assert report.recommendation.startswith("Recommend A")
-    assert any("Execution iteration" in event for event in report.events)
+    assert report["status"] == "completed"
+    assert report["completed_tasks"] == 2
+    assert report["recommendation"] == "A"
+    assert any(event["type"] == "iteration_started" for event in report["events"])
 
 
 def test_sensitive_action_pauses_for_approval():
-    task = ProjectTask("t1", "Publish", "publishing")
+    task = {"id": "t1", "title": "Publish", "status": "queued"}
     report = AutonomousProjectLoop().run(
         "Launch product", [task], lambda _: "published",
         requested_actions=["external_publication"],
     )
-    assert report.status == ProjectStatus.NEEDS_APPROVAL.value
-    assert task.status == "queued"
-    assert report.questions_for_human
+    assert report["status"] == "needs_approval"
+    assert task["status"] == "queued"
+    assert report["questions_for_human"]
 
 
 def test_twin_memory_persists_decisions_and_lessons(tmp_path):
