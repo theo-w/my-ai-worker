@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS Playtest · 潮痕档案馆</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--line:#2c3e59;--text:#edf4ff;--muted:#9aabc4;--accent:#75ddff;--good:#7ee2ad;--warn:#ffd17a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"PingFang SC",sans-serif}.wrap{max-width:1100px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.tag{font-size:11px;color:var(--accent);letter-spacing:.12em}.layout{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-top:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}.wide{grid-column:1/-1}h1{font-size:25px;margin:5px 0}h2{font-size:16px;margin:0 0 10px}.muted{color:var(--muted);font-size:12px}.room{height:210px;border-radius:10px;background:linear-gradient(180deg,#182b47 0%,#253b52 55%,#25536a 56%,#14283c 100%);position:relative;overflow:hidden;border:1px solid #34516d}.warehouse{position:absolute;left:27%;top:20px;width:47%;height:150px;background:#584b42;border:5px solid #91765a;clip-path:polygon(8% 0,92% 0,100% 100%,0 100%)}.door{position:absolute;left:43%;top:66px;width:16%;height:105px;background:#2b201e;border:4px solid #b48c61}.water{position:absolute;left:0;right:0;bottom:0;height:44%;background:#287b9c99;border-top:2px solid #80d9ef}.itemrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.item{border:1px solid var(--line);background:#0d1728;border-radius:9px;padding:11px;cursor:pointer;color:var(--text);text-align:left}.item:hover,.item.selected{border-color:var(--accent);background:#182b40}.item b{display:block;margin-bottom:4px}.clue{min-height:48px;margin-top:10px;color:var(--muted);font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.btn{background:var(--accent);color:#06101a;border:0;border-radius:8px;padding:10px 13px;font-weight:750;cursor:pointer}.btn.alt{background:#22334a;color:var(--text);border:1px solid var(--line)}.btn:disabled{opacity:.5}.field{width:100%;background:#091321;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px}.result{padding:12px;border:1px solid var(--line);border-radius:9px;margin-top:10px;min-height:80px}.result.good{border-color:#2b8058}.result.warn{border-color:#96713a}.log{max-height:220px;overflow:auto;font-size:12px;color:var(--muted)}.log div{padding:6px 0;border-bottom:1px solid #24344b}.pill{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:3px 8px;font-size:11px;color:var(--muted)}@media(max-width:750px){.layout{grid-template-columns:1fr}.wide{grid-column:auto}.itemrow{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body><main class="wrap">
+<div class="top"><div><div class="tag">JARVIS · PLAYTEST BUILD 0.1</div><h1>潮痕档案馆：涨潮仓库</h1><div class="muted">目标：进入旧仓库。观察线索，提出自己的解法；失败也可以帮助你理解规则。</div></div><span class="pill">本地试玩 · 不上传数据</span></div>
+<div class="layout">
+<section class="panel"><h2>场景</h2><div class="room" aria-label="涨潮仓库场景"><div class="warehouse"></div><div class="door"></div><div class="water"></div></div>
+<p class="muted">涨潮正在上涨。仓库正门被锁住，旁边的维护通道在水位升高后会短暂连通。你听见远处有人活动。</p>
+<h2 style="margin-top:16px">调查物件</h2><div class="itemrow">
+<button class="item" data-clue="key"><b>🗝 铜钥匙</b><span class="muted">齿口有新鲜刮痕</span></button>
+<button class="item" data-clue="bell"><b>🔔 旧铜铃</b><span class="muted">铃柄磨损，像曾被反复固定</span></button>
+<button class="item" data-clue="rope"><b>🪢 浮绳与滑轨</b><span class="muted">轨道会随水位轻微移动</span></button>
+</div><div id="clue" class="clue">点击任一物件查看线索。</div>
+<h2 style="margin-top:15px">居民线索</h2><div class="actions"><button class="btn alt" id="talk1">询问码头修复师</button><button class="btn alt" id="talk2">询问夜班搬运工</button></div><div id="npc" class="clue">两位居民掌握的信息不同；他们都不全知，也未必完全可信。</div>
+</section>
+<section class="panel"><h2>尝试你的解法</h2><p class="muted">可以选择物件后描述如何使用，也可以直接输入动作。这个版本使用明确的规则判定器，不是实时 LLM；请把未识别的行动也记录下来。</p>
+<label class="muted" for="action">你准备怎么做？</label><textarea id="action" class="field" rows="4" placeholder="例如：把铜铃绑在浮动滑轨上，让涨潮推动它发出旧搬运信号……"></textarea>
+<div class="actions"><button class="btn" id="try">尝试行动</button><button class="btn alt" id="key">使用钥匙开门</button><button class="btn alt" id="bell">铃声引导维护通道</button></div>
+<div id="result" class="result">等待你的行动。没有预设在按钮里的想法，也可以直接描述。</div>
+<div class="actions"><button class="btn alt" id="export">导出试玩记录 JSON</button><button class="btn alt" id="reset">重置场景</button></div>
+</section>
+<section class="panel wide"><h2>试玩记录</h2><div class="muted">记录行动描述、线索发现、结果类型和完成状态。记录只保存在当前页面内，点击导出即可保存为 JSON。</div><div id="log" class="log" style="margin-top:10px">尚无记录。</div></section>
+<section class="panel wide"><h2>测试说明</h2><div class="muted">本原型只用于早期体验链路检查：玩家是否能提出解法、理解结果因果、把人物信息与玩法连接起来。规则判定器会识别少数演示路径，不代表完整的开放式 NPC 智能。测试者应同时记录玩家原话、困惑点和未识别但有创意的行动。请勿把这份小样本记录视为市场验证。</div></section>
+</div></main>
+<script>
+const $=id=>document.getElementById(id);let selected=new Set(),events=[],opened=false,found=new Set(),npcs=new Set();
+const clues={
+ key:"钥匙齿口的新鲜刮痕与仓库门锁吻合。它是直接、可靠的解法，但不会告诉你仓库过去发生过什么。",
+ bell:"铜铃柄有两道平行磨痕，像曾被绑在移动结构上。铃身刻着一个几乎磨平的三道波纹标记。",
+ rope:"浮绳固定在一条可随潮水移动的滑轨上。水位升高时，滑轨会缓慢向维护通道一侧移动。"
+};
+function log(type,detail,success=false){events.push({time:new Date().toISOString(),type,detail,success,found:[...found],npcs:[...npcs]});renderLog()}
+function renderLog(){$("log").innerHTML=events.length?events.slice().reverse().map(e=>'<div><b>'+esc(e.type)+'</b> · '+esc(e.detail)+' <span class="pill">'+(e.success?"目标推进":"未完成")+'</span></div>').join(""):"尚无记录。"}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+document.querySelectorAll("[data-clue]").forEach(b=>b.onclick=()=>{const id=b.dataset.clue;selected.has(id)?selected.delete(id):selected.add(id);found.add(id);document.querySelectorAll("[data-clue]").forEach(x=>x.classList.toggle("selected",selected.has(x.dataset.clue)));$("clue").textContent=clues[id];log("调查物件",id+": "+clues[id])});
+$("talk1").onclick=()=>{npcs.add("repairer");$("npc").textContent="修复师说：水位升高时，旧滑轨会被水流推向西侧。过去的工人用三声短铃表示“维护通道可以通行”。";log("交谈","修复师提供潮汐与滑轨信息")};
+$("talk2").onclick=()=>{npcs.add("porter");$("npc").textContent="搬运工说：他的祖母曾在旧仓库夜班工作。她说那种三道波纹的铃声不是警报，而是工人之间的通行信号。";log("交谈","搬运工提供旧铃声的社会含义")};
+function resolve(text,source){
+ const t=text.toLowerCase(),hasBell=/铃|铜铃|bell/.test(t),hasRail=/滑轨|栏杆|轨道|浮绳|rope|rail/.test(t),hasTide=/潮|水位|涨潮|水流|tide/.test(t),hasSignal=/信号|三声|搬运|响|敲|声音|铃声|signal|ring/.test(t),hasKey=/钥匙|开锁|key/.test(t);
+ if(/钥匙|开门|开锁|key/.test(t)&&hasKey){opened=true;return {ok:true,title:"仓库门打开了",body:"钥匙与锁芯吻合。你进入仓库，得到直接结果。这个解法可靠，但没有用到居民线索。",type:"标准解法"}}
+ if((hasBell&&hasRail&&hasTide&&hasSignal)||(selected.has("bell")&&selected.has("rope")&&found.has("bell")&&found.has("rope")&&npcs.size>0&&hasSignal)){
+ opened=true;return {ok:true,title:"维护通道被打开",body:"涨潮推动滑轨，铜铃发出旧搬运信号。搬运工认出信号并回应，修复师打开维护通道。物件、潮汐和人物记忆共同构成了解法。",type:"跨系统解法"}}
+ if(hasBell&&hasSignal&&npcs.has("porter"))return {ok:false,title:"有人听见铃声，但没有回应",body:"你发出了信号，但铃声没有沿滑轨传到维护通道。搬运工记得这种信号，却无法确认你的位置。还需要考虑空间与潮汐。",type:"部分推理"}
+ if(hasBell||hasRail||hasTide||hasSignal)return {ok:false,title:"行动没有打开通道",body:"这个尝试还不足以让维护通道连通。想想物件的磨损、滑轨随潮水的移动，以及居民提到的旧信号之间是否有关联。也可能是原型规则尚未覆盖你的想法。",type:"未识别/不完整行动"}
+ return {ok:false,title:"没有观察到有效变化",body:"目前的原型规则无法判定这项行动。它不一定是坏主意——请把它保留在记录中，作为后续扩展系统规则的候选。",type:"未识别行动"}
+}
+function attempt(text,source){if(!text.trim())return;const r=resolve(text,source);$("result").className="result "+(r.ok?"good":"warn");$("result").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span>';log(source,text+" → "+r.title+"。"+r.body,r.ok)}
+$("try").onclick=()=>attempt($("action").value,"自由输入行动");
+$("key").onclick=()=>{selected.add("key");found.add("key");attempt("使用铜钥匙开锁","快捷动作")};
+$("bell").onclick=()=>{selected.add("bell");selected.add("rope");found.add("bell");found.add("rope");attempt("把铜铃固定在浮动滑轨上，借涨潮推动它并发出三声搬运信号","快捷动作")};
+$("export").onclick=()=>{const blob=new Blob([JSON.stringify({prototype:"Tidemark Archive Warehouse v0.1",generated_at:new Date().toISOString(),notice:"Local prototype event log; not representative user research.",events},null,2)],{type:"application/json'});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="jarvis-playtest-events.json";a.click();URL.revokeObjectURL(url)};
+$("reset").onclick=()=>{selected=new Set();events=[];opened=false;found=new Set();npcs=new Set();document.querySelectorAll("[data-clue]").forEach(x=>x.classList.remove("selected"));$("clue").textContent="点击任一物件查看线索。";$("npc").textContent="两位居民掌握的信息不同；他们都不全知，也未必完全可信。";$("action").value="";$("result").className="result";$("result").textContent="等待你的行动。没有预设在按钮里的想法，也可以直接描述。";renderLog()};
+</script></body></html>
