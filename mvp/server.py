@@ -203,6 +203,7 @@ class Handler(BaseHTTPRequestHandler):
             if STATE["phase"] in {"planning", "team", "evaluation"}:
                 self._json({"ok": False, "error": "A run is already in progress."}, 409)
                 return
+            STATE["phase"] = "planning"  # Reserve atomically before starting the worker thread.
         threading.Thread(target=execute, args=(goal,), daemon=True).start()
         self._json({"ok": True})
 
