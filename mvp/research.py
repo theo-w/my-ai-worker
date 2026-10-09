@@ -143,3 +143,26 @@ def research_environment_status() -> dict:
         "message": "Search provider configured." if configured
                    else "No live search provider configured; real research is unavailable.",
     }
+
+
+def run_live_research(query: str, limit: int = 5) -> dict:
+    """Run configured provider, quality-gate results, then synthesize."""
+    import os
+    from quality import evaluate_evidence
+    from synthesis import synthesize
+
+    query = str(query).strip()
+    if not query:
+        return {"ok": False, "status": "invalid_request", "error": "A research query is required."}
+    endpoint = os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip()
+    if not endpoint:
+        return {"ok": False, "status": "provider_unconfigured", "message": "No live search provider configured; no real research was performed.", "sources": [], "evidence": [], "quality": evaluate_evidence([]), "synthesis": synthesize(query, []).to_dict()}
+    try:
+        provider = JsonHttpSearchProvider(endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None)
+        sources = provider.search(query, limit)
+        evidence = [{"worker": "Live Research Adapter", "finding": source.snippet, "confidence": 0.75, "simulated": False, "source": source.to_dict()} for source in sources]
+        quality = evaluate_evidence(evidence)
+        synthesis = synthesize(query, quality["items"])
+        return {"ok": bool(sources), "status": "completed" if sources else "no_results", "query": query, "sources": [source.to_dict() for source in sources], "evidence": quality["items"], "quality": quality, "synthesis": synthesis.to_dict()}
+    except Exception as exc:
+        return {"ok": False, "status": "provider_error", "error": type(exc).__name__ + ": " + str(exc), "query": query, "sources": [], "evidence": [], "quality": evaluate_evidence([]), "synthesis": synthesize(query, []).to_dict()}
