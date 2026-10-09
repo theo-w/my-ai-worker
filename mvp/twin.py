@@ -129,3 +129,65 @@ class AutonomousProjectLoop:
             "recommendation": options[0]["name"] if options else None,
             "questions_for_human": questions, "events": events,
         }
+
+
+
+@dataclass
+class PersistentTwinMemory:
+    """Local JSON memory for explicit preferences, decisions and lessons."""
+    path: str = "data/twin_memory.json"
+    preferences: dict | None = None
+    decisions: list[dict] | None = None
+    lessons: list[dict] | None = None
+
+    def __post_init__(self):
+        self.preferences = self.preferences or {}
+        self.decisions = self.decisions or []
+        self.lessons = self.lessons or []
+        self.load()
+
+    def load(self):
+        target = Path(self.path)
+        if not target.exists():
+            return
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+            self.preferences = data.get("preferences", {})
+            self.decisions = data.get("decisions", [])
+            self.lessons = data.get("lessons", [])
+        except (OSError, ValueError, TypeError):
+            # Broken memory should never prevent a project from running.
+            self.preferences, self.decisions, self.lessons = {}, [], []
+
+    def save(self):
+        target = Path(self.path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({
+            "preferences": self.preferences,
+            "decisions": self.decisions,
+            "lessons": self.lessons,
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def remember_preference(self, key: str, value):
+        self.preferences[key] = value
+        self.save()
+
+    def record_decision(self, goal: str, recommendation: str, alternatives=None,
+                        outcome: str = "pending"):
+        item = {
+            "goal": goal, "recommendation": recommendation,
+            "alternatives": alternatives or [], "outcome": outcome,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.decisions.append(item)
+        self.save()
+        return item
+
+    def record_lesson(self, lesson: str, context: str = ""):
+        item = {
+            "lesson": lesson, "context": context,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.lessons.append(item)
+        self.save()
+        return item
