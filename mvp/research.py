@@ -199,12 +199,19 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
             "verified pages; only supplied excerpts have been evaluated.",
             json.dumps(prompt, ensure_ascii=False),
         )
+        try:
+            from .claim_evidence import audit_synthesis
+        except ImportError:
+            from claim_evidence import audit_synthesis
+        citation_audit = audit_synthesis(result, rows)
         return {
-            "status": "completed",
+            "status": "completed_review_required",
             "text": result,
             "source_urls": [row["url"] for row in rows],
             "model": client.model,
-            "message": "LLM synthesis is based only on quality-accepted excerpts; source pages are not independently verified here.",
+            "citation_audit": citation_audit,
+            "factual_release_allowed": False,
+            "message": "LLM synthesis is based only on quality-accepted excerpts. Citation IDs and sentence coverage were audited structurally; semantic support and source truth remain unverified.",
         }
     except Exception as exc:
         return {
