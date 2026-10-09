@@ -126,3 +126,79 @@ class LLMWorkerExecutor:
                 **trust,
             },
         )
+
+
+class HybridWorkerExecutor:
+    """Route research to a configured live-search adapter and other work to an LLM.
+
+    Missing integrations fail closed. Model-generated prose is never used as
+    source-backed evidence, and research is complete only when at least one
+    finding passes the mechanical evidence-quality gate.
+    """
+    def __init__(self, llm_executor=None):
+        self.llm_executor = llm_executor
+        self.client = getattr(llm_executor, "client", None)
+
+    @staticmethod
+    def _is_research(capability: str) -> bool:
+        return capability == "research" or capability.endswith("_research") or capability == "player_research"
+
+    def execute(self, task: dict, goal: str) -> WorkerExecutionResult:
+        import json
+        import os
+        task_id = str(task.get("id", "unnamed"))
+        capability = str(task.get("capability", "general"))
+
+        if self._is_research(capability):
+            if not os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip():
+                raise LookupError(
+                    "Live research is not configured. Configure JARVIS_SEARCH_ENDPOINT; "
+                    "an LLM response cannot substitute for a search result."
+                )
+            try:
+                from .research import run_live_research
+                from .accuracy import classify_output
+            except ImportError:
+                from research import run_live_research
+                from accuracy import classify_output
+            report = run_live_research(goal, limit=5)
+            quality = report.get("quality") or {}
+            accepted = [
+                item for item in quality.get("items", [])
+                if item.get("quality_accepted") is True
+            ]
+            if not accepted:
+                raise RuntimeError(
+                    "Live research returned no quality-accepted evidence; task remains blocked."
+                )
+            trust = classify_output("research", source_backed=True, quality_accepted=True)
+            output = json.dumps({
+                "query": goal,
+                "accepted_evidence": accepted,
+                "synthesis": report.get("synthesis"),
+                "llm_synthesis": report.get("llm_synthesis"),
+                "warning": "Source structure passed a mechanical gate; semantic support and source truth are not independently verified.",
+            }, ensure_ascii=False)
+            return WorkerExecutionResult(
+                task_id=task_id,
+                capability=capability,
+                status="completed",
+                output=output,
+                simulated=False,
+                metadata={
+                    "mode": "live_research",
+                    "provider": "configured_search_adapter",
+                    "source_count": len(report.get("sources", [])),
+                    "quality_accepted_count": len(accepted),
+                    "output_is_verified_evidence": False,
+                    "verified_truth": False,
+                    "semantic_support_verified": False,
+                    **trust,
+                },
+            )
+
+        if self.llm_executor is None:
+            raise LookupError(
+                "No LLM executor is configured for capability: " + capability
+            )
+        return self.llm_executor.execute(task, goal)
