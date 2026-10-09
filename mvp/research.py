@@ -74,3 +74,72 @@ def build_finding(
         source=source,
         simulated=simulated,
     )
+
+
+
+class JsonHttpSearchProvider:
+    """Adapter for search APIs that return JSON.
+
+    Configure an endpoint and optional bearer token through environment
+    variables JARVIS_SEARCH_ENDPOINT and JARVIS_SEARCH_API_KEY. The endpoint
+    must accept ?q=<query>&limit=<n> and return either a list of results or
+    {"results": [{"title": ..., "url": ..., "snippet": ..., "published_at": ...}]}.
+    This generic adapter does not assume a particular vendor schema beyond
+    that small response contract.
+    """
+    def __init__(self, endpoint: str, api_key: str | None = None, timeout: float = 10.0):
+        self.endpoint = endpoint.strip()
+        self.api_key = api_key
+        self.timeout = max(1.0, float(timeout))
+        if not self.endpoint.startswith("https://"):
+            raise ValueError("Search endpoint must use HTTPS.")
+
+    def search(self, query: str, limit: int = 5) -> list[ResearchSource]:
+        import json
+        from urllib.parse import urlencode
+        from urllib.request import Request, urlopen
+
+        limit = max(1, min(int(limit), 10))
+        url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
+            "q": query, "limit": limit
+        })
+        headers = {"Accept": "application/json", "User-Agent": "JARVIS-ResearchAdapter/1.0"}
+        if self.api_key:
+            headers["Authorization"] = "Bearer " + self.api_key
+        request = Request(url, headers=headers, method="GET")
+        with urlopen(request, timeout=self.timeout) as response:
+            if response.status < 200 or response.status >= 300:
+                raise RuntimeError("Search provider returned HTTP " + str(response.status))
+            payload = json.loads(response.read().decode("utf-8"))
+
+        rows = payload.get("results", []) if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            raise ValueError("Search provider response must be a list or contain a results list.")
+        sources = []
+        for row in rows[:limit]:
+            if not isinstance(row, dict):
+                continue
+            title = str(row.get("title", "")).strip()
+            source_url = str(row.get("url", "")).strip()
+            snippet = str(row.get("snippet", row.get("description", ""))).strip()
+            if not title or not source_url.startswith("https://") or not snippet:
+                continue
+            sources.append(ResearchSource(
+                title=title, url=source_url, snippet=snippet,
+                provider=str(row.get("provider", "json_http")),
+                published_at=row.get("published_at"),
+            ))
+        return sources
+
+
+def research_environment_status() -> dict:
+    """Report provider configuration without exposing the API key."""
+    import os
+    endpoint = os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip()
+    configured = bool(endpoint)
+    return {
+        "configured": configured,
+        "provider": "json_http" if configured else None,
+        "message": "Search provider configured." if configured
+                   else "No live search provider configured; real research is unavailable.",
+    }
