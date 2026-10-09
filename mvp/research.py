@@ -147,6 +147,7 @@ def research_environment_status() -> dict:
 
 def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
     """Optional LLM synthesis over accepted, source-backed findings only."""
+    import json
     import os
     if not accepted_items:
         return {
