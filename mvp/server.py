@@ -13,7 +13,9 @@ from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
-TWIN = DigitalTwin()\nMEMORY = PersistentTwinMemory()\nPROJECT_LOOP = AutonomousProjectLoop()
+TWIN = DigitalTwin()
+MEMORY = PersistentTwinMemory()
+PROJECT_LOOP = AutonomousProjectLoop()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
