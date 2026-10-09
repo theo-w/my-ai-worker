@@ -52,9 +52,12 @@ def run_worker(worker: str, capability: str, goal: str) -> list[Evidence]:
 
 
 def evaluate(goal: str, evidence: list[Evidence], demo_mode: bool = False) -> Decision:
-    if not evidence:
+    if not evidence and demo_mode:
         recommendation = "DEMO_GO_TO_PROTOTYPE"
         demo_fallback = True
+    elif not evidence:
+        recommendation = "HOLD_FOR_EVIDENCE"
+        demo_fallback = False
     elif all(item.simulated for item in evidence) and demo_mode:
         # Demo-only handoff is opt-in and never represents real business approval.
         recommendation = "DEMO_GO_TO_PROTOTYPE"
