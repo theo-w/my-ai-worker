@@ -186,3 +186,36 @@ GET /api/executor/status
 The response reports the executor mode, whether search/LLM are configured,
 which capabilities are available, and explicit trust-policy flags. Never place
 API keys in source control; configure them in the runtime environment.
+
+
+## Game experience-design MVP API
+
+JARVIS exposes a structured first-pass workflow that analyzes a reference game's
+transferable design mechanisms, proposes a distinct concept, maps hypotheses
+across player perspectives, and creates a small prototype-validation plan.
+
+Start the local server:
+
+```bash
+python -m mvp.server
+```
+
+Call the endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:8765/api/experience-design \
+  -H 'Content-Type: application/json' \
+  -d '{"source_game":"塞尔达传说：王国之泪","concept_name":"潮痕档案馆"}'
+```
+
+The response contains `brief` plus a `trust` section. When a configured
+OpenAI-compatible LLM is available, it generates a structured design brief;
+otherwise a deterministic, explicitly labeled template is returned. LLM
+outputs must pass JSON schema-shape checks and are never treated as verified
+player research. The endpoint forcibly reports `market_validated=false` and
+`playtested=false`. The current fallback concept is a starting hypothesis,
+not a claim of proven originality, player appeal, or commercial viability.
+
+Automated tests in `mvp/test_experience_design.py` cover required fields,
+input validation, invalid model output, and the rule that model output cannot
+declare market validation or playtesting complete.
