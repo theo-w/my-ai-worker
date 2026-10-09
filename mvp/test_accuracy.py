@@ -25,3 +25,16 @@ def test_decision_gate_fails_closed_for_simulation_and_insufficient_evidence():
     assert decision_gate(required_evidence=2, accepted_evidence=5, all_evidence_simulated=True, policy_checks_passed=True)["status"] == "demo_only"
     assert decision_gate(required_evidence=2, accepted_evidence=1, all_evidence_simulated=False, policy_checks_passed=True)["status"] == "hold_for_evidence"
     assert decision_gate(required_evidence=1, accepted_evidence=1, all_evidence_simulated=False, policy_checks_passed=False)["allowed"] is False
+
+def test_llm_executor_marks_generated_text_as_unverified():
+    from mvp.executor import LLMWorkerExecutor
+    class FakeLLM:
+        model = "test-model"
+        def complete(self, system_prompt, user_prompt):
+            return "The market is growing rapidly."
+    result = LLMWorkerExecutor(FakeLLM()).execute({"id": "analysis", "capability": "analysis"}, "Assess market")
+    data = result.to_dict()
+    assert data["metadata"]["trust_level"] == "model_generated_unverified"
+    assert data["metadata"]["verified_truth"] is False
+    assert data["metadata"]["usable_as_factual_evidence"] is False
+    assert data["metadata"]["external_tools_used"] is False
