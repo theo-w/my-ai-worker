@@ -219,3 +219,24 @@ not a claim of proven originality, player appeal, or commercial viability.
 Automated tests in `mvp/test_experience_design.py` cover required fields,
 input validation, invalid model output, and the rule that model output cannot
 declare market validation or playtesting complete.
+
+
+## Playable prototype: Tidemark Archive warehouse
+
+With the local server running, open `http://127.0.0.1:8765/playtest` or use the
+link in Game Experience Lab. The scene lets a player inspect three objects,
+talk to two residents, try a standard key solution or describe an alternate
+action, and export the local event log as JSON.
+
+**Important limitation:** this is a deterministic rule-based interaction
+prototype, not an LLM-driven world and not a completed game. It recognizes a
+small set of authored action patterns. Unrecognized actions are retained as
+test signals rather than treated as impossible in principle. The goal is to
+check whether the experience loop is understandable before investing in a
+larger dynamic-NPC implementation. Do not interpret a successful scripted path
+as evidence of emergent AI behavior or market demand.
+
+For a real-model test, configure `JARVIS_LLM_BASE_URL`,
+`JARVIS_LLM_API_KEY`, and `JARVIS_LLM_MODEL` in the runtime environment.
+Never commit credentials. The current CI run checks the Python suite; it does
+not execute browser interaction tests or prove that a real provider is reachable.
