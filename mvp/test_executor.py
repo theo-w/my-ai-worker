@@ -45,3 +45,53 @@ def test_empty_adapter_output_is_rejected():
         pass
     else:
         raise AssertionError("empty output should not be accepted")
+
+
+def test_hybrid_executor_never_uses_llm_as_research_substitute(monkeypatch):
+    from mvp.executor import HybridWorkerExecutor, LLMWorkerExecutor
+    class FakeLLM:
+        model = "fake-model"
+        def complete(self, system_prompt, user_prompt):
+            return "Invented market summary"
+    monkeypatch.delenv("JARVIS_SEARCH_ENDPOINT", raising=False)
+    executor = HybridWorkerExecutor(LLMWorkerExecutor(FakeLLM()))
+    try:
+        executor.execute({"id": "research", "title": "Research market", "capability": "research"}, "Assess market")
+    except LookupError as exc:
+        assert "cannot substitute" in str(exc)
+    else:
+        raise AssertionError("research must not silently fall back to LLM prose")
+
+
+def test_hybrid_executor_routes_analysis_to_llm(monkeypatch):
+    from mvp.executor import HybridWorkerExecutor, LLMWorkerExecutor
+    class FakeLLM:
+        model = "fake-model"
+        def complete(self, system_prompt, user_prompt):
+            return "Analysis draft; facts remain unverified."
+    monkeypatch.delenv("JARVIS_SEARCH_ENDPOINT", raising=False)
+    executor = HybridWorkerExecutor(LLMWorkerExecutor(FakeLLM()))
+    result = executor.execute(
+        {"id": "analysis", "title": "Analyze tradeoffs", "capability": "analysis"},
+        "Evaluate an AI-native game",
+    )
+    assert result.status == "completed"
+    assert result.metadata["trust_level"] == "model_generated_unverified"
+    assert result.metadata["verified_truth"] is False
+
+
+def test_hybrid_executor_blocks_research_without_accepted_evidence(monkeypatch):
+    import mvp.research as research
+    from mvp.executor import HybridWorkerExecutor
+    monkeypatch.setenv("JARVIS_SEARCH_ENDPOINT", "https://search.example/api")
+    monkeypatch.setattr(research, "run_live_research", lambda query, limit=5: {
+        "status": "no_results", "sources": [],
+        "quality": {"items": []}, "synthesis": None, "llm_synthesis": None,
+    })
+    executor = HybridWorkerExecutor()
+    try:
+        executor.execute({"id": "research", "title": "Research", "capability": "research"}, "Assess market")
+    except RuntimeError as exc:
+        assert "no quality-accepted evidence" in str(exc)
+    else:
+        raise AssertionError("empty evidence must block research task")
