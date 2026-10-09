@@ -56,6 +56,10 @@ def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
         recommendation = "DEMO_GO_TO_PROTOTYPE"
         demo_fallback = True
     elif all(item.simulated for item in evidence):
+        # Explicit demo handoff; this is not a real business go decision.
+        recommendation = "DEMO_GO_TO_PROTOTYPE"
+        demo_fallback = True
+    elif not any(getattr(item, "source", None) for item in evidence):
         recommendation = "HOLD_FOR_EVIDENCE"
         demo_fallback = False
     else:
@@ -69,7 +73,7 @@ def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
             "NPC memory and behavior can drift",
             "Inference cost and latency may limit production economics",
         ],
-        next_step="AI Game Prototype Sprint" if recommendation in {"GO_TO_PROTOTYPE", "DEMO_GO_TO_PROTOTYPE"} else "Evidence Collection Sprint",
+        next_step=("AI Game Prototype Sprint (demo only)" if recommendation == "DEMO_GO_TO_PROTOTYPE" else ("AI Game Prototype Sprint" if recommendation == "GO_TO_PROTOTYPE" else "Evidence Collection Sprint")),
     )
 
 
