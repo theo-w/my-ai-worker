@@ -60,3 +60,26 @@ def plan_project(goal: str, llm_client=None) -> dict:
         fallback = deterministic_plan(goal)
         fallback["warnings"].append("LLM planner unavailable or invalid (" + type(exc).__name__ + "); deterministic plan used.")
         return fallback
+
+def replan_failed_tasks(goal: str, failed_tasks: list[dict], iteration: int, llm_client=None, existing_ids=None) -> list[dict]:
+    """Propose bounded replacement tasks for failures; never executes sensitive actions."""
+    if llm_client is None or not failed_tasks:
+        return []
+    existing_ids = set(existing_ids or [])
+    prompt = {
+        "goal": goal,
+        "iteration": iteration,
+        "failed_tasks": [{"id": t.get("id"), "title": t.get("title"), "output": t.get("output"), "capability": t.get("capability", "general")} for t in failed_tasks],
+        "existing_task_ids": sorted(existing_ids),
+        "required_output": {"tasks": [{"id": "unique_new_id", "title": "specific fallback", "capability": "research|analysis|design|implementation|testing|decision|general"}]},
+        "rules": ["Return JSON only.", "Suggest at most 3 replacement tasks.", "Use a different approach from the failed task.", "Do not claim work has already happened.", "Do not include publishing, spending, legal, or destructive actions.", "Do not reuse any existing task IDs."],
+    }
+    try:
+        raw = llm_client.complete("You are a cautious recovery planner. Return safe replacement tasks as JSON only.", json.dumps(prompt, ensure_ascii=False))
+        plan = validate_plan(raw, max_tasks=3)
+        tasks = plan["tasks"]
+        if any(task["id"] in existing_ids for task in tasks):
+            return []
+        return tasks
+    except Exception:
+        return []
