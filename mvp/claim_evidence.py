@@ -12,7 +12,7 @@ def audit_synthesis(text: str, sources: list[dict]) -> dict:
     the sentence semantically, so every cited claim remains review-required.
     """
     source_ids = {str(item.get("source_id", "")) for item in sources if item.get("source_id")}
-    normalized_text = re.sub(r"([。！？.!?])(\\s*)(\\[S\\d+\\])", r"\\3\\1", str(text or ""))
+    normalized_text = re.sub(r"([。！？.!?])(\s*)(\[S\d+\])", r"\3\1", str(text or ""))
     sentences = [part.strip() for part in _SENTENCE_SPLIT.split(normalized_text) if part.strip()]
     audited = []
     for sentence in sentences:
