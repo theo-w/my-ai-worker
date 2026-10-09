@@ -17,7 +17,10 @@ class TwinPolicy:
 
     def __post_init__(self):
         if self.approval_required_for is None:
-            self.approval_required_for = ["production_release", "budget_commitment"]
+            self.approval_required_for = [
+                "production_release", "budget_commitment", "external_publication",
+                "destructive_operation", "legal_commitment",
+            ]
 
 
 @dataclass
