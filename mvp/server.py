@@ -86,6 +86,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _read_json(self, max_bytes=1048576):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except (TypeError, ValueError):
+            self._json({"ok": False, "error": "Invalid Content-Length."}, 400)
+            return None
+        if length < 0:
+            self._json({"ok": False, "error": "Invalid Content-Length."}, 400)
+            return None
+        if length > max_bytes:
+            self._json({"ok": False, "error": "Request body too large."}, 413)
+            return None
+        try:
+            raw = self.rfile.read(length) if length else b"{}"
+            body = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._json({"ok": False, "error": "Malformed JSON request body."}, 400)
+            return None
+        if not isinstance(body, dict):
+            self._json({"ok": False, "error": "JSON request body must be an object."}, 400)
+            return None
+        return body
     def do_GET(self):
         if self.path == "/api/state":
             with LOCK:
