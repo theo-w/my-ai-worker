@@ -9,11 +9,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from run import WORKERS, evaluate, run_worker
-from twin import DigitalTwin
+from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
-TWIN = DigitalTwin()
+TWIN = DigitalTwin()\nMEMORY = PersistentTwinMemory()\nPROJECT_LOOP = AutonomousProjectLoop()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
@@ -97,8 +97,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path not in ("/api/run", "/api/prototype"):
+        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous"):
             self.send_error(404)
+            return
+        if self.path == "/api/autonomous":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = json.loads(self.rfile.read(length) or b"{}")
+            goal = str(body.get("goal", "")).strip()
+            if not goal:
+                self._json({"ok": False, "error": "A project goal is required."}, 400)
+                return
+            tasks = body.get("tasks") or [
+                {"id": "research", "title": "Gather and validate evidence", "status": "queued"},
+                {"id": "analysis", "title": "Compare options and risks", "status": "queued"},
+                {"id": "checkpoint", "title": "Prepare a decision report", "status": "queued"},
+            ]
+            options = body.get("options") or []
+            actions = body.get("requested_actions") or []
+            # The executor contract is intentionally explicit: this MVP does not
+            # pretend to perform external research or tool calls.
+            def executor(task):
+                return "Simulated execution only; connect a real worker/tool adapter to perform this task."
+            report = PROJECT_LOOP.run(goal, tasks, executor, options, actions)
+            if report["status"] == "completed" and report.get("recommendation"):
+                MEMORY.record_decision(goal, report["recommendation"], report.get("options", []))
+            self._json({"ok": True, "report": report, "memory": {
+                "decision_count": len(MEMORY.decisions),
+                "lesson_count": len(MEMORY.lessons),
+                "preference_count": len(MEMORY.preferences),
+            }})
             return
         if self.path == "/api/prototype":
             with LOCK:
