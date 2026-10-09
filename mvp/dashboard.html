@@ -102,6 +102,35 @@ function render(){
 }
 async function poll(){try{const r=await fetch("/api/state");state=await r.json();render()}catch(e){}}
 document.getElementById("run").onclick=async()=>{const b=document.getElementById("run");b.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});b.disabled=false};
+async function refreshProviderStatus(){
+ try{
+  const results=await Promise.all([
+   fetch("/api/llm/status").then(r=>r.json()),
+   fetch("/api/research/status").then(r=>r.json())
+  ]);
+  const llm=results[0], search=results[1];
+  document.getElementById("researchMode").textContent=
+   (llm.mode==="llm"?"LLM: "+(llm.model||"configured"):"LLM: SIMULATED")+" · "+
+   (search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+ }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
+}
+document.getElementById("researchRun").onclick=async function(){
+ const button=document.getElementById("researchRun");
+ const out=document.getElementById("researchResult");
+ button.disabled=true;out.textContent="正在执行研究请求…";
+ try{
+  const response=await fetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
+  const result=await response.json();
+  const quality=result.quality||{}, det=result.synthesis||{}, llm=result.llm_synthesis||{};
+  const sources=(result.sources||[]).map(function(s){
+   return '<div class="ev"><b>'+esc(s.title)+'</b><div class="sub">'+esc(s.snippet)+'</div><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.url)+'</a></div>';
+  }).join("");
+  out.innerHTML='<div class="kv"><b>Status</b><div>'+esc(result.status||"unknown")+'</div><b>Evidence</b><div>'+esc(String(quality.accepted||0))+' accepted / '+esc(String(quality.total||0))+' total</div><b>Baseline</b><div>'+esc(det.conclusion||result.message||"No conclusion")+'</div><b>LLM synthesis</b><div>'+esc(llm.status||"not returned")+' '+esc(llm.message||"")+'</div></div>'+
+   (llm.text?'<div class="outcome" style="margin-top:10px;white-space:pre-wrap">'+esc(llm.text)+'</div>':"")+
+   (sources||'<div class="sub">No source results returned. Check provider configuration and API response.</div>');
+ }catch(e){out.textContent="Research request failed: "+e.name;}
+ finally{button.disabled=false;}
+};
 async function startPrototype(){const r=await fetch("/api/prototype",{method:"POST"});if(r.ok)poll()}
-setInterval(poll,300);poll();
+setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
 </script></body></html>
