@@ -250,6 +250,31 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/research/status":
             self._json(research_environment_status())
             return
+        if self.path == "/api/executor/status":
+            search_configured = bool(os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip())
+            llm_configured = getattr(WORKER_EXECUTOR, "client", None) is not None
+            self._json({
+                "mode": (
+                    "simulated" if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor)
+                    else "hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor)
+                    else "llm"
+                ),
+                "search_configured": search_configured,
+                "llm_configured": llm_configured,
+                "capabilities": {
+                    "research": "live_search" if search_configured else "blocked_or_simulated_demo_only",
+                    "analysis": "llm" if llm_configured else "blocked_or_simulated_demo_only",
+                    "design": "llm" if llm_configured else "blocked_or_simulated_demo_only",
+                    "implementation": "no_code_execution_adapter_configured",
+                    "testing": "no_test_runner_adapter_configured",
+                },
+                "truth_policy": {
+                    "llm_output_is_verified": False,
+                    "search_snippet_is_verified_truth": False,
+                    "missing_required_tool_fails_closed": True,
+                },
+            })
+            return
         if self.path == "/api/llm/status":
             configured = isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor))
             self._json({
