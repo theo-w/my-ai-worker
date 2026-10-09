@@ -72,7 +72,7 @@ def execute(goal: str):
     with LOCK:
         STATE["phase"] = "evaluation"
     time.sleep(.3)
-    decision = evaluate(goal, [type("E", (), e) for e in STATE["evidence"]])
+    decision = evaluate(goal, [type("E", (), e) for e in STATE["evidence"]], demo_mode=True)
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
