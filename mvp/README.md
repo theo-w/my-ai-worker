@@ -64,3 +64,26 @@ Prototype Sprint
 ```
 
 This is a showcase MVP: the orchestration is real, while research outputs are simulated. The next implementation replaces individual simulated Workers with real Web Research + LLM Synthesis without changing the product-level workflow.
+
+
+## Configurable live research provider
+
+JARVIS now includes a vendor-neutral HTTPS JSON search adapter. It is not
+automatically connected to a search service; configure one that supports the
+response contract below.
+
+Set environment variables before starting the server:
+
+```bash
+export JARVIS_SEARCH_ENDPOINT="https://your-search-provider.example/api/search"
+export JARVIS_SEARCH_API_KEY="your-api-key"
+```
+
+The endpoint receives `q` and `limit` query parameters and must return JSON
+as either a list or `{"results": [...]}`. Each usable result needs `title`,
+an HTTPS `url`, and `snippet` (or `description`). The optional key is sent
+as a Bearer token. Never commit API keys to the repository.
+
+This is the provider adapter and its test contract, not a claim that live
+research is already enabled in the dashboard. Without a configured provider,
+the adapter reports that live research is unavailable and returns no sources.
