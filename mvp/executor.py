@@ -77,3 +77,46 @@ class RegistryWorkerExecutor:
             simulated=False,
             metadata={"mode": "registered_adapter", "external_tools_used": "adapter-defined"},
         )
+
+
+class LLMWorkerExecutor:
+    """Execute task instructions with an LLM; output is not external evidence."""
+
+    def __init__(self, client):
+        self.client = client
+
+    def execute(self, task: dict, goal: str) -> WorkerExecutionResult:
+        import json
+        task_id = str(task.get("id", "unnamed"))
+        capability = str(task.get("capability", "general"))
+        title = str(task.get("title", capability))
+        context = {
+            "goal": goal,
+            "task": task,
+            "instruction": (
+                "Complete the assigned task. Separate assumptions from verified facts. "
+                "Do not invent citations, URLs, experiments, or external actions. "
+                "If external evidence is needed but not supplied, say so explicitly."
+            ),
+        }
+        output = self.client.complete(
+            "You are a careful JARVIS digital worker. Return a concise, structured result. "
+            "Model-generated claims are not independently verified evidence.",
+            json.dumps(context, ensure_ascii=False),
+        )
+        if not isinstance(output, str) or not output.strip():
+            raise ValueError("LLM returned no usable output for task: " + task_id)
+        return WorkerExecutionResult(
+            task_id=task_id,
+            capability=capability,
+            status="completed",
+            output=output,
+            simulated=False,
+            metadata={
+                "mode": "llm",
+                "provider": "openai_compatible",
+                "model": getattr(self.client, "model", "configured"),
+                "external_tools_used": False,
+                "output_is_verified_evidence": False,
+            },
+        )
