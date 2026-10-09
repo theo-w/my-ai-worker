@@ -72,3 +72,12 @@ def test_persistent_twin_memory_round_trip(tmp_path):
     assert restored.preferences["decision_style"] == "evidence_first"
     assert restored.decisions[0]["recommendation"] == "Prototype"
     assert "retention" in restored.lessons[0]["lesson"]
+
+
+def test_demo_mode_allows_labeled_handoff_without_real_evidence():
+    evidence = []
+    for worker, capability in WORKERS:
+        evidence.extend(run_worker(worker, capability, "AI RPG"))
+    decision = evaluate("AI RPG", evidence, demo_mode=True)
+    assert decision.recommendation == "DEMO_GO_TO_PROTOTYPE"
+    assert "demo only" in decision.next_step.lower()
