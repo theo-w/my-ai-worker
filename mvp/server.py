@@ -15,12 +15,14 @@ try:
     from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
     from .research import run_live_research, research_environment_status
+    from .planning import plan_project
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from executor import SimulatedWorkerExecutor, LLMWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
     from research import run_live_research, research_environment_status
+    from planning import plan_project
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -228,11 +230,15 @@ class Handler(BaseHTTPRequestHandler):
             if not goal:
                 self._json({"ok": False, "error": "A project goal is required."}, 400)
                 return
-            tasks = body.get("tasks") or [
-                {"id": "research", "title": "Gather and validate evidence", "status": "queued"},
-                {"id": "analysis", "title": "Compare options and risks", "status": "queued"},
-                {"id": "checkpoint", "title": "Prepare a decision report", "status": "queued"},
-            ]
+            planning = None
+            supplied_tasks = body.get("tasks")
+            if isinstance(supplied_tasks, list) and supplied_tasks:
+                tasks = supplied_tasks
+                planning = {"mode": "user_supplied", "warnings": []}
+            else:
+                planner_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else None
+                planning = plan_project(goal, planner_client)
+                tasks = planning["tasks"]
             options = body.get("options") or []
             actions = body.get("requested_actions") or []
             # The default executor is explicitly simulated. A real capability
@@ -244,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
             report = PROJECT_LOOP.run(goal, tasks, executor, options, actions)
             if report["status"] == "completed" and report.get("recommendation"):
                 MEMORY.record_decision(goal, report["recommendation"], report.get("options", []))
-            self._json({"ok": True, "report": report, "memory": {
+            self._json({"ok": True, "planning": planning, "report": report, "memory": {
                 "decision_count": len(MEMORY.decisions),
                 "lesson_count": len(MEMORY.lessons),
                 "preference_count": len(MEMORY.preferences),
