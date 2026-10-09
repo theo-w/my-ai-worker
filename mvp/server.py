@@ -131,8 +131,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         if self.path == "/api/research":
-            length = int(self.headers.get("Content-Length", "0"))
-            body = json.loads(self.rfile.read(length) or b"{}")
+            body = self._read_json()
+            if body is None:
+                return
             query = str(body.get("query", body.get("goal", ""))).strip()
             try:
                 limit = max(1, min(int(body.get("limit", 5)), 10))
@@ -143,8 +144,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(result, code)
             return
         if self.path == "/api/autonomous":
-            length = int(self.headers.get("Content-Length", "0"))
-            body = json.loads(self.rfile.read(length) or b"{}")
+            body = self._read_json()
+            if body is None:
+                return
             goal = str(body.get("goal", "")).strip()
             if not goal:
                 self._json({"ok": False, "error": "A project goal is required."}, 400)
@@ -193,8 +195,9 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["phase"] = "prototype"
             self._json({"ok": True, "prototype": STATE["prototype"]})
             return
-        length = int(self.headers.get("Content-Length", "0"))
-        body = json.loads(self.rfile.read(length) or b"{}")
+        body = self._read_json()
+        if body is None:
+            return
         goal = str(body.get("goal", "")).strip() or "评估一个 AI 原生游戏机会"
         with LOCK:
             if STATE["phase"] in {"planning", "team", "evaluation"}:
