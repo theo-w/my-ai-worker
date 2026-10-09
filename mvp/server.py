@@ -66,33 +66,79 @@ def reset(goal: str):
         STATE["twin"] = TWIN.snapshot(goal, team)
 
 def execute(goal: str):
+    """Run the Dashboard workforce using the configured executor.
+
+    Simulated outputs may populate the demo evidence stream. LLM outputs are
+    displayed as task artifacts, never promoted to source-backed evidence.
+    """
     reset(goal)
-    time.sleep(.25)
+    time.sleep(.1)
     with LOCK:
         STATE["phase"] = "team"
-        for a in STATE["agents"]:
-            a["status"] = "ready"
-    for idx, (worker, capability) in enumerate(
-        (tuple((a["worker"], a["capability"]) for a in STATE["agents"]))
-    ):
+        for agent in STATE["agents"]:
+            agent["status"] = "ready"
+
+    with LOCK:
+        planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
+
+    for idx, (worker, capability) in enumerate(planned):
         with LOCK:
-            a = STATE["agents"][idx]
-            a["status"] = "running"
-            a["progress"] = 20
-        time.sleep(.35)
-        items = run_worker(worker, capability, goal)
-        with LOCK:
-            a["progress"] = 70
-            a["output"] = "完成任务并生成候选证据。"
-            a["evidence"] = [e.__dict__ for e in items]
-            a["status"] = "completed"
-            a["progress"] = 100
-            STATE["evidence"].extend(e.__dict__ for e in items)
-        time.sleep(.2)
+            agent = STATE["agents"][idx]
+            agent["status"] = "running"
+            agent["progress"] = 20
+
+        try:
+            if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor):
+                items = run_worker(worker, capability, goal)
+                output = " [SIMULATED] ".join(item.finding for item in items)
+                result_data = {
+                    "mode": "simulation",
+                    "simulated": True,
+                    "output_is_verified_evidence": False,
+                }
+            else:
+                task = {
+                    "id": str(idx),
+                    "title": capability.replace("_", " "),
+                    "capability": capability,
+                    "worker": worker,
+                }
+                result = WORKER_EXECUTOR.execute(task, goal)
+                output = result.output
+                result_data = result.to_dict()
+                # LLM prose is a task artifact, not source-backed evidence.
+                items = []
+
+            with LOCK:
+                agent = STATE["agents"][idx]
+                agent["progress"] = 70
+                agent["output"] = output
+                agent["execution"] = result_data
+                agent["evidence"] = [item.__dict__ for item in items]
+                agent["status"] = "completed"
+                agent["progress"] = 100
+                STATE["evidence"].extend(item.__dict__ for item in items)
+        except Exception as exc:
+            with LOCK:
+                agent = STATE["agents"][idx]
+                agent["status"] = "blocked"
+                agent["progress"] = 100
+                agent["output"] = "执行失败：" + type(exc).__name__
+                agent["execution"] = {
+                    "mode": "llm" if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else "simulation",
+                    "status": "failed",
+                    "error_type": type(exc).__name__,
+                }
+
     with LOCK:
         STATE["phase"] = "evaluation"
-    time.sleep(.3)
-    decision = evaluate(goal, [type("E", (), e) for e in STATE["evidence"]], demo_mode=True)
+    time.sleep(.1)
+    evidence = [type("E", (), item) for item in STATE["evidence"]]
+    # Only the explicit simulated executor may use the demo handoff.
+    decision = evaluate(
+        goal, evidence,
+        demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor),
+    )
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
