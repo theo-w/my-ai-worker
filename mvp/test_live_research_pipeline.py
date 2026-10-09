@@ -76,7 +76,10 @@ def test_live_research_deduplicates_sources_and_llm_synthesis_uses_accepted_evid
 
     assert len(result["sources"]) == 1
     assert result["quality"]["accepted"] == 1
-    assert result["llm_synthesis"]["status"] == "completed"
+    assert result["llm_synthesis"]["status"] == "completed_review_required"
+    assert result["llm_synthesis"]["factual_release_allowed"] is False
+    assert result["llm_synthesis"]["citation_audit"]["all_claims_semantically_verified"] is False
+    assert result["llm_synthesis"]["citation_audit"]["counts"]["missing_citation"] == 0
     assert "[S1]" in result["llm_synthesis"]["text"]
     assert result["llm_synthesis"]["source_urls"] == ["https://example.com/report#section"]
 
