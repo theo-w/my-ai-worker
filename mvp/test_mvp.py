@@ -13,8 +13,14 @@ def test_workers_produce_evidence():
     assert all(item.simulated for item in evidence)
 
 
-def test_empty_evidence_is_demo_only():
+def test_empty_evidence_holds_in_strict_mode():
     decision = evaluate("AI RPG", [])
+    assert decision.recommendation == "HOLD_FOR_EVIDENCE"
+    assert decision.confidence == 42
+
+
+def test_empty_evidence_allows_only_explicit_demo_handoff():
+    decision = evaluate("AI RPG", [], demo_mode=True)
     assert decision.recommendation == "DEMO_GO_TO_PROTOTYPE"
     assert decision.confidence == 50
 
