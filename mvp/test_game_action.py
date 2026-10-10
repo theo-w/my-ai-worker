@@ -91,3 +91,46 @@ def test_hidden_hole_solution_requires_inspection_and_causal_action():
     result=interpret_and_validate_action("我用鱼钩打开了门",{"inspected":[],"talked":[]})
     assert result["validation"]["ok"] is False
     assert result["validation"]["world_state"]["warehouse_open"] is False
+
+def _hidden_gap_handoff_reply():
+    return json.dumps({
+        "intent": "用弯鱼钩穿过墙脚破洞拨动内侧门闩",
+        "action_kind": "hidden_gap",
+        "entities": ["hole", "hook", "latch"],
+        "reasoning": "弯钩可以穿过检修孔勾住内侧插销",
+        "uncertainties": ["鱼钩是否足够坚固"],
+        "counterexample": "洞口可能被堵住，或鱼钩无法触及门闩",
+    })
+
+
+def test_manual_handoff_accepts_hidden_gap_only_with_inspected_objects_and_causal_action():
+    action = "清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    state = {"inspected": ["hole", "hook"], "talked": [], "selected": ["hole", "hook"]}
+    result = interpret_handoff_and_validate_action(action, state, _hidden_gap_handoff_reply())
+
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["type"] == "隐藏环境解法"
+    assert result["validation"]["world_state"]["warehouse_open"] is True
+    assert result["trust"]["model_output_is_authoritative"] is False
+    assert result["trust"]["world_state_changed_only_by_rules"] is True
+
+
+def test_manual_handoff_cannot_skip_hidden_gap_inspection_even_if_model_proposes_success():
+    action = "清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    result = interpret_handoff_and_validate_action(
+        action, {"inspected": [], "talked": [], "selected": []}, _hidden_gap_handoff_reply()
+    )
+
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+    assert result["validation"]["state_changes"] == []
+
+
+def test_manual_handoff_rejects_hidden_gap_without_explaining_latch_causality():
+    action = "我把鱼钩和墙脚破洞组合起来"
+    state = {"inspected": ["hole", "hook"], "talked": [], "selected": ["hole", "hook"]}
+    result = interpret_handoff_and_validate_action(action, state, _hidden_gap_handoff_reply())
+
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+
