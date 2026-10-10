@@ -9,7 +9,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top"><div><div class="tag">JARVIS · PLAYTEST BUILD 0.1</div><h1>潮痕档案馆：涨潮仓库</h1><div class="muted">目标：进入旧仓库。观察线索，提出自己的解法；失败也可以帮助你理解规则。</div></div><span class="pill">本地试玩 · 不上传数据</span></div>
+<div class="top"><div><div class="tag">JARVIS · PLAYTEST BUILD 0.1</div><h1>潮痕档案馆：涨潮仓库</h1><div class="muted">目标：进入旧仓库。观察线索，提出自己的解法；失败也可以帮助你理解规则。</div></div><span class="pill">试玩服务 · 不保存服务端对话</span></div>
 <div class="layout">
 <section class="panel"><h2>场景</h2><div class="room" aria-label="涨潮仓库场景"><div class="warehouse"></div><div class="door"></div><div class="water"></div></div>
 <p class="muted">涨潮正在上涨。仓库正门被锁住，旁边的维护通道在水位升高后会短暂连通。你听见远处有人活动。</p>
@@ -27,7 +27,7 @@
 <div class="actions"><button class="btn alt" id="export">导出试玩记录 JSON</button><button class="btn alt" id="reset">重置场景</button></div>
 </section>
 <section class="panel wide"><h2>ChatGPT 临时模型 · 人工交接</h2><p class="muted">本功能不会自动读取 ChatGPT 对话。先复制提示词到 ChatGPT，让它按 JSON 输出分析，再把完整回复粘贴回来。模型只能提出解释；服务端规则引擎独立判定是否改变世界状态。粘贴内容只保存在当前页面的试玩记录中，除非你主动导出，不会由本功能写入服务端持久存储。</p><label class="muted" for="handoffPrompt">发给 ChatGPT 的提示词（根据当前行动和线索生成）</label><textarea id="handoffPrompt" class="field" rows="5" placeholder="先在上方填写行动，再点击生成提示词。"></textarea><div class="actions"><button class="btn alt" id="makePrompt">生成提示词</button><button class="btn alt" id="copyPrompt">复制提示词</button></div><label class="muted" for="modelReply">粘贴 ChatGPT 的 JSON 回复</label><textarea id="modelReply" class="field" rows="6" placeholder='{"intent":"…","action_kind":"partial","entities":[],"reasoning":"…","uncertainties":[],"counterexample":"…"}'></textarea><div class="actions"><button class="btn" id="submitHandoff">校验回复并尝试行动</button></div><div id="handoffResult" class="result">等待人工交接的模型输出。</div></section>\n<section class="panel wide"><h2>试玩记录</h2><div class="muted">记录行动描述、线索发现、结果类型和完成状态。记录只保存在当前页面内，点击导出即可保存为 JSON。</div><div id="log" class="log" style="margin-top:10px">尚无记录。</div></section>
-<section class="panel wide"><h2>测试说明</h2><div class="muted">本原型只用于早期体验链路检查：玩家是否能提出解法、理解结果因果、把人物信息与玩法连接起来。规则判定器会识别少数演示路径，不代表完整的开放式 NPC 智能。测试者应同时记录玩家原话、困惑点和未识别但有创意的行动。请勿把这份小样本记录视为市场验证。</div></section>
+<section class="panel wide"><h2>测试说明</h2><div class="muted">本原型只用于早期体验链路检查：玩家是否能提出解法、理解结果因果、把人物信息与玩法连接起来。行动文本会发送到试玩服务进行规则校验；页面内试玩记录仅在当前浏览器内保存。规则判定器会识别少数演示路径，不代表完整的开放式 NPC 智能。测试者应同时记录玩家原话、困惑点和未识别但有创意的行动。请勿把这份小样本记录视为市场验证。</div></section>
 </div></main>
 <script>
 const $=id=>document.getElementById(id);let selected=new Set(),events=[],opened=false,found=new Set(),npcs=new Set();
@@ -63,7 +63,7 @@ $("submitHandoff").onclick=async()=>{
   const response=await fetch("/api/model-handoff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,state:currentState(),model_reply:modelReply})});
   const data=await response.json();
   if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次模型输出");
-  const r=data.validation, p=data.interpretation;
+  const r=data.validation, p=data.interpretation; if(r.ok) opened=true;
   $("handoffResult").className="result "+(r.ok?"good":"warn");
   $("handoffResult").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span> <span class="pill">人工 ChatGPT 输出 + 服务端规则校验</span><p>模型理解：'+esc(p.intent)+'</p><p>因果解释：'+esc(p.reasoning)+'</p><p>不确定性：'+esc((p.uncertainties||[]).join("；")||"未提供")+'</p><p>反例：'+esc(p.counterexample||"未提供")+'</p><p class="muted">模型输出不能直接改变世界状态；只有规则校验通过才会返回状态变化。</p>';
   log("ChatGPT 人工交接 [模型提议+规则校验]",JSON.stringify({action,model_reply:modelReply,interpretation:p,validation:r,trust:data.trust}),r.ok);
@@ -89,7 +89,7 @@ async function attempt(text,source){
   const response=await fetch("/api/game-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:text,state:{inspected:[...found],talked:[...npcs],selected:[...selected]}})});
   const data=await response.json();
   if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次行动");
-  const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验";
+  const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验"; if(r.ok) opened=true;
   $("result").className="result "+(r.ok?"good":"warn");
   $("result").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span> <span class="pill">'+esc(mode)+'</span><p class="muted">行动理解：'+esc(data.interpretation.intent)+'。模型输出不能直接改变世界状态。</p>';
   log(source+" ["+mode+"]",text+" → "+r.title+"。"+r.body,r.ok);
