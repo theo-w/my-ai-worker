@@ -458,5 +458,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"ok": True})
 
 if __name__ == "__main__":
-    print("JARVIS Dashboard: http://127.0.0.1:8765")
-    ThreadingHTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8765"))
+    print(f"JARVIS Dashboard listening on {host}:{port}")
+    ThreadingHTTPServer((host, port), Handler).serve_forever()
