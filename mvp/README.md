@@ -240,3 +240,29 @@ For a real-model test, configure `JARVIS_LLM_BASE_URL`,
 `JARVIS_LLM_API_KEY`, and `JARVIS_LLM_MODEL` in the runtime environment.
 Never commit credentials. The current CI run checks the Python suite; it does
 not execute browser interaction tests or prove that a real provider is reachable.
+
+
+## Manual ChatGPT response handoff (Loophole first, reusable JARVIS capability)
+
+The playtest includes a **manual** temporary-model workflow at `/playtest`. It does
+not read ChatGPT conversations automatically and does not require an API key:
+
+1. Enter a player's action and inspect/talk to clues as usual.
+2. Generate and copy the context-scoped prompt into a ChatGPT conversation.
+3. Ask ChatGPT for the single JSON object requested by the prompt.
+4. Paste the response back into the playtest and submit it for validation.
+
+The response contract includes `intent`, `action_kind`, `entities`, `reasoning`,
+`uncertainties`, and `counterexample`. `mvp/model_handoff.py` validates the
+shape and allowed vocabulary, then passes the proposal to the independent game
+rules validator. A model saying "success" cannot itself authorize a state change.
+Invalid output fails closed. The raw pasted response and the validation result are
+included in the **browser-local** event log export when a handoff is submitted;
+the endpoint does not persist conversation text on the server. Review exported
+logs before sharing them, since they can contain pasted text.
+
+This is an experimental handoff protocol, not a real ChatGPT connector. The
+game-specific transition validator remains separate from the reusable handoff
+contract so later JARVIS capabilities can define their own validators. A successful
+build/deploy only confirms the service is running; it does not establish player
+appeal, market validation, or the correctness of model reasoning.
