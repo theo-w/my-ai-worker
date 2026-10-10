@@ -76,3 +76,18 @@ def test_unlock_word_alone_does_not_count_as_having_a_key():
     result=interpret_and_validate_action("尝试开锁",{})
     assert result["validation"]["ok"] is False
     assert result["validation"]["world_state"]["warehouse_open"] is False
+
+
+def test_hidden_hole_and_bent_hook_is_a_valid_alternate_solution():
+    state={"inspected":["hole","hook"],"talked":[],"selected":["hole","hook"]}
+    action="清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    result=interpret_and_validate_action(action,state)
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["type"]=="隐藏环境解法"
+    assert result["validation"]["world_state"]["warehouse_open"] is True
+
+
+def test_hidden_hole_solution_requires_inspection_and_causal_action():
+    result=interpret_and_validate_action("我用鱼钩打开了门",{"inspected":[],"talked":[]})
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
