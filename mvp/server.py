@@ -246,6 +246,22 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "JSON request body must be an object."}, 400)
             return None
         return body
+    def do_HEAD(self):
+        # Render and other HTTP monitors commonly probe the root with HEAD.
+        if self.path in ("/", "/index.html", "/playtest"):
+            page = "loophole.html" if self.path == "/playtest" else "dashboard.html"
+            try:
+                size = (ROOT / page).stat().st_size
+            except OSError:
+                self.send_error(500)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(size))
+            self.end_headers()
+            return
+        self.send_error(404)
+
     def do_GET(self):
         if self.path == "/api/state":
             with LOCK:
