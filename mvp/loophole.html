@@ -51,7 +51,24 @@ function resolve(text,source){
  if(hasBell||hasRail||hasTide||hasSignal)return {ok:false,title:"行动没有打开通道",body:"这个尝试还不足以让维护通道连通。想想物件的磨损、滑轨随潮水的移动，以及居民提到的旧信号之间是否有关联。也可能是原型规则尚未覆盖你的想法。",type:"未识别/不完整行动"}
  return {ok:false,title:"没有观察到有效变化",body:"目前的原型规则无法判定这项行动。它不一定是坏主意——请把它保留在记录中，作为后续扩展系统规则的候选。",type:"未识别行动"}
 }
-function attempt(text,source){if(!text.trim())return;const r=resolve(text,source);$("result").className="result "+(r.ok?"good":"warn");$("result").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span>';log(source,text+" → "+r.title+"。"+r.body,r.ok)}
+async function attempt(text,source){
+ if(!text.trim())return;
+ $("try").disabled=true;$("key").disabled=true;$("bell").disabled=true;
+ $("result").className="result";$("result").textContent="正在解释行动并校验世界状态…";
+ try{
+  const response=await fetch("/api/game-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:text,state:{inspected:[...found],talked:[...npcs],selected:[...selected]}})});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次行动");
+  const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验";
+  $("result").className="result "+(r.ok?"good":"warn");
+  $("result").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span> <span class="pill">'+esc(mode)+'</span><p class="muted">行动理解：'+esc(data.interpretation.intent)+'。模型输出不能直接改变世界状态。</p>';
+  log(source+" ["+mode+"]",text+" → "+r.title+"。"+r.body,r.ok);
+ }catch(error){
+  $("result").className="result warn";
+  $("result").textContent="本次行动未执行："+String(error.message||error)+"。为避免把模型回答误当成游戏结果，服务不可用时不会在浏览器中伪造成功。";
+  log(source+" [请求失败]",text+" → "+String(error.message||error),false);
+ }finally{$("try").disabled=false;$("key").disabled=false;$("bell").disabled=false}
+}
 $("try").onclick=()=>attempt($("action").value,"自由输入行动");
 $("key").onclick=()=>{selected.add("key");found.add("key");attempt("使用铜钥匙开锁","快捷动作")};
 $("bell").onclick=()=>{selected.add("bell");selected.add("rope");found.add("bell");found.add("rope");attempt("把铜铃固定在浮动滑轨上，借涨潮推动它并发出三声搬运信号","快捷动作")};
