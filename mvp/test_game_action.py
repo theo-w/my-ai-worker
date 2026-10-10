@@ -54,3 +54,19 @@ def test_prompt_is_manual_and_state_scoped():
     prompt=build_handoff_prompt("尝试打开仓库",{"inspected":["key"]})
     assert "Return exactly one JSON object" in prompt
     assert "尝试打开仓库" in prompt
+
+
+def test_manual_handoff_rejects_wrong_state_types():
+    reply=json.dumps({"intent":"用钥匙开仓库门","action_kind":"use_key","entities":["key","door"],"reasoning":"钥匙匹配门锁"})
+    with pytest.raises(ValueError):
+        interpret_handoff_and_validate_action("使用铜钥匙打开仓库门",{"inspected":"bell","talked":[]},reply)
+
+def test_manual_handoff_rejects_oversized_model_reply():
+    with pytest.raises(ValueError):
+        interpret_handoff_and_validate_action("使用钥匙开门",{}, "x"*12001)
+
+def test_model_cannot_turn_partial_action_into_success():
+    reply=json.dumps({"intent":"说自己已经成功","action_kind":"use_key","entities":["key","door"],"reasoning":"仅凭模型说成功"})
+    result=interpret_handoff_and_validate_action("我宣布自己已经成功",{"inspected":[],"talked":[]},reply)
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
