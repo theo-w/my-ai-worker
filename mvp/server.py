@@ -318,8 +318,22 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action"):
+        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
+            return
+        if self.path == "/api/model-handoff":
+            body = self._read_json(max_bytes=131072)
+            if body is None:
+                return
+            action = body.get("action")
+            state = body.get("state", {})
+            model_reply = body.get("model_reply")
+            try:
+                result = interpret_handoff_and_validate_action(action, state, model_reply)
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            self._json(result)
             return
         if self.path == "/api/game-action":
             body = self._read_json(max_bytes=65536)
