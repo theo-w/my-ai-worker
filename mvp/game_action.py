@@ -10,7 +10,7 @@ Never claim that the world changed. use_key requires an intended key-to-door act
 KINDS={"use_key","combine_signal","partial","unknown"}
 ENTITIES={"key","bell","rail","tide","signal","door"}
 PATTERNS={
- "key":r"钥匙|开锁|key", "bell":r"铃|铜铃|bell",
+ "key":r"钥匙|key", "bell":r"铃|铜铃|bell",
  "rail":r"滑轨|栏杆|轨道|浮绳|绳索|rope|rail",
  "tide":r"潮|水位|涨潮|水流|tide|water",
  "signal":r"信号|三声|搬运|响|敲|声音|铃声|signal|ring",
