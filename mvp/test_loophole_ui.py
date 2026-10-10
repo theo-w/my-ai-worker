@@ -5,7 +5,7 @@ HTML = Path(__file__).with_name("loophole.html").read_text(encoding="utf-8")
 
 
 def test_reset_restores_scene_status_and_syncs_visual_state():
-    match = re.search(r'\$("reset")\.onclick=\(\)=>\{(.*?)renderLog\(\)\};', HTML, re.S)
+    match = re.search(r'\$\("reset"\)\.onclick=\(\)=>\{(.*?)renderLog\(\)\};', HTML, re.S)
     assert match, "reset handler should remain identifiable"
     body = match.group(1)
 
