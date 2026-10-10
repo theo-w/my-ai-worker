@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import re
-from .game_action import ENTITIES, KINDS, validate_world_transition
+try:\n    from .game_action import ENTITIES, KINDS, validate_world_transition\nexcept ImportError:  # Direct script execution from mvp/\n    from game_action import ENTITIES, KINDS, validate_world_transition
 
 MAX_REPLY_CHARS = 12000
 
