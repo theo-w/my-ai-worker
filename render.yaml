@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: jarvis-loophole-playtest
+    runtime: python
+    plan: free
+    branch: feat/autonomous-twin-project-loop
+    buildCommand: python -m compileall -q mvp
+    startCommand: python -m mvp.server
+    healthCheckPath: /api/llm/status
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
