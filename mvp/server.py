@@ -20,6 +20,7 @@ try:
     from .accuracy import classify_output
     from .experience_design import create_design_brief
     from .game_action import interpret_and_validate_action
+    from .model_handoff import interpret_handoff_and_validate_action
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -30,6 +31,7 @@ except ImportError:  # Direct script execution from mvp/
     from accuracy import classify_output
     from experience_design import create_design_brief
     from game_action import interpret_and_validate_action
+    from model_handoff import interpret_handoff_and_validate_action
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
