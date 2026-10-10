@@ -266,3 +266,15 @@ game-specific transition validator remains separate from the reusable handoff
 contract so later JARVIS capabilities can define their own validators. A successful
 build/deploy only confirms the service is running; it does not establish player
 appeal, market validation, or the correctness of model reasoning.
+
+
+### Current handoff verification checklist
+
+- [ ] A normal key action is accepted only when the action text mentions a key and the door/unlocking action.
+- [ ] The alternate route is accepted only when the action connects bell, rail/rope, tide and signal, and the required inspection/talk state is present.
+- [ ] A model claiming "success" without rule conditions cannot open the warehouse.
+- [ ] Invalid JSON, unsupported action kinds/entities, invalid state types, and oversized responses fail closed.
+- [ ] Browser UI manual handoff works on the deployed service and the exported event log can be inspected.
+- [ ] Deployment status is confirmed for the latest commit, not inferred from a previous live build.
+
+The first five items require code/tests or hands-on runtime checks; a successful Render deploy alone does not mark them all complete.
