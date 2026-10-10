@@ -128,7 +128,7 @@ async function attempt(text,source){
   const response=await fetch("/api/game-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:text,state:{inspected:[...found],talked:[...npcs],selected:[...selected]}})});
   const data=await response.json();
   if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次行动");
-  const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验"; if(r.ok) opened=true;
+  const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验"; if(r.ok){opened=true;animateWorld(r.type)}
   $("result").className="result "+(r.ok?"good":"warn");
   $("result").innerHTML='<b>'+esc(r.title)+'</b><p>'+esc(r.body)+'</p><span class="pill">'+esc(r.type)+'</span> <span class="pill">'+esc(mode)+'</span><p class="muted">行动理解：'+esc(data.interpretation.intent)+'。模型输出不能直接改变世界状态。</p>';
   log(source+" ["+mode+"]",text+" → "+r.title+"。"+r.body,r.ok);
@@ -141,6 +141,6 @@ async function attempt(text,source){
 $("try").onclick=()=>attempt($("action").value,"自由输入行动");
 $("key").onclick=()=>{selected.add("key");found.add("key");attempt("使用铜钥匙开锁","快捷动作")};
 $("bell").onclick=()=>{selected.add("bell");selected.add("rope");found.add("bell");found.add("rope");attempt("把铜铃固定在浮动滑轨上，借涨潮推动它并发出三声搬运信号","快捷动作")};
-$("export").onclick=()=>{const blob=new Blob([JSON.stringify({prototype:"Tidemark Archive Warehouse v0.3",generated_at:new Date().toISOString(),notice:"Local prototype event log; pasted model responses are unverified reasoning artifacts, not validated player research.",events},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="jarvis-playtest-events.json";a.click();URL.revokeObjectURL(url)};
+$("export").onclick=()=>{const blob=new Blob([JSON.stringify({prototype:"Tidemark Archive Warehouse v0.4",generated_at:new Date().toISOString(),notice:"Local prototype event log; pasted model responses are unverified reasoning artifacts, not validated player research.",events},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="jarvis-playtest-events.json";a.click();URL.revokeObjectURL(url)};
 $("reset").onclick=()=>{$("room").classList.remove("opened","pulse","discover");selected=new Set();events=[];opened=false;found=new Set();npcs=new Set();mechanics=new Set();document.querySelectorAll("[data-mechanic]").forEach(x=>x.classList.remove("selected"));$("comboResult").className="result";$("comboResult").textContent="尚未选择玩法要素。建议至少选择两个不同类型的要素，探索系统之间的交汇。";$("handoffPrompt").value="";$("modelReply").value="";$("handoffResult").className="result";$("handoffResult").textContent="等待人工交接的模型输出。模型提议 ≠ 游戏事实；以规则校验结果为准。";document.querySelectorAll("[data-clue]").forEach(x=>x.classList.remove("selected"));$("clue").textContent="点击任一物件查看线索。";$("npc").textContent="两位居民掌握的信息不同；他们都不全知，也未必完全可信。";$("action").value="";$("result").className="result";$("result").textContent="等待你的行动。没有预设在按钮里的想法，也可以直接描述。";renderLog()};
 </script></body></html>
