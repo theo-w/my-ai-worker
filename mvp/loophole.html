@@ -42,7 +42,9 @@ const $=id=>document.getElementById(id);let selected=new Set(),events=[],opened=
 const clues={
  key:"钥匙齿口的新鲜刮痕与仓库门锁吻合。它是直接、可靠的解法，但不会告诉你仓库过去发生过什么。",
  bell:"铜铃柄有两道平行磨痕，像曾被绑在移动结构上。铃身刻着一个几乎磨平的三道波纹标记。",
- rope:"浮绳固定在一条可随潮水移动的滑轨上。水位升高时，滑轨会缓慢向维护通道一侧移动。"
+ rope:"浮绳固定在一条可随潮水移动的滑轨上。水位升高时，滑轨会缓慢向维护通道一侧移动。",
+ hole:"墙脚破洞被泥和旧布堵住一半，深处有金属反光；洞后似乎通向门内侧。",
+ hook:"这枚弯鱼钩虽然不起眼，但尖端仍坚硬，弧度可能适合勾住狭窄缝隙里的门闩。"
 };
 function log(type,detail,success=false){events.push({time:new Date().toISOString(),type,detail,success,found:[...found],selected:[...selected],npcs:[...npcs],world:{warehouse_open:opened}});renderLog()}
 function renderLog(){$("log").innerHTML=events.length?events.slice().reverse().map(e=>'<div><b>'+esc(e.type)+'</b> · '+esc(e.detail)+' <span class="pill">'+(e.success?"目标推进":"未完成")+'</span></div>').join(""):"尚无记录。"}
@@ -58,6 +60,7 @@ function inspectHidden(id){const b=document.querySelector(`[data-clue="${id}"]`)
 const mechanicNames={key:"铜钥匙/直接解锁",bell:"旧铜铃/可复用信号",rail:"浮绳与滑轨/空间移动",tide:"潮汐/时间与动力",memory:"居民记忆/旧搬运信号",relationship:"NPC 信任与关系",hole:"墙脚破洞/隐藏通路",hook:"弯曲鱼钩/远距操作"};
 function comboAction(){
  const m=mechanics;
+ if(m.has("hole")&&m.has("hook"))return "先清理墙脚被泥和旧布堵住的破洞，再把弯曲鱼钩伸进去，尝试勾住门内侧的插销并拉开";
  if(m.has("key")&&!m.has("bell")&&!m.has("rail")&&!m.has("tide"))return "使用铜钥匙打开仓库门";
  if(m.has("bell")&&m.has("rail")&&m.has("tide")&&(m.has("memory")||m.has("relationship")))return "把铜铃固定在浮动滑轨上，借涨潮推动它发出三声旧搬运信号，并根据居民的记忆与信任判断是否回应";
  if(m.has("bell")&&m.has("rail")&&m.has("tide"))return "把铜铃固定在浮动滑轨上，借涨潮推动它发出三声搬运信号";
