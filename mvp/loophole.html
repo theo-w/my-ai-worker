@@ -51,8 +51,10 @@ document.querySelectorAll("[data-clue]").forEach(b=>b.onclick=()=>{const id=b.da
 $("talk1").onclick=()=>{npcs.add("repairer");$("npc").textContent="修复师说：水位升高时，旧滑轨会被水流推向西侧。过去的工人用三声短铃表示“维护通道可以通行”。";log("交谈","修复师提供潮汐与滑轨信息")};
 $("talk2").onclick=()=>{npcs.add("porter");$("npc").textContent="搬运工说：他的祖母曾在旧仓库夜班工作。她说那种三道波纹的铃声不是警报，而是工人之间的通行信号。";log("交谈","搬运工提供旧铃声的社会含义")};
 
-function animateWorld(type){const room=$("room");room.classList.add("opened","pulse");const s=document.createElement("span");s.className="spark";s.textContent=type==="隐藏环境解法"?"✨":"✦";s.style.left="49%";s.style.top="48%";room.appendChild(s);setTimeout(()=>{s.remove();room.classList.remove("pulse")},1000)}\n function currentState(){return {inspected:[...found],talked:[...npcs],selected:[...selected],world:{warehouse_open:opened}}}
-function currentAction(){return $("action").value.trim()}\nfunction inspectHidden(id){const b=document.querySelector(`[data-clue="${id}"]`);if(b)b.click();$("room").classList.add("discover");setTimeout(()=>$("room").classList.remove("discover"),1700)}
+function animateWorld(type){const room=$("room");room.classList.add("opened","pulse");const s=document.createElement("span");s.className="spark";s.textContent=type==="隐藏环境解法"?"✨":"✦";s.style.left="49%";s.style.top="48%";room.appendChild(s);setTimeout(()=>{s.remove();room.classList.remove("pulse")},1000)}
+ function currentState(){return {inspected:[...found],talked:[...npcs],selected:[...selected],world:{warehouse_open:opened}}}
+function currentAction(){return $("action").value.trim()}
+function inspectHidden(id){const b=document.querySelector(`[data-clue="${id}"]`);if(b)b.click();$("room").classList.add("discover");setTimeout(()=>$("room").classList.remove("discover"),1700)}
 const mechanicNames={key:"铜钥匙/直接解锁",bell:"旧铜铃/可复用信号",rail:"浮绳与滑轨/空间移动",tide:"潮汐/时间与动力",memory:"居民记忆/旧搬运信号",relationship:"NPC 信任与关系",hole:"墙脚破洞/隐藏通路",hook:"弯曲鱼钩/远距操作"};
 function comboAction(){
  const m=mechanics;
