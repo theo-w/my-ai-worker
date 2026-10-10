@@ -19,6 +19,7 @@ try:
     from .planning import plan_project, replan_failed_tasks, validate_plan
     from .accuracy import classify_output
     from .experience_design import create_design_brief
+    from .game_action import interpret_and_validate_action
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -28,6 +29,7 @@ except ImportError:  # Direct script execution from mvp/
     from planning import plan_project, replan_failed_tasks, validate_plan
     from accuracy import classify_output
     from experience_design import create_design_brief
+    from game_action import interpret_and_validate_action
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -300,8 +302,22 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design"):
+        if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action"):
             self.send_error(404)
+            return
+        if self.path == "/api/game-action":
+            body = self._read_json(max_bytes=65536)
+            if body is None:
+                return
+            action = body.get("action")
+            state = body.get("state", {})
+            llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+            try:
+                result = interpret_and_validate_action(action, state, llm_client)
+            except (ValueError, RuntimeError, OSError) as exc:
+                self._json({"ok": False, "error": "Action interpretation failed closed: " + type(exc).__name__}, 502)
+                return
+            self._json(result)
             return
         if self.path == "/api/experience-design":
             body = self._read_json(max_bytes=65536)
