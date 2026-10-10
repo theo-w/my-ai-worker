@@ -26,7 +26,7 @@
 <div id="result" class="result">等待你的行动。没有预设在按钮里的想法，也可以直接描述。</div>
 <div class="actions"><button class="btn alt" id="export">导出试玩记录 JSON</button><button class="btn alt" id="reset">重置场景</button></div>
 </section>
-<section class="panel wide"><h2>ChatGPT 临时模型 · 人工交接</h2><p class="muted">本功能不会自动读取 ChatGPT 对话。先复制提示词到 ChatGPT，让它按 JSON 输出分析，再把完整回复粘贴回来。模型只能提出解释；服务端规则引擎独立判定是否改变世界状态。粘贴内容只保存在当前页面的试玩记录中，除非你主动导出，不会由本功能写入服务端持久存储。</p><label class="muted" for="handoffPrompt">发给 ChatGPT 的提示词（根据当前行动和线索生成）</label><textarea id="handoffPrompt" class="field" rows="5" placeholder="先在上方填写行动，再点击生成提示词。"></textarea><div class="actions"><button class="btn alt" id="makePrompt">生成提示词</button><button class="btn alt" id="copyPrompt">复制提示词</button></div><label class="muted" for="modelReply">粘贴 ChatGPT 的 JSON 回复</label><textarea id="modelReply" class="field" rows="6" placeholder='{"intent":"…","action_kind":"partial","entities":[],"reasoning":"…","uncertainties":[],"counterexample":"…"}'></textarea><div class="actions"><button class="btn" id="submitHandoff">校验回复并尝试行动</button></div><div id="handoffResult" class="result">等待人工交接的模型输出。</div></section>\n<section class="panel wide"><h2>试玩记录</h2><div class="muted">记录行动描述、线索发现、结果类型和完成状态。记录只保存在当前页面内，点击导出即可保存为 JSON。</div><div id="log" class="log" style="margin-top:10px">尚无记录。</div></section>
+<section class="panel wide"><h2>ChatGPT 临时模型 · 人工交接</h2><p class="muted">本功能不会自动读取 ChatGPT 对话。先复制提示词到 ChatGPT，让它按 JSON 输出分析，再把完整回复粘贴回来。模型只能提出解释；服务端规则引擎独立判定是否改变世界状态。粘贴内容只保存在当前页面的试玩记录中，除非你主动导出，不会由本功能写入服务端持久存储。</p><label class="muted" for="handoffPrompt">发给 ChatGPT 的提示词（根据当前行动和线索生成）</label><textarea id="handoffPrompt" class="field" rows="5" placeholder="先在上方填写行动，再点击生成提示词。"></textarea><div class="actions"><button class="btn alt" id="makePrompt">生成提示词</button><button class="btn alt" id="copyPrompt">复制提示词</button></div><label class="muted" for="modelReply">粘贴 ChatGPT 的 JSON 回复</label><textarea id="modelReply" class="field" rows="6" placeholder='{"intent":"…","action_kind":"partial","entities":[],"reasoning":"…","uncertainties":[],"counterexample":"…"}'></textarea><div class="actions"><button class="btn" id="submitHandoff">校验回复并尝试行动</button></div><div id="handoffResult" class="result">等待人工交接的模型输出。</div></section>\n<section class="panel wide"><h2>试玩记录</h2><div class="muted">记录行动描述、调查/选中线索、交谈对象、判定结果与世界状态。记录只保存在当前页面内；点击导出即可保存为 JSON。请在分享前检查导出内容，因其中可能包含你粘贴的模型回复。</div><div id="log" class="log" style="margin-top:10px">尚无记录。</div></section>
 <section class="panel wide"><h2>测试说明</h2><div class="muted">本原型只用于早期体验链路检查：玩家是否能提出解法、理解结果因果、把人物信息与玩法连接起来。行动文本会发送到试玩服务进行规则校验；页面内试玩记录仅在当前浏览器内保存。规则判定器会识别少数演示路径，不代表完整的开放式 NPC 智能。测试者应同时记录玩家原话、困惑点和未识别但有创意的行动。请勿把这份小样本记录视为市场验证。</div></section>
 </div></main>
 <script>
@@ -36,7 +36,7 @@ const clues={
  bell:"铜铃柄有两道平行磨痕，像曾被绑在移动结构上。铃身刻着一个几乎磨平的三道波纹标记。",
  rope:"浮绳固定在一条可随潮水移动的滑轨上。水位升高时，滑轨会缓慢向维护通道一侧移动。"
 };
-function log(type,detail,success=false){events.push({time:new Date().toISOString(),type,detail,success,found:[...found],npcs:[...npcs]});renderLog()}
+function log(type,detail,success=false){events.push({time:new Date().toISOString(),type,detail,success,found:[...found],selected:[...selected],npcs:[...npcs],world:{warehouse_open:opened}});renderLog()}
 function renderLog(){$("log").innerHTML=events.length?events.slice().reverse().map(e=>'<div><b>'+esc(e.type)+'</b> · '+esc(e.detail)+' <span class="pill">'+(e.success?"目标推进":"未完成")+'</span></div>').join(""):"尚无记录。"}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 document.querySelectorAll("[data-clue]").forEach(b=>b.onclick=()=>{const id=b.dataset.clue;selected.has(id)?selected.delete(id):selected.add(id);found.add(id);document.querySelectorAll("[data-clue]").forEach(x=>x.classList.toggle("selected",selected.has(x.dataset.clue)));$("clue").textContent=clues[id];log("调查物件",id+": "+clues[id])});
@@ -72,7 +72,8 @@ $("submitHandoff").onclick=async()=>{
   log("ChatGPT 人工交接 [失败]",JSON.stringify({action,model_reply:modelReply,error:String(error.message||error)}),false);
  }finally{$("submitHandoff").disabled=false}
 };
-\nfunction resolve(text,source){
+
+function resolve(text,source){
  const t=text.toLowerCase(),hasBell=/铃|铜铃|bell/.test(t),hasRail=/滑轨|栏杆|轨道|浮绳|rope|rail/.test(t),hasTide=/潮|水位|涨潮|水流|tide/.test(t),hasSignal=/信号|三声|搬运|响|敲|声音|铃声|signal|ring/.test(t),hasKey=/钥匙|开锁|key/.test(t);
  if(/钥匙|开门|开锁|key/.test(t)&&hasKey){opened=true;return {ok:true,title:"仓库门打开了",body:"钥匙与锁芯吻合。你进入仓库，得到直接结果。这个解法可靠，但没有用到居民线索。",type:"标准解法"}}
  if((hasBell&&hasRail&&hasTide&&hasSignal)||(selected.has("bell")&&selected.has("rope")&&found.has("bell")&&found.has("rope")&&npcs.size>0&&hasSignal)){
@@ -102,6 +103,6 @@ async function attempt(text,source){
 $("try").onclick=()=>attempt($("action").value,"自由输入行动");
 $("key").onclick=()=>{selected.add("key");found.add("key");attempt("使用铜钥匙开锁","快捷动作")};
 $("bell").onclick=()=>{selected.add("bell");selected.add("rope");found.add("bell");found.add("rope");attempt("把铜铃固定在浮动滑轨上，借涨潮推动它并发出三声搬运信号","快捷动作")};
-$("export").onclick=()=>{const blob=new Blob([JSON.stringify({prototype:"Tidemark Archive Warehouse v0.2",generated_at:new Date().toISOString(),notice:"Local prototype event log; pasted model responses are unverified reasoning artifacts, not validated player research.",events},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="jarvis-playtest-events.json";a.click();URL.revokeObjectURL(url)};
+$("export").onclick=()=>{const blob=new Blob([JSON.stringify({prototype:"Tidemark Archive Warehouse v0.3",generated_at:new Date().toISOString(),notice:"Local prototype event log; pasted model responses are unverified reasoning artifacts, not validated player research.",events},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="jarvis-playtest-events.json";a.click();URL.revokeObjectURL(url)};
 $("reset").onclick=()=>{selected=new Set();events=[];opened=false;found=new Set();npcs=new Set();document.querySelectorAll("[data-clue]").forEach(x=>x.classList.remove("selected"));$("clue").textContent="点击任一物件查看线索。";$("npc").textContent="两位居民掌握的信息不同；他们都不全知，也未必完全可信。";$("action").value="";$("result").className="result";$("result").textContent="等待你的行动。没有预设在按钮里的想法，也可以直接描述。";renderLog()};
 </script></body></html>
