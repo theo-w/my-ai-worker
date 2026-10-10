@@ -48,7 +48,7 @@ def _propose(action,llm_client):
 
 def validate_world_transition(action,state,proposal):
  inspected=set(state["inspected"]); talked=set(state["talked"])
- has_key=_has(PATTERNS["key"],action); has_door=_has(PATTERNS["door"],action)
+ has_key=_has(PATTERNS["key"],action); has_door=_has(PATTERNS["door"],action) or _has(r"开锁|开门|锁芯|unlock",action)
  mentions_all=all(_has(PATTERNS[e],action) for e in ("bell","rail","tide","signal"))
  if proposal["action_kind"]=="use_key" and has_key and has_door:
   return {"ok":True,"title":"仓库门打开了","body":"规则校验确认：行动明确使用钥匙处理仓库门锁。钥匙与锁芯吻合，你进入仓库。","type":"标准解法","state_changes":["warehouse_open"],"world_state":{"warehouse_open":True,"maintenance_route_open":False}}
