@@ -70,3 +70,9 @@ def test_model_cannot_turn_partial_action_into_success():
     result=interpret_handoff_and_validate_action("我宣布自己已经成功",{"inspected":[],"talked":[]},reply)
     assert result["validation"]["ok"] is False
     assert result["validation"]["world_state"]["warehouse_open"] is False
+
+
+def test_unlock_word_alone_does_not_count_as_having_a_key():
+    result=interpret_and_validate_action("尝试开锁",{})
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
