@@ -68,7 +68,8 @@ function comboAction(){
  if(m.has("rail")&&m.has("tide"))return "观察涨潮如何推动浮绳与滑轨，尝试借助环境变化接近维护通道";
  return "尝试组合："+[...m].map(x=>mechanicNames[x]).join("、")+"，并说明它们之间的因果关系";
 }
-document.querySelectorAll("[data-mechanic]").forEach(b=>b.onclick=()=>{const id=b.dataset.mechanic;if(mechanics.has(id))mechanics.delete(id);else mechanics.add(id);b.classList.toggle("selected",mechanics.has(id));$("comboResult").className="result";$("comboResult").textContent="已选择："+[...mechanics].map(x=>mechanicNames[x]).join(" + ")+"。这些是方案组件，不代表游戏内已获得线索。"});
+function refreshComboPreview(){if(!mechanics.size){$("comboResult").className="result";$("comboResult").textContent="尚未选择玩法要素。选择后，候选解法会立即更新。";return}const action=comboAction();$("action").value=action;$("comboResult").className="result";$("comboResult").textContent="实时候选："+action+"。\n组件："+[...mechanics].map(x=>mechanicNames[x]).join(" + ")+"。选择组件只生成假设，不会自动获得线索或触发成功。"}
+document.querySelectorAll("[data-mechanic]").forEach(b=>b.onclick=()=>{const id=b.dataset.mechanic;if(mechanics.has(id))mechanics.delete(id);else mechanics.add(id);b.classList.toggle("selected",mechanics.has(id));refreshComboPreview()});
 function buildCombo(){if(!mechanics.size){$("comboResult").className="result warn";$("comboResult").textContent="请先选择至少一个玩法要素。";return ""}const action=comboAction();$("action").value=action;$("comboResult").className="result";$("comboResult").textContent="候选方案："+action+"。\n组合要素："+[...mechanics].map(x=>mechanicNames[x]).join(" + ")+"。下一步可直接测试规则，或交给 ChatGPT 分析因果、边界条件和反例。";log("组合玩法方案",JSON.stringify({mechanics:[...mechanics],action}),false);return action}
 $("buildCombo").onclick=buildCombo;
 $("testCombo").onclick=()=>{const action=buildCombo();if(action)attempt(action,"组合方案测试")};
