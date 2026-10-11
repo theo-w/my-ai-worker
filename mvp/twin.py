@@ -400,7 +400,7 @@ class DigitalTwinCoordinator:
 
     def execute_goal(self, goal: str, employees: list, max_cycles: int = 8,
                      tasks: list[dict] | None = None,
-                     execution_profile: dict | None = None) -> dict:
+                     execution_profile: dict | None = None,\n                     revision_policy=None) -> dict:
         """Select a bounded execution mode, then supervise and verify the goal.
 
         Parallel execution is opt-in via explicit estimated benefits; a larger
@@ -505,6 +505,48 @@ class DigitalTwinCoordinator:
                     worker_runs.append({"cycle": cycle, **result})
             events.append({"type": "cycle_finished", "cycle": cycle,
                            "execution_mode": decision.mode, "worker_results": cycle_results})
+            if revision_policy is not None:
+                try:
+                    revision_snapshot = self.inspect()
+                    revision = revision_policy(
+                        goal,
+                        [t for t in revision_snapshot["tasks"] if t["task_id"] in ids],
+                        cycle,
+                    ) or {}
+                    if not isinstance(revision, dict):
+                        raise ValueError("revision_policy must return an object")
+                    for action in revision.get("merge", [])[:10]:
+                        target_id = action.get("target_task_id")
+                        source_ids = action.get("source_task_ids", [])
+                        reason = str(action.get("reason", "Plan consolidation"))
+                        if target_id not in ids or not isinstance(source_ids, list) or any(sid not in ids for sid in source_ids):
+                            events.append({"type": "revision_rejected", "action": "merge",
+                                           "reason": "Task IDs must belong to the current goal."})
+                            continue
+                        try:
+                            merged = self.merge_tasks(target_id, source_ids, reason)
+                            ids.difference_update(source_ids)
+                            events.append({"type": "tasks_merged", "target_task_id": target_id,
+                                           "source_task_ids": source_ids, "reason": reason})
+                        except (DigitalTwinAPIError, ValueError) as exc:
+                            events.append({"type": "revision_rejected", "action": "merge",
+                                           "reason": str(exc)[:300]})
+                    for action in revision.get("cancel", [])[:10]:
+                        task_id = action.get("task_id")
+                        reason = str(action.get("reason", "No longer valuable"))
+                        if task_id not in ids:
+                            continue
+                        try:
+                            self.cancel_task(task_id, reason)
+                            ids.discard(task_id)
+                            events.append({"type": "task_cancelled", "task_id": task_id,
+                                           "reason": reason})
+                        except (DigitalTwinAPIError, ValueError) as exc:
+                            events.append({"type": "revision_rejected", "action": "cancel",
+                                           "task_id": task_id, "reason": str(exc)[:300]})
+                except Exception as exc:
+                    events.append({"type": "revision_policy_failed",
+                                   "cycle": cycle, "error": type(exc).__name__})
             after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
                      if t["task_id"] in ids}
             if after and all(s in ("completed", "blocked", "failed") for s in after.values()):
@@ -549,6 +591,31 @@ class DigitalTwinCoordinator:
             "execution_decision": decision.to_dict(),
             "evidence_note": "执行器输出不自动等于已核实证据；必须检查来源与可复现性。",
         }
+
+    def cancel_task(self, task_id: str, reason: str) -> dict:
+        """Cancel pending work through the authenticated admin API."""
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task_id must be a non-empty string")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
+        return self._request("POST", "/api/workforce/cancel", {
+            "task_id": task_id, "reason": reason.strip()[:1000],
+        })
+
+    def merge_tasks(self, target_task_id: str, source_task_ids: list[str],
+                    reason: str) -> dict:
+        """Merge only compatible, unstarted tasks; server enforces final invariants."""
+        if not isinstance(target_task_id, str) or not target_task_id.strip():
+            raise ValueError("target_task_id must be a non-empty string")
+        if not isinstance(source_task_ids, list) or not source_task_ids:
+            raise ValueError("source_task_ids must be a non-empty list")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
+        return self._request("POST", "/api/workforce/merge", {
+            "target_task_id": target_task_id,
+            "source_task_ids": source_task_ids,
+            "reason": reason.strip()[:1000],
+        })
 
     def give_feedback(self, task_id: str, message: str, kind: str = "correction") -> dict:
         if not isinstance(task_id, str) or not task_id.strip():
