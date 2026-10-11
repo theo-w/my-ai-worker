@@ -165,3 +165,41 @@ def test_worker_heartbeat_is_authenticated_and_cannot_impersonate(workforce_http
     status, snapshot = request_json(base, "/api/workforce", ADMIN)
     assert status == 200
     assert any(w["worker_id"] == "researcher" for w in snapshot["workers"])
+
+
+def test_admin_can_cancel_and_merge_tasks_but_worker_cannot(workforce_http):
+    base, _ = workforce_http
+    status, target = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Analyze cohort A", "description": "Week one", "capability": "analysis",
+    })
+    assert status == 201
+    status, source = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Analyze cohort B", "description": "Week two", "capability": "analysis",
+    })
+    assert status == 201
+
+    status, forbidden = request_json(base, "/api/workforce/merge", ANALYST, {
+        "target_task_id": target["task"]["id"],
+        "source_task_ids": [source["task"]["id"]],
+        "reason": "Combine duplicates",
+    })
+    assert status == 403
+
+    status, merged = request_json(base, "/api/workforce/merge", ADMIN, {
+        "target_task_id": target["task"]["id"],
+        "source_task_ids": [source["task"]["id"]],
+        "reason": "Combine duplicate analyses",
+    })
+    assert status == 200
+    assert merged["target"]["id"] == target["task"]["id"]
+    assert merged["sources"][0]["status"] == "superseded"
+
+    status, cancel_target = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Obsolete task", "capability": "analysis",
+    })
+    assert status == 201
+    status, cancelled = request_json(base, "/api/workforce/cancel", ADMIN, {
+        "task_id": cancel_target["task"]["id"], "reason": "Goal no longer needs it",
+    })
+    assert status == 200
+    assert cancelled["task"]["status"] == "cancelled"
