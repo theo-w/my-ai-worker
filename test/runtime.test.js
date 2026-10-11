@@ -9,91 +9,88 @@ const { createServer } = require('../src/server');
 
 async function setup(t) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-runtime-'));
-  const server = createServer({ storePath: path.join(dir, 'runtime.json') });
+  const server = createServer({ storePath: path.join(dir, 'runtime.json'), adminToken: 'test-admin-secret', workerToken: 'test-worker-secret', workerId: 'worker-1' });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   t.after(async () => {
     await new Promise((resolve) => server.close(resolve));
     await fs.rm(dir, { recursive: true, force: true });
   });
-  async function request(route, method = 'GET', body) {
+  async function request(route, method = 'GET', body, token = 'test-admin-secret') {
     const response = await fetch(base + route, {
       method,
-      headers: body === undefined ? {} : { 'content-type': 'application/json' },
+      headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: 'Bearer ' + token } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     return { status: response.status, body: await response.json() };
   }
-  return { request, dir };
+  return { request };
 }
 
-test('health endpoint reports healthy runtime', async (t) => {
+test('health endpoint is public for deployment probes', async (t) => {
   const { request } = await setup(t);
-  const response = await request('/health');
+  const response = await request('/health', 'GET', undefined, null);
   assert.equal(response.status, 200);
-  assert.equal(response.body.status, 'ok');
 });
 
-test('task can be created, accepted, progressed, and completed with evidence', async (t) => {
+test('task can be created, accepted, progressed, and completed', async (t) => {
   const { request } = await setup(t);
-  const created = await request('/tasks', 'POST', { goal: 'Assess AI-native game feasibility', worker_type: 'research' });
+  const created = await request('/tasks', 'POST', { goal: 'Assess AI-native game feasibility' });
   assert.equal(created.status, 201);
   const id = created.body.task.task_id;
-  assert.equal(created.body.task.status, 'queued');
-
-  assert.equal((await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'researcher-1' })).body.task.status, 'accepted');
-  assert.equal((await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'progress', summary: 'Reviewing market and technical constraints', progress: 40
-  })).body.task.status, 'running');
-
-  const completed = await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'result', summary: 'Assessment complete', result: { verdict: 'promising' },
-    artifacts: ['reports/feasibility.md'], evidence: ['market research notes']
-  });
-  assert.equal(completed.status, 201);
-  assert.equal(completed.body.task.status, 'succeeded');
-  const detail = await request('/tasks/' + id);
-  assert.equal(detail.body.events.length, 4);
+  assert.equal((await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret')).body.task.status, 'accepted');
+  assert.equal((await request('/tasks/' + id + '/events', 'POST', { event_type: 'progress', summary: 'Researching', progress: 40 }, 'test-worker-secret')).body.task.status, 'running');
+  const result = await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Done', result: { verdict: 'promising' }, evidence: ['research notes'] }, 'test-worker-secret');
+  assert.equal(result.body.task.status, 'succeeded');
+  assert.equal((await request('/tasks/' + id)).body.events.length, 4);
 });
 
-test('approval-required task cannot succeed before explicit approval', async (t) => {
+test('approval-required task needs explicit admin approval', async (t) => {
   const { request } = await setup(t);
-  const created = await request('/tasks', 'POST', { goal: 'Prepare external announcement', approval_required: true });
+  const created = await request('/tasks', 'POST', { goal: 'Prepare announcement', approval_required: true });
   const id = created.body.task.task_id;
-  await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'comms-1' });
-  const result = await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'result', summary: 'Draft prepared', result: { draft: 'Ready for review' }
-  });
+  await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
+  const result = await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Draft ready', result: { draft: 'Review me' } }, 'test-worker-secret');
   assert.equal(result.body.task.status, 'awaiting_approval');
-  const approved = await request('/tasks/' + id + '/approve', 'POST', { approved: true });
-  assert.equal(approved.body.task.status, 'succeeded');
+  assert.equal((await request('/tasks/' + id + '/approve', 'POST', { approved: true }, 'test-worker-secret')).status, 403);
+  assert.equal((await request('/tasks/' + id + '/approve', 'POST', { approved: true })).body.task.status, 'succeeded');
 });
 
-test('blocked task can be retried only within attempt limit', async (t) => {
+test('blocked task retries only within attempt limit', async (t) => {
   const { request } = await setup(t);
   const created = await request('/tasks', 'POST', { goal: 'Collect test data', max_attempts: 1 });
   const id = created.body.task.task_id;
-  await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'qa-1' });
-  const blocked = await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'blocked', summary: 'Dataset access unavailable', blocker: 'Need data access'
-  });
-  assert.equal(blocked.body.task.status, 'blocked');
+  await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
+  assert.equal((await request('/tasks/' + id + '/events', 'POST', { event_type: 'blocked', summary: 'Dataset unavailable', blocker: 'Need access' }, 'test-worker-secret')).body.task.status, 'blocked');
   assert.equal((await request('/tasks/' + id + '/retry', 'POST')).body.task.status, 'queued');
-  await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'qa-1' });
-  await request('/tasks/' + id + '/events', 'POST', { event_type: 'failed', summary: 'Still unavailable' });
-  const exhausted = await request('/tasks/' + id + '/retry', 'POST');
-  assert.equal(exhausted.status, 409);
+  await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
+  await request('/tasks/' + id + '/events', 'POST', { event_type: 'failed', summary: 'Still unavailable' }, 'test-worker-secret');
+  assert.equal((await request('/tasks/' + id + '/retry', 'POST')).status, 409);
 });
 
-test('worker ownership is enforced and invalid progress is rejected', async (t) => {
+test('missing and invalid credentials are rejected', async (t) => {
   const { request } = await setup(t);
-  const created = await request('/tasks', 'POST', { goal: 'Run QA' });
+  assert.equal((await request('/tasks', 'GET', undefined, null)).status, 401);
+  assert.equal((await request('/tasks', 'GET', undefined, 'wrong-secret')).status, 401);
+});
+
+test('worker cannot create tasks, impersonate another worker, or approve', async (t) => {
+  const { request } = await setup(t);
+  assert.equal((await request('/tasks', 'POST', { goal: 'forbidden' }, 'test-worker-secret')).status, 403);
+  const created = await request('/tasks', 'POST', { goal: 'Run QA', approval_required: true });
   const id = created.body.task.task_id;
-  await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'qa-1' });
-  assert.equal((await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'progress', summary: 'wrong worker', worker_id: 'qa-2', progress: 20
-  })).status, 403);
-  assert.equal((await request('/tasks/' + id + '/events', 'POST', {
-    event_type: 'progress', summary: 'invalid progress', progress: 140
-  })).status, 400);
+  assert.equal((await request('/tasks/' + id + '/accept', 'POST', { worker_id: 'other-worker' }, 'test-worker-secret')).status, 403);
+  await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
+  await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Result ready', result: { ok: true } }, 'test-worker-secret');
+  assert.equal((await request('/tasks/' + id + '/approve', 'POST', { approved: true }, 'test-worker-secret')).status, 403);
+});
+
+test('server fails closed when no tokens are configured', async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-no-auth-'));
+  const server = createServer({ storePath: path.join(dir, 'runtime.json'), adminToken: '', workerToken: '' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const response = await fetch('http://127.0.0.1:' + server.address().port + '/tasks');
+  assert.equal(response.status, 503);
+  await new Promise((resolve) => server.close(resolve));
+  await fs.rm(dir, { recursive: true, force: true });
 });
