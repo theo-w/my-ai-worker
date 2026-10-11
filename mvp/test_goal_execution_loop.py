@@ -25,7 +25,7 @@ def test_twin_coordinates_worker_and_reports_goal(monkeypatch, tmp_path):
     admin, token = "admin-test-token-000000000001", "worker-test-token-000000000002"
     monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
     monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"researcher": token}))
-    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"researcher": ["research"]}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"researcher": ["analysis"]}))
     registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"))
     monkeypatch.setattr(server, "WORKFORCE", registry)
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
@@ -34,9 +34,9 @@ def test_twin_coordinates_worker_and_reports_goal(monkeypatch, tmp_path):
     base = f"http://127.0.0.1:{httpd.server_port}"
     try:
         twin = DigitalTwinCoordinator(base, admin)
-        worker = DigitalEmployeeAgent(base, token, ["research"], FakeExecutor(), "test goal")
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], FakeExecutor(), "test goal")
         result = twin.execute_goal("test goal", [worker], max_cycles=3, tasks=[
-            {"title": "Research", "capability": "research", "priority": 5},
+            {"title": "Summarize test input", "capability": "analysis", "priority": 5},
         ])
         assert result["status"] == "completed"
         assert result["counts"]["completed"] == 1
@@ -51,3 +51,33 @@ def test_twin_rejects_invalid_execution_parameters():
     twin = DigitalTwinCoordinator("http://127.0.0.1:1", "admin-test-token-000000000001")
     with pytest.raises(ValueError):
         twin.execute_goal("goal", [], max_cycles=2)
+
+
+
+def test_twin_does_not_accept_simulated_research_as_goal_success(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000001", "worker-test-token-000000000002"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"researcher": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"researcher": ["research"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-evidence.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_port}"
+    try:
+        twin = DigitalTwinCoordinator(base, admin)
+        worker = DigitalEmployeeAgent(base, token, ["research"], FakeExecutor(), "research goal")
+        result = twin.execute_goal("research goal", [worker], max_cycles=3, tasks=[
+            {"title": "Research evidence", "capability": "research", "priority": 5},
+        ])
+        assert result["counts"]["completed"] == 1
+        assert result["status"] == "needs_attention"
+        task = result["tasks"][0]
+        assert task["verification"]["accepted"] is False
+        assert task["verification"]["simulated"] is True
+        assert any(event["type"] == "verification_rejected" for event in result["events"])
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
