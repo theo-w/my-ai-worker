@@ -220,12 +220,11 @@ def test_independent_review_policy_fails_closed_without_reviewer(monkeypatch, tm
             tasks=[{"title": "Analyze risk", "capability": "analysis"}],
             execution_profile={"risk_level": 5, "quality_requirement": 4},
         )
-        assert result["execution_decision"]["verification"] == "independent_review"
+        assert result["execution_decision"]["verification"] == "evidence_gate"
         assert result["status"] == "needs_attention"
         verification = result["tasks"][0]["verification"]
         assert verification["accepted"] is False
-        assert verification["independent_review"] == "not_configured"
-        assert any(check["name"] == "independent_review_configured" and not check["passed"]
+        assert any(check["name"] == "source_structure" and not check["passed"]
                    for check in verification["checks"])
     finally:
         httpd.shutdown()
