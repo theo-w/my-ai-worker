@@ -52,10 +52,10 @@ completion.
 ## MVP implementation sequence
 
 - [x] Add a deterministic, inspectable execution-mode policy as an initial decision seam.
-- [ ] Connect the policy to the Digital Twin goal loop and capability-based worker selection.
+- [x] Connect the policy to the Digital Twin goal loop, capability-based worker selection, and bounded concurrent polling for justified parallel-team mode.
 - [ ] Add a verifier interface that consumes output, task criteria, provenance, and evidence.
-- [ ] Require verification before goal-level completion for configured task classes.
-- [ ] Add worker heartbeat/registration and expose offline suspicion in the monitor.
+- [x] Require evidence-gate verification before goal-level completion for research/evidence-required tasks; semantic truth still needs domain checks or human review.
+- [x] Add authenticated worker heartbeat/registration and expose offline suspicion in the monitor.
 - [ ] Add replanning operations for merge, cancel/supersede, and bounded retry.
 - [ ] Benchmark single-agent versus team mode on representative tasks; tune thresholds from
   observed outcomes.
