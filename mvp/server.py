@@ -421,6 +421,10 @@ class Handler(BaseHTTPRequestHandler):
                     task_id = body.get("current_task_id")
                     if task_id is not None and not isinstance(task_id, str):
                         raise ValueError("current_task_id must be a string or null")
+                    if status == "working":
+                        if not isinstance(task_id, str) or not task_id:
+                            raise ValueError("working heartbeat requires current_task_id")
+                        WORKFORCE.renew_lease(task_id, worker_id, body.get("lease_token"))
                     worker = WORKFORCE.heartbeat_worker(
                         worker_id, str(status), task_id,
                         str(body.get("progress", "")), str(body.get("last_error", "")),
