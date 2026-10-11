@@ -75,9 +75,29 @@ twin = DigitalTwinCoordinator(
 result = run_supervision_loop(
     twin,
     interval_seconds=10,
-    max_iterations=6,  # omit or use None only when you provide a stop event
+    max_iterations=6,
 )
 ```
+
+A standalone command-line supervisor is also available. Start the API server
+first, then configure the same administrator credentials in the supervisor shell:
+
+```bash
+export JARVIS_WORKFORCE_URL="http://127.0.0.1:8765"
+export JARVIS_ADMIN_TOKEN="YOUR_ADMIN_TOKEN"
+python -m mvp.supervisor --interval-seconds 10 --max-iterations 6
+```
+
+Omit `--max-iterations` to keep supervising until Ctrl-C. Each cycle emits a
+JSON record, including failures; this is a runtime utility, not a deployed
+background service. Use a process manager and protected secret injection for
+unattended operation.
+
+Workers send authenticated heartbeats while executing. A `working` heartbeat
+must include the current task ID and its current lease token; the server renews
+that task's lease only if the worker identity and fencing token still match.
+This prevents a legitimate long-running executor from being reclaimed simply
+because its original lease duration elapsed.
 
 You can also run it as a process after the workforce HTTP server is running:
 
