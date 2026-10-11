@@ -89,6 +89,7 @@ def test_cancel_task_is_audited_and_rejects_late_worker_report(tmp_path):
     claimed = registry.claim("worker-a", ["analysis"])
     cancelled = registry.cancel_task(task["id"], "Goal changed; no longer valuable")
     assert cancelled["status"] == "cancelled"
+    assert "_lease_token" not in cancelled
     assert cancelled["history"][-1]["event"] == "cancelled"
     with pytest.raises(ValueError, match="not leased"):
         registry.report(task["id"], "worker-a", "completed", output="late output", lease_token=claimed["lease_token"])
@@ -101,6 +102,8 @@ def test_merge_only_unstarted_tasks_with_same_capability(tmp_path):
     source = registry.create_task("Analyze cohort", "Week 2", "analysis", priority=5)
     merged = registry.merge_tasks(target["id"], [source["id"]], "Combine overlapping analysis")
     assert merged["target"]["priority"] == 5
+    assert "_lease_token" not in merged["target"]
+    assert "_lease_token" not in merged["sources"][0]
     assert "[Merged from " + source["id"] + "]" in merged["target"]["description"]
     assert merged["sources"][0]["status"] == "superseded"
     assert registry.snapshot()["counts"]["superseded"] == 1
