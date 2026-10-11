@@ -125,7 +125,7 @@ def test_fencing_token_rejects_stale_attempt_from_same_worker(tmp_path):
         registry.tasks[task["id"]]["lease_until"] = (
             datetime.now(timezone.utc) - timedelta(seconds=1)
         ).isoformat()
-    with pytest.raises(ValueError, match="lease token"):
+    with pytest.raises(ValueError, match="not leased"):
         registry.report(task["id"], "same-worker", "completed", output="late attempt",
                         lease_token=first["lease_token"])
     second = registry.claim("same-worker", ["analysis"])
