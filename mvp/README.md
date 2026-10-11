@@ -305,3 +305,21 @@ This is an MVP bearer-token boundary, not a complete identity platform. Use
 HTTPS, secret management, rotation, rate limiting, and per-environment secrets
 before production exposure. Keep the service private until credentials are
 configured.
+
+## Continuous workforce supervision
+
+Run the API/dashboard in one process, then start the supervisor in a second terminal:
+
+```bash
+export JARVIS_WORKFORCE_URL="http://127.0.0.1:8765"
+export JARVIS_ADMIN_TOKEN="your-admin-token"
+python3 -m mvp.supervisor --interval-seconds 10
+```
+
+For a finite smoke run, add `--max-iterations 3`. The supervisor emits one JSON record
+per cycle, including maintenance results, observed alerts, and errors. Stop it with
+Ctrl-C. It reclaims expired leases and reports the workforce state; it does not invent
+an LLM recovery policy or claim that worker outputs are independently verified.
+The server and supervisor must use the same configured admin token. Keep tokens in
+environment variables or a secret manager, never in committed files or logs.
+
