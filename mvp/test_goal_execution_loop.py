@@ -194,3 +194,44 @@ def test_twin_can_cancel_low_value_pending_work_after_feedback(monkeypatch, tmp_
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=2)
+
+
+def test_high_quality_goal_runs_independent_review_and_rejects_revision(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000001", "worker-test-token-000000000002"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-review.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_port}"
+    reviews = []
+
+    def reviewer(task, context):
+        reviews.append((task.get("title"), context.get("provenance")))
+        return {"decision": "revise", "rationale": "Need a counterargument and supporting evidence."}
+
+    try:
+        twin = DigitalTwinCoordinator(base, admin)
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], FakeExecutor(), "high-quality goal")
+        result = twin.execute_goal(
+            "high-quality goal", [worker], max_cycles=3,
+            tasks=[{
+                "title": "Analyze key risk", "capability": "analysis",
+                "success_criteria": {"required_phrases": ["simulated test output"]},
+            }],
+            execution_profile={"risk_level": 5, "quality_requirement": 4},
+            independent_reviewer=reviewer,
+        )
+        assert result["execution_decision"]["verification"] == "independent_review"
+        assert result["status"] == "needs_attention"
+        assert reviews and reviews[0][0] == "Analyze key risk"
+        verification = result["tasks"][0]["verification"]
+        assert verification["independent_review"] == "revise"
+        assert verification["accepted"] is False
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
