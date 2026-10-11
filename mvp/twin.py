@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from datetime import datetime, timezone
 import json
+from time import monotonic
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -465,8 +466,10 @@ class DigitalTwinCoordinator:
                 "execution_decision": decision.to_dict(),
             }
 
+        started_at = monotonic()
         plan = self.start_goal(goal, tasks=plan_items)
         ids = {task["id"] for task in plan["created_tasks"]}
+        all_goal_ids = set(ids)
         worker_runs = []
         cycles = 0
         for cycle in range(1, max_cycles + 1):
@@ -563,7 +566,8 @@ class DigitalTwinCoordinator:
                                "reason": "No progress; check worker capability and credentials."})
                 break
         snapshot = self.inspect()
-        scoped = [t for t in snapshot["tasks"] if t["task_id"] in ids]
+        # Keep terminally cancelled/superseded work visible in the final audit.
+        scoped = [t for t in snapshot["tasks"] if t["task_id"] in all_goal_ids]
         if decision.verification in ("evidence_gate", "independent_review"):
             try:
                 from .verification import verify_task_output
@@ -585,7 +589,8 @@ class DigitalTwinCoordinator:
                                                else None),
                     )
         counts = {s: sum(t["status"] == s for t in scoped)
-                  for s in ("queued", "assigned", "completed", "blocked", "failed")}
+                  for s in ("queued", "assigned", "completed", "blocked", "failed",
+                            "cancelled", "superseded", "approval_required")}
         if counts["queued"] or counts["assigned"]:
             status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
         elif counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
@@ -601,10 +606,29 @@ class DigitalTwinCoordinator:
         else:
             status = "completed"
         events.append({"type": "goal_finished", "status": status, "counts": counts})
+        metrics = {
+            "elapsed_seconds": round(max(0.0, monotonic() - started_at), 4),
+            "cycles": cycles,
+            "worker_runs": len(worker_runs),
+            "task_count": len(scoped),
+            "accepted_outputs": sum(
+                t["status"] == "completed" and t.get("verification", {}).get("accepted", False)
+                for t in scoped
+            ),
+            "rejected_outputs": sum(
+                t["status"] == "completed" and not t.get("verification", {}).get("accepted", False)
+                for t in scoped
+            ),
+            "cancelled_tasks": counts["cancelled"],
+            "superseded_tasks": counts["superseded"],
+            "cost": None,
+            "cost_note": "No cost is reported unless the executor provides a normalized, auditable cost field.",
+        }
+        events.append({"type": "execution_metrics", **metrics})
         return {
             "goal": goal.strip(), "status": status, "cycles": cycles, "counts": counts,
             "tasks": scoped, "worker_runs": worker_runs, "events": events,
-            "execution_decision": decision.to_dict(),
+            "execution_decision": decision.to_dict(), "metrics": metrics,
             "evidence_note": "执行器输出不自动等于已核实证据；必须检查来源与可复现性。",
         }
 
