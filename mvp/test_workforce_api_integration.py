@@ -278,3 +278,34 @@ def test_http_rejects_late_report_from_previous_lease(workforce_http):
     assert status == 200
     assert current["task"]["output"] == "result from current attempt"
 
+def test_working_heartbeat_renews_lease_only_with_current_token(workforce_http):
+    from datetime import datetime
+
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Keep long task leased", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+    status, claim = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"],
+    })
+    assert status == 200
+    lease_token = claim["task"]["lease_token"]
+    before = datetime.fromisoformat(claim["task"]["lease_until"])
+
+    status, rejected = request_json(base, "/api/workers/heartbeat", RESEARCHER, {
+        "status": "working", "current_task_id": task_id, "lease_token": "stale-token",
+    })
+    assert status == 400
+    assert "lease token" in rejected["error"]
+
+    status, beat = request_json(base, "/api/workers/heartbeat", RESEARCHER, {
+        "status": "working", "current_task_id": task_id, "lease_token": lease_token,
+        "progress": "Still executing",
+    })
+    assert status == 200
+    after = datetime.fromisoformat(registry.snapshot()["tasks"][0]["lease_until"])
+    assert after > before
+    assert beat["worker"]["status"] == "working"
+
