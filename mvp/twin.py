@@ -450,6 +450,8 @@ class DigitalTwinCoordinator:
             "team_cost_multiplier": 1.5,
         }
         profile_fields.update(supplied)
+        # Availability is a runtime fact, not a caller-controlled policy hint.
+        profile_fields["independent_review_available"] = callable(independent_reviewer)
         profile_fields["evidence_required"] = evidence_required
         profile_fields["human_approval_required"] = human_approval_required
         profile = TaskProfile(**profile_fields)
