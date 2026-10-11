@@ -201,6 +201,37 @@ def test_twin_can_cancel_low_value_pending_work_after_feedback(monkeypatch, tmp_
         thread.join(timeout=2)
 
 
+def test_independent_review_policy_fails_closed_without_reviewer(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000011", "worker-test-token-000000000012"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-review-unconfigured.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{httpd.server_port}"
+        twin = DigitalTwinCoordinator(base, admin)
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], FakeExecutor(), "review unavailable")
+        result = twin.execute_goal(
+            "review unavailable", [worker], max_cycles=2,
+            tasks=[{"title": "Analyze risk", "capability": "analysis"}],
+            execution_profile={"risk_level": 5, "quality_requirement": 4},
+        )
+        assert result["execution_decision"]["verification"] == "independent_review"
+        assert result["status"] == "needs_attention"
+        verification = result["tasks"][0]["verification"]
+        assert verification["accepted"] is False
+        assert verification["independent_review"] == "not_configured"
+        assert any(check["name"] == "independent_review_configured" and not check["passed"]
+                   for check in verification["checks"])
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
 def test_high_quality_goal_runs_independent_review_and_rejects_revision(monkeypatch, tmp_path):
     admin, token = "admin-test-token-000000000001", "worker-test-token-000000000002"
     monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
