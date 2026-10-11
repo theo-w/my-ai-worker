@@ -127,6 +127,9 @@ class WorkforceRegistry:
         if len(output) > 20000 or len(blocker) > 3000:
             raise ValueError("output or blocker is too long")
         with self.lock:
+            # A worker must not be able to submit a late result after its lease
+            # expired merely because the background supervisor has not ticked yet.
+            self.maintain(save=True)
             task = self._get(task_id)
             if task["status"] != "assigned" or task.get("assigned_to") != worker_id:
                 raise ValueError("task is not leased to this worker")
