@@ -80,3 +80,37 @@ def test_expired_lease_exhausting_attempts_fails_closed(tmp_path):
     with pytest.raises(ValueError, match="not leased"):
         registry.report(task["id"], "worker-a", "completed", output="late result")
     assert registry.snapshot()["tasks"][0]["status"] == "failed"
+
+
+def test_cancel_task_is_audited_and_rejects_late_worker_report(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"))
+    task = registry.create_task("Optional task", capability="analysis")
+    registry.claim("worker-a", ["analysis"])
+    cancelled = registry.cancel_task(task["id"], "Goal changed; no longer valuable")
+    assert cancelled["status"] == "cancelled"
+    assert cancelled["history"][-1]["event"] == "cancelled"
+    with pytest.raises(ValueError, match="not leased"):
+        registry.report(task["id"], "worker-a", "completed", output="late output")
+    assert any(event["type"] == "task_cancelled" for event in registry.snapshot()["events"])
+
+
+def test_merge_only_unstarted_tasks_with_same_capability(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"))
+    target = registry.create_task("Analyze retention", "Week 1", "analysis", priority=2)
+    source = registry.create_task("Analyze cohort", "Week 2", "analysis", priority=5)
+    merged = registry.merge_tasks(target["id"], [source["id"]], "Combine overlapping analysis")
+    assert merged["target"]["priority"] == 5
+    assert "[Merged from " + source["id"] + "]" in merged["target"]["description"]
+    assert merged["sources"][0]["status"] == "superseded"
+    assert registry.snapshot()["counts"]["superseded"] == 1
+
+
+def test_merge_rejects_incompatible_or_started_tasks(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"))
+    target = registry.create_task("Analyze", capability="analysis")
+    source = registry.create_task("Research", capability="research")
+    with pytest.raises(ValueError, match="matching capabilities"):
+        registry.merge_tasks(target["id"], [source["id"]], "Unsafe merge")
+    registry.claim(target["id"] if False else "worker-a", ["analysis"])
+    with pytest.raises(ValueError, match="must not have started"):
+        registry.merge_tasks(target["id"], [source["id"]], "Too late")
