@@ -1,3 +1,7 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
 from mvp.workforce import WorkforceRegistry
 
 
@@ -20,11 +24,8 @@ def test_worker_cannot_report_another_workers_task(tmp_path):
     registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"))
     task = registry.create_task("Research", capability="research")
     registry.claim("worker-a", ["research"])
-    try:
+    with pytest.raises(ValueError, match="not leased"):
         registry.report(task["id"], "worker-b", "completed", output="forged")
-        assert False, "unassigned worker must be rejected"
-    except ValueError as exc:
-        assert "not leased" in str(exc)
 
 
 def test_approval_gate_prevents_claim_until_approved(tmp_path):
@@ -45,3 +46,37 @@ def test_persistent_queue_survives_restart_and_retries_blocker(tmp_path):
     restarted = WorkforceRegistry(path=path, max_attempts=2)
     assert restarted.snapshot()["tasks"][0]["status"] == "queued"
     assert restarted.claim("worker-b", ["testing"])["attempts"] == 2
+
+
+def test_expired_lease_rejects_late_report_and_requeues_task(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"), max_attempts=2)
+    task = registry.create_task("Run tests", capability="testing")
+    claimed = registry.claim("worker-a", ["testing"])
+    assert claimed["status"] == "assigned"
+
+    # Simulate expiry without waiting for the periodic supervisor.
+    with registry.lock:
+        registry.tasks[task["id"]]["lease_until"] = (
+            datetime.now(timezone.utc) - timedelta(seconds=1)
+        ).isoformat()
+    with pytest.raises(ValueError, match="not leased"):
+        registry.report(task["id"], "worker-a", "completed", output="late result")
+
+    refreshed = registry.snapshot()["tasks"][0]
+    assert refreshed["status"] == "queued"
+    assert refreshed["assigned_to"] is None
+    assert refreshed["lease_until"] is None
+    assert refreshed["attempts"] == 1
+
+
+def test_expired_lease_exhausting_attempts_fails_closed(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce.json"), max_attempts=1)
+    task = registry.create_task("One shot", capability="testing")
+    registry.claim("worker-a", ["testing"])
+    with registry.lock:
+        registry.tasks[task["id"]]["lease_until"] = (
+            datetime.now(timezone.utc) - timedelta(seconds=1)
+        ).isoformat()
+    with pytest.raises(ValueError, match="not leased"):
+        registry.report(task["id"], "worker-a", "completed", output="late result")
+    assert registry.snapshot()["tasks"][0]["status"] == "failed"
