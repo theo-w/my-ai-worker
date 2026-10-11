@@ -119,6 +119,9 @@ class WorkforceRegistry:
             task["status"] = "assigned"
             task["assigned_to"] = worker_id
             task["attempts"] += 1
+            # A fresh fencing token distinguishes this lease from every prior attempt,
+            # including a retry claimed by the same worker identity.
+            task["_lease_token"] = uuid.uuid4().hex
             task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
             task["updated_at"] = _stamp()
             task["history"].append({"event": "assigned", "worker_id": worker_id,
@@ -126,10 +129,12 @@ class WorkforceRegistry:
             self._event("task_assigned", task_id=task["id"], worker_id=worker_id,
                         attempt=task["attempts"])
             self.save()
-            return dict(task)
+            claimed = {key: value for key, value in task.items() if key != "_lease_token"}
+            claimed["lease_token"] = task["_lease_token"]
+            return claimed
 
     def report(self, task_id: str, worker_id: str, status: str,
-               output: str = "", blocker: str = "") -> dict:
+               output: str = "", blocker: str = "", lease_token: str | None = None) -> dict:
         if status not in {"completed", "blocked", "failed", "in_progress"}:
             raise ValueError("status must be completed, blocked, failed, or in_progress")
         if len(output) > 20000 or len(blocker) > 3000:
@@ -141,6 +146,8 @@ class WorkforceRegistry:
             task = self._get(task_id)
             if task["status"] != "assigned" or task.get("assigned_to") != worker_id:
                 raise ValueError("task is not leased to this worker")
+            if not isinstance(lease_token, str) or not lease_token or lease_token != task.get("_lease_token"):
+                raise ValueError("lease token is missing or stale")
             task["output"] = output
             task["blocker"] = blocker
             task["updated_at"] = _stamp()
@@ -148,6 +155,7 @@ class WorkforceRegistry:
                 task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
                 task["status"] = "assigned"
             elif status == "blocked":
+                task["_lease_token"] = None
                 task["status"] = "queued" if task["attempts"] < task["max_attempts"] else "blocked"
                 task["lease_until"] = None
                 if task["status"] == "queued":
@@ -155,6 +163,7 @@ class WorkforceRegistry:
             else:
                 task["status"] = status
                 task["lease_until"] = None
+                task["_lease_token"] = None
             task["history"].append({"event": "worker_report", "worker_id": worker_id,
                                     "status": status, "at": _stamp(),
                                     "blocker": blocker})
@@ -193,6 +202,7 @@ class WorkforceRegistry:
                 if not expired:
                     continue
                 task["lease_until"] = None
+                task["_lease_token"] = None
                 task["updated_at"] = _stamp()
                 task["history"].append({"event": "lease_expired", "at": _stamp()})
                 if task["attempts"] < task["max_attempts"]:
@@ -220,6 +230,7 @@ class WorkforceRegistry:
             prior_status = task["status"]
             task["status"] = "cancelled"
             task["lease_until"] = None
+            task["_lease_token"] = None
             task["blocker"] = reason.strip()
             task["updated_at"] = _stamp()
             task["history"].append({"event": "cancelled", "reason": reason.strip(),
@@ -260,6 +271,7 @@ class WorkforceRegistry:
             for task in sources:
                 task["status"] = "superseded"
                 task["lease_until"] = None
+                task["_lease_token"] = None
                 task["blocker"] = "Merged into " + target_task_id
                 task["updated_at"] = _stamp()
                 task["history"].append({"event": "superseded_by_merge", "target_task_id": target_task_id,
@@ -304,7 +316,11 @@ class WorkforceRegistry:
             for task in self.tasks.values():
                 counts[task["status"]] = counts.get(task["status"], 0) + 1
             self.save()
-            return {"counts": counts, "tasks": list(self.tasks.values()),
+            safe_tasks = [
+                {key: value for key, value in task.items() if key != "_lease_token"}
+                for task in self.tasks.values()
+            ]
+            return {"counts": counts, "tasks": safe_tasks,
                     "events": self.events[-100:], "workers": list(self.workers.values()), "lease_seconds": self.lease_seconds}
 
     def _get(self, task_id: str) -> dict:
