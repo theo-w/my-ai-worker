@@ -63,6 +63,24 @@ def test_monitor_accepts_dictionary_task_snapshots():
     assert report["twin"]["completed_tasks"] == 1
 
 
+def test_monitor_does_not_infer_worker_liveness_from_assignment_alone():
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
+    report = build_monitor_report({
+        "tasks": [{
+            "id": "task-a", "status": "assigned", "assigned_to": "worker-no-heartbeat",
+            "updated_at": now.isoformat(), "lease_until": (now + timedelta(minutes=2)).isoformat(),
+        }],
+        "events": [],
+        "workers": [],
+    }, now=now)
+    employee = report["employees"][0]
+    assert employee["status"] == "working_unconfirmed"
+    assert employee["availability"] == "unknown"
+    assert employee["online"] is None
+    assert employee["active_task_ids"] == ["task-a"]
+    assert employee["assignment_consistent"] is None
+
+
 def test_monitor_detects_stale_worker_heartbeat_and_keeps_idle_worker_visible():
     now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
     report = build_monitor_report({
