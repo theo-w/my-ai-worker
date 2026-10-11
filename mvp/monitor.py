@@ -82,10 +82,11 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None) -> dict:
         })
     active_count = sum(counts.get(key, 0) for key in ACTIVE)
     blocked_count = counts.get("blocked", 0) + counts.get("failed", 0)
-    if active_count:
-        twin_status = "in_progress"
-    elif blocked_count:
+    # An active queue can still require attention if any task is blocked/failed.
+    if blocked_count:
         twin_status = "needs_attention"
+    elif active_count:
+        twin_status = "in_progress"
     elif counts.get("completed", 0):
         twin_status = "completed"
     else:
