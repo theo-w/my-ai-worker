@@ -170,7 +170,7 @@ class WorkforceRegistry:
             self._event("worker_reported", task_id=task_id, worker_id=worker_id,
                         status=status, blocker=blocker)
             self.save()
-            return dict(task)
+            return {key: value for key, value in task.items() if key != "_lease_token"}
 
     def feedback(self, task_id: str, actor: str, message: str,
                  kind: str = "note") -> dict:
