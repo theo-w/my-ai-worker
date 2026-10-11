@@ -140,6 +140,11 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None,
             observed_status = heartbeat_status
         elif active_ids:
             observed_status = "working_unconfirmed"
+            alerts.append({
+                "severity": "warning", "type": "assigned_worker_unobserved",
+                "worker_id": worker_id, "task_ids": active_ids,
+                "message": "任务已分配给该员工，但监控快照中没有员工心跳记录。",
+            })
         else:
             observed_status = "unknown"
         employees.append({
