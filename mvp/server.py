@@ -21,6 +21,7 @@ try:
     from .experience_design import create_design_brief
     from .game_action import interpret_and_validate_action
     from .model_handoff import interpret_handoff_and_validate_action
+    from .workforce import WorkforceRegistry
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -32,12 +33,14 @@ except ImportError:  # Direct script execution from mvp/
     from experience_design import create_design_brief
     from game_action import interpret_and_validate_action
     from model_handoff import interpret_handoff_and_validate_action
+    from workforce import WorkforceRegistry
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
 PROJECT_LOOP = AutonomousProjectLoop()
+WORKFORCE = WorkforceRegistry(path=os.getenv("JARVIS_WORKFORCE_STORE", "data/workforce.json"))
 def _build_worker_executor():
     llm_executor = None
     if all(os.getenv(key, "").strip() for key in (
@@ -265,6 +268,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_GET(self):
+        if self.path == "/api/workforce":
+            self._json({"ok": True, **WORKFORCE.snapshot()})
+            return
         if self.path == "/api/state":
             with LOCK:
                 self._json(dict(STATE))
@@ -320,6 +326,52 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve"):
+            body = self._read_json(max_bytes=131072)
+            if body is None:
+                return
+            try:
+                if self.path == "/api/workforce/tasks":
+                    task = WORKFORCE.create_task(
+                        title=str(body.get("title", "")),
+                        description=str(body.get("description", "")),
+                        capability=str(body.get("capability", "general")),
+                        priority=body.get("priority", 3),
+                        assigned_to=body.get("assigned_to"),
+                        approval_required=bool(body.get("approval_required", False)),
+                    )
+                    self._json({"ok": True, "task": task}, 201)
+                elif self.path == "/api/workforce/claim":
+                    worker_id = body.get("worker_id")
+                    capabilities = body.get("capabilities", [])
+                    if not isinstance(worker_id, str) or not isinstance(capabilities, list):
+                        raise ValueError("worker_id must be a string and capabilities an array")
+                    task = WORKFORCE.claim(worker_id, capabilities)
+                    self._json({"ok": True, "task": task, "message": "No eligible task" if task is None else "Task assigned"})
+                elif self.path == "/api/workforce/report":
+                    for key in ("task_id", "worker_id", "status"):
+                        if not isinstance(body.get(key), str):
+                            raise ValueError(key + " must be a string")
+                    task = WORKFORCE.report(body["task_id"], body["worker_id"], body["status"],
+                                            str(body.get("output", "")), str(body.get("blocker", "")))
+                    self._json({"ok": True, "task": task})
+                elif self.path == "/api/workforce/feedback":
+                    for key in ("task_id", "actor", "message"):
+                        if not isinstance(body.get(key), str):
+                            raise ValueError(key + " must be a string")
+                    item = WORKFORCE.feedback(body["task_id"], body["actor"], body["message"],
+                                              str(body.get("kind", "note")))
+                    self._json({"ok": True, "feedback": item})
+                else:
+                    task_id = body.get("task_id")
+                    if not isinstance(task_id, str):
+                        raise ValueError("task_id must be a string")
+                    self._json({"ok": True, "task": WORKFORCE.approve_task(task_id)})
+            except (ValueError, TypeError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+            except OSError:
+                self._json({"ok": False, "error": "Unable to persist workforce state."}, 500)
+            return
         if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
             return
