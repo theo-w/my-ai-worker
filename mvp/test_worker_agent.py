@@ -103,3 +103,40 @@ def test_agent_reports_missing_executor_dependency_as_blocked(system):
                   if item["id"] == plan["created_tasks"][0]["id"])
     assert stored["status"] == "queued"  # blocked work is eligible for bounded retry
     assert stored["blocker"]
+
+
+class SlowExecutor(FakeExecutor):
+    def execute(self, task, goal):
+        import time
+        self.calls.append((task["id"], goal))
+        time.sleep(0.38)
+        return WorkerExecutionResult(
+            task_id=task["id"], capability=task["capability"],
+            status="completed", output="Long-running test result.",
+            simulated=True, metadata={"mode": "slow_test"},
+        )
+
+
+def test_agent_sends_periodic_working_heartbeats_during_long_task(system):
+    twin, base, registry = system
+    plan = twin.start_goal("Test worker heartbeat", tasks=[{
+        "title": "Long task", "capability": "analysis",
+    }])
+    employee = DigitalEmployeeAgent(
+        base, ANALYST, ["analysis"], SlowExecutor(), plan["goal"],
+        heartbeat_interval=0.1,
+    )
+
+    result = employee.run_once()
+    assert result["status"] == "completed"
+    snapshot = registry.snapshot()
+    working = [
+        event for event in snapshot["events"]
+        if event["type"] == "worker_heartbeat"
+        and event.get("worker_id") == "analyst"
+        and event.get("status") == "working"
+    ]
+    assert len(working) >= 2
+    worker = next(item for item in snapshot["workers"] if item["worker_id"] == "analyst")
+    assert worker["status"] == "idle"
+    assert worker["current_task_id"] is None
