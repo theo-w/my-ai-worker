@@ -79,6 +79,19 @@ result = run_supervision_loop(
 )
 ```
 
+You can also run it as a process after the workforce HTTP server is running:
+
+```bash
+export JARVIS_WORKFORCE_URL="http://127.0.0.1:8765"
+export JARVIS_ADMIN_TOKEN="YOUR_ADMIN_TOKEN"
+python -m mvp.supervisor --interval-seconds 10 --max-iterations 6
+```
+
+Omit `--max-iterations` to keep supervising until interrupted with Ctrl+C.
+Each cycle is printed as one JSON line. The command only reclaims expired
+leases and reports observable state unless an explicit recovery policy is wired
+in; it does not autonomously invent task cancellations or merges.
+
 `run_supervision_loop` is not started automatically on import. It supports a
 stop event, a bounded iteration count, per-cycle result records, and recovery from
 individual cycle errors. It does not invent an AI recovery policy: pass
