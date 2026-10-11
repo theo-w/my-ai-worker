@@ -278,3 +278,30 @@ appeal, market validation, or the correctness of model reasoning.
 - [ ] Deployment status is confirmed for the latest commit, not inferred from a previous live build.
 
 The first five items require code/tests or hands-on runtime checks; a successful Render deploy alone does not mark them all complete.
+## Workforce API authentication (security hardening)
+
+The `/api/workforce` endpoints are fail-closed: they return `503` until at least
+one admin or worker token is configured. Send credentials as
+`Authorization: Bearer <token>`.
+
+Configure a strong admin token and a map of independent worker tokens using
+your deployment secret manager (never commit real values):
+
+```bash
+export JARVIS_ADMIN_TOKEN="replace-with-a-long-random-admin-secret"
+export JARVIS_WORKER_TOKENS='{"researcher":"replace-with-a-different-long-random-secret","analyst":"replace-with-another-long-random-secret"}'
+export JARVIS_WORKER_CAPABILITIES='{"researcher":["research"],"analyst":["analysis"]}'
+```
+
+Worker tokens must be at least 24 characters. A worker's identity comes from
+its token, not from a request-body `worker_id`; its capabilities are assigned
+server-side, so a worker cannot grant itself new capabilities. Worker tokens
+can claim/report tasks only. Admin credentials are required to create tasks,
+inspect the whole queue, approve tasks, and add supervisor feedback. A legacy
+single-worker setup may use `JARVIS_WORKER_TOKEN` plus `JARVIS_WORKER_ID`;
+`JARVIS_WORKER_CAPABILITIES` still defines that worker's capabilities.
+
+This is an MVP bearer-token boundary, not a complete identity platform. Use
+HTTPS, secret management, rotation, rate limiting, and per-environment secrets
+before production exposure. Keep the service private until credentials are
+configured.
