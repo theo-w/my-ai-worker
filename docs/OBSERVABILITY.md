@@ -42,3 +42,33 @@ or later dashboard adapter. Stop it with Ctrl-C.
 2. `executor_reported_live` means the executor reported a non-simulated result; it is **not** proof that the content is correct or independently verified.
 3. The monitor displays task descriptions and outputs. Treat these as potentially sensitive business data; protect the admin token, avoid public exposure, and do not ship raw outputs to third-party log collectors without a data policy.
 4. The current persistence backend is a local JSON store. For multiple server instances or production use, migrate to a transactional database and add redaction, retention, and access audit controls.
+
+## Twin supervision loop
+
+The monitor remains read-only. The coordinator exposes `supervise_once()`, which
+collects a snapshot, runs bounded expired-lease maintenance, and optionally asks
+a supplied recovery policy to propose validated cancellation or merge actions.
+
+For a controlled repeated loop, call the supervisor from your own runtime:
+
+```python
+from mvp.supervisor import run_supervision_loop
+from mvp.twin import DigitalTwinCoordinator
+
+twin = DigitalTwinCoordinator(
+    base_url="http://127.0.0.1:8765",
+    admin_token="YOUR_ADMIN_TOKEN",
+)
+result = run_supervision_loop(
+    twin,
+    interval_seconds=10,
+    max_iterations=6,  # omit or use None only when you provide a stop event
+)
+```
+
+`run_supervision_loop` is not started automatically on import. It supports a
+stop event, a bounded iteration count, per-cycle result records, and recovery from
+individual cycle errors. It does not invent an AI recovery policy: pass
+`recovery_policy(report)` only when an explicit policy implementation is available.
+Use a process manager for deployment, and configure secure secret injection,
+logs, restart policy, and an external health check before running it unattended.
