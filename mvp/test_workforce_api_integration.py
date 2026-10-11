@@ -346,38 +346,3 @@ def test_working_heartbeat_renews_only_the_current_lease(workforce_http):
     })
     assert status == 400
     assert "lease token" in rejected["error"] or "not leased" in rejected["error"]
-
-
-def test_working_heartbeat_renews_only_the_current_lease(workforce_http):
-    from datetime import datetime, timedelta, timezone
-
-    base, registry = workforce_http
-    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
-        "title": "Long-running worker task", "capability": "research",
-    })
-    assert status == 201
-    task_id = created["task"]["id"]
-    status, claim = request_json(
-        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
-    )
-    assert status == 200
-    lease_token = claim["task"]["lease_token"]
-    original_deadline = datetime.fromisoformat(claim["task"]["lease_until"])
-
-    status, heartbeat = request_json(base, "/api/workers/heartbeat", RESEARCHER, {
-        "status": "working", "current_task_id": task_id,
-        "lease_token": lease_token, "progress": "Still processing",
-    })
-    assert status == 200
-    renewed_deadline = datetime.fromisoformat(
-        registry.snapshot()["tasks"][0]["lease_until"]
-    )
-    assert renewed_deadline > original_deadline
-
-    status, stale = request_json(base, "/api/workers/heartbeat", RESEARCHER, {
-        "status": "working", "current_task_id": task_id,
-        "lease_token": "stale-lease-token", "progress": "Stale worker",
-    })
-    assert status == 400
-    assert "lease token" in stale["error"]
-
