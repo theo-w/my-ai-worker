@@ -172,6 +172,30 @@ class WorkforceRegistry:
             self.save()
             return {key: value for key, value in task.items() if key != "_lease_token"}
 
+
+    def renew_lease(self, task_id: str, worker_id: str,
+                    lease_token: str | None) -> dict:
+        """Renew an active task lease only for its current token holder."""
+        worker_id = worker_id.strip()
+        with self.lock:
+            task = self._get(task_id)
+            if task["status"] != "assigned" or task.get("assigned_to") != worker_id:
+                raise ValueError("task is not leased to this worker")
+            if (not isinstance(lease_token, str) or not lease_token
+                    or lease_token != task.get("_lease_token")):
+                raise ValueError("lease token is missing or stale")
+            task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
+            task["updated_at"] = _stamp()
+            task["history"].append({
+                "event": "lease_renewed", "worker_id": worker_id,
+                "at": _stamp(), "attempt": task["attempts"],
+            })
+            self._event("task_lease_renewed", task_id=task_id, worker_id=worker_id,
+                        attempt=task["attempts"])
+            self.save()
+            return {key: value for key, value in task.items() if key != "_lease_token"}
+
+
     def feedback(self, task_id: str, actor: str, message: str,
                  kind: str = "note") -> dict:
         if not actor.strip() or len(actor) > 120 or not message.strip() or len(message) > 5000:
