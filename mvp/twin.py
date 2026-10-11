@@ -591,7 +591,12 @@ class DigitalTwinCoordinator:
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "completed", "blocked", "failed",
                             "cancelled", "superseded", "approval_required")}
-        if counts["queued"] or counts["assigned"]:
+        if not ids:
+            # A goal with no remaining active work must not be reported as completed
+            # merely because all work was cancelled or superseded.
+            status = ("cancelled" if counts["cancelled"] else
+                      "superseded" if counts["superseded"] else "needs_attention")
+        elif counts["queued"] or counts["assigned"]:
             status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
         elif counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
             status = "needs_attention"
