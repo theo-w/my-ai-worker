@@ -232,3 +232,49 @@ def test_admin_can_cancel_and_merge_tasks_but_worker_cannot(workforce_http):
     })
     assert status == 200
     assert cancelled["task"]["status"] == "cancelled"
+
+
+def test_http_rejects_late_report_from_previous_lease(workforce_http):
+    from datetime import datetime, timedelta, timezone
+
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Retry safely over HTTP", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+
+    status, first_claim = request_json(
+        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
+    )
+    assert status == 200
+    old_token = first_claim["task"]["lease_token"]
+
+    # Expire the lease deterministically, then let the same worker claim the retry.
+    with registry.lock:
+        registry.tasks[task_id]["lease_until"] = (
+            datetime.now(timezone.utc) - timedelta(seconds=1)
+        ).isoformat()
+    registry.maintain()
+    status, second_claim = request_json(
+        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
+    )
+    assert status == 200
+    assert second_claim["task"]["attempts"] == 2
+    new_token = second_claim["task"]["lease_token"]
+    assert new_token != old_token
+
+    status, stale = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed", "lease_token": old_token,
+        "output": "late result from previous attempt",
+    })
+    assert status == 400
+    assert "not leased" in stale["error"] or "lease token" in stale["error"]
+
+    status, current = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed", "lease_token": new_token,
+        "output": "result from current attempt",
+    })
+    assert status == 200
+    assert current["task"]["output"] == "result from current attempt"
+
