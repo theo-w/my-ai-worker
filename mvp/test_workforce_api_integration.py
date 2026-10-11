@@ -70,10 +70,13 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     assert claim["task"]["id"] == task_id
     assert claim["task"]["assigned_to"] == "researcher"
     assert claim["task"]["status"] == "assigned"
+    lease_token = claim["task"]["lease_token"]
+    assert lease_token
 
     status, progress = request_json(
         base, "/api/workforce/report", RESEARCHER,
-        {"task_id": task_id, "status": "in_progress", "output": "Checking source material"},
+        {"task_id": task_id, "status": "in_progress", "lease_token": lease_token,
+         "output": "Checking source material"},
     )
     assert status == 200
     assert progress["task"]["status"] == "assigned"
@@ -81,7 +84,7 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
 
     status, completed = request_json(
         base, "/api/workforce/report", RESEARCHER,
-        {"task_id": task_id, "status": "completed",
+        {"task_id": task_id, "status": "completed", "lease_token": lease_token,
          "output": "Found three candidate sources; independent verification still required."},
     )
     assert status == 200
@@ -92,6 +95,32 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     assert snapshot["counts"]["completed"] == 1
     assert any(event["type"] == "worker_reported" and event["task_id"] == task_id
                for event in snapshot["events"])
+
+
+def test_worker_report_requires_current_lease_token(workforce_http):
+    base, _ = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Research with lease token", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+    status, claim = request_json(base, "/api/workforce/claim", RESEARCHER,
+                                 {"capabilities": ["research"]})
+    assert status == 200
+    lease_token = claim["task"]["lease_token"]
+
+    status, rejected = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed", "output": "missing token",
+    })
+    assert status == 400
+    assert "lease token" in rejected["error"]
+
+    status, accepted = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed", "lease_token": lease_token,
+        "output": "current lease result",
+    })
+    assert status == 200
+    assert accepted["task"]["output"] == "current lease result"
 
 
 def test_worker_cannot_impersonate_another_worker_or_admin(workforce_http):
