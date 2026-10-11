@@ -332,6 +332,10 @@ class DigitalTwinCoordinator:
                 "capability": capability.strip(),
                 "priority": item.get("priority", 3),
                 "approval_required": bool(item.get("approval_required", False)),
+                "success_criteria": item.get("success_criteria", {}),
+                "evidence_required": bool(item.get("evidence_required", capability.strip() == "research")),
+                "success_criteria": item.get("success_criteria", {}),
+                "evidence_required": bool(item.get("evidence_required", capability.strip() == "research")),
             }
             created.append(self._request("POST", "/api/workforce/tasks", payload)["task"])
         return {
@@ -369,6 +373,8 @@ class DigitalTwinCoordinator:
                 task,
                 require_evidence=(task.get("capability") == "research"
                                   or bool(task.get("evidence_required"))),
+                success_criteria=task.get("success_criteria"),
+                provenance=provenance,
             )
             results.append({
                 "task_id": task.get("id"),
@@ -401,7 +407,7 @@ class DigitalTwinCoordinator:
     def execute_goal(self, goal: str, employees: list, max_cycles: int = 8,
                      tasks: list[dict] | None = None,
                      execution_profile: dict | None = None,
-                     revision_policy=None) -> dict:
+                     revision_policy=None, independent_reviewer=None) -> dict:
         """Select a bounded execution mode, then supervise and verify the goal.
 
         Parallel execution is opt-in via explicit estimated benefits; a larger
@@ -558,7 +564,7 @@ class DigitalTwinCoordinator:
                 break
         snapshot = self.inspect()
         scoped = [t for t in snapshot["tasks"] if t["task_id"] in ids]
-        if decision.verification == "evidence_gate":
+        if decision.verification in ("evidence_gate", "independent_review"):
             try:
                 from .verification import verify_task_output
             except ImportError:
@@ -566,8 +572,15 @@ class DigitalTwinCoordinator:
             for task in scoped:
                 if task["status"] == "completed":
                     task["verification"] = verify_task_output(
-                        {"id": task["task_id"], "output": task.get("output", "")},
-                        require_evidence=True,
+                        {"id": task["task_id"], "output": task.get("output", ""),
+                         "success_criteria": task.get("success_criteria", {})},
+                        require_evidence=(decision.verification == "evidence_gate"
+                                          or task.get("capability") == "research"
+                                          or bool(task.get("evidence_required"))),
+                        success_criteria=task.get("success_criteria"),
+                        independent_reviewer=(independent_reviewer
+                                               if decision.verification == "independent_review"
+                                               else None),
                     )
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "completed", "blocked", "failed")}
