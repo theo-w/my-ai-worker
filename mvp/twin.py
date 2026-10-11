@@ -572,7 +572,9 @@ class DigitalTwinCoordinator:
             for task in scoped:
                 if task["status"] == "completed":
                     task["verification"] = verify_task_output(
-                        {"id": task["task_id"], "output": task.get("output", ""),
+                        {"id": task["task_id"], "title": task.get("title"),
+                         "capability": task.get("capability"),
+                         "output": task.get("output", ""),
                          "success_criteria": task.get("success_criteria", {})},
                         require_evidence=(decision.verification == "evidence_gate"
                                           or task.get("capability") == "research"
