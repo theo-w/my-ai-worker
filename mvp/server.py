@@ -435,6 +435,8 @@ class Handler(BaseHTTPRequestHandler):
                         priority=body.get("priority", 3),
                         assigned_to=body.get("assigned_to"),
                         approval_required=bool(body.get("approval_required", False)),
+                        success_criteria=body.get("success_criteria", {}),
+                        evidence_required=bool(body.get("evidence_required", False)),
                     )
                     self._json({"ok": True, "task": task}, 201)
                 elif self.path == "/api/workforce/claim":
