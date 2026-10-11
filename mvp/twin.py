@@ -479,7 +479,7 @@ class DigitalTwinCoordinator:
                 # rotate by cycle so capability-specialized workers still get a turn.
                 compatible = compatible[(cycle - 1) % len(compatible):] + compatible[:(cycle - 1) % len(compatible)] if compatible else []
                 compatible = compatible[:1]
-            if decision.mode == "parallel_team":
+            if decision.mode == "parallel_team" and compatible:
                 # Only use concurrent polling when the profile explicitly
                 # justified parallelism. Each worker still claims its own task.
                 with ThreadPoolExecutor(max_workers=min(len(compatible), self.max_tasks)) as pool:
