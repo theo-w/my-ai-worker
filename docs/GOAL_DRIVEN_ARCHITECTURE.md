@@ -56,7 +56,7 @@ completion.
 - [ ] Add a verifier interface that consumes output, task criteria, provenance, and evidence.
 - [x] Require evidence-gate verification before goal-level completion for research/evidence-required tasks; semantic truth still needs domain checks or human review.
 - [x] Add authenticated worker heartbeat/registration and expose offline suspicion in the monitor.
-- [ ] Add replanning operations for merge, cancel/supersede, and bounded retry.
+- [x] Add audited merge/cancel operations for pending tasks, with optional per-cycle revision policy hooks and bounded action counts. Automatic semantic replanning still depends on a trustworthy planner/revision policy.
 - [ ] Benchmark single-agent versus team mode on representative tasks; tune thresholds from
   observed outcomes.
 
