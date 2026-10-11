@@ -431,7 +431,6 @@ class Handler(BaseHTTPRequestHandler):
                     worker = WORKFORCE.heartbeat_worker(
                         worker_id, str(status), task_id,
                         str(body.get("progress", "")), str(body.get("last_error", "")),
-                        lease_token=lease_token,
                     )
                     worker["capabilities"] = _worker_capabilities(worker_id)
                     WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
