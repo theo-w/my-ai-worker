@@ -134,13 +134,27 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None,
         active_ids = [t["task_id"] for t in rows
                       if t["assigned_to"] == worker_id and t["status"] == "assigned"]
         worker = worker_by_id.get(worker_id, {})
+        heartbeat_status = worker.get("status")
+        # An assignment does not prove the worker process is alive.
+        if heartbeat_status:
+            observed_status = heartbeat_status
+        elif active_ids:
+            observed_status = "working_unconfirmed"
+        else:
+            observed_status = "unknown"
         employees.append({
             "worker_id": worker_id,
-            "status": ("working" if active_ids else worker.get("status", "idle")),
+            "status": observed_status,
             "online": worker.get("online"),
             "availability": worker.get("availability", "unknown"),
             "last_heartbeat_at": worker.get("last_heartbeat_at"),
+            "heartbeat_age_seconds": worker.get("heartbeat_age_seconds"),
             "active_task_ids": active_ids,
+            "active_task_count": len(active_ids),
+            "assignment_consistent": (
+                bool(active_ids) == (heartbeat_status == "working")
+                if heartbeat_status is not None else None
+            ),
             "progress": worker.get("progress", ""),
             "last_error": worker.get("last_error", ""),
         })
