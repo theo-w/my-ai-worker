@@ -400,7 +400,8 @@ class DigitalTwinCoordinator:
 
     def execute_goal(self, goal: str, employees: list, max_cycles: int = 8,
                      tasks: list[dict] | None = None,
-                     execution_profile: dict | None = None,\n                     revision_policy=None) -> dict:
+                     execution_profile: dict | None = None,
+                     revision_policy=None) -> dict:
         """Select a bounded execution mode, then supervise and verify the goal.
 
         Parallel execution is opt-in via explicit estimated benefits; a larger
