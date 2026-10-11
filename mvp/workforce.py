@@ -58,7 +58,8 @@ class WorkforceRegistry:
 
     def create_task(self, title: str, description: str = "", capability: str = "general",
                     priority: int = 3, assigned_to: str | None = None,
-                    approval_required: bool = False) -> dict:
+                    approval_required: bool = False, success_criteria: dict | None = None,
+                    evidence_required: bool = False) -> dict:
         title = title.strip()
         if not title or len(title) > 200:
             raise ValueError("title must be between 1 and 200 characters")
@@ -67,6 +68,10 @@ class WorkforceRegistry:
         if not capability.strip() or len(capability) > 100:
             raise ValueError("capability must be between 1 and 100 characters")
         priority = max(1, min(int(priority), 5))
+        if success_criteria is None:
+            success_criteria = {}
+        if not isinstance(success_criteria, dict) or len(json.dumps(success_criteria)) > 4000:
+            raise ValueError("success_criteria must be an object up to 4000 serialized characters")
         with self.lock:
             task_id = uuid.uuid4().hex[:12]
             task = {
@@ -77,6 +82,7 @@ class WorkforceRegistry:
                 "max_attempts": self.max_attempts, "created_at": _stamp(),
                 "updated_at": _stamp(), "lease_until": None, "output": "",
                 "blocker": "", "feedback": [], "history": [],
+                "success_criteria": success_criteria, "evidence_required": bool(evidence_required),
             }
             self.tasks[task_id] = task
             self._event("task_created", task_id=task_id, title=title,
