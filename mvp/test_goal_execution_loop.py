@@ -48,6 +48,36 @@ def test_twin_coordinates_worker_and_reports_goal(monkeypatch, tmp_path):
         thread.join(timeout=2)
 
 
+def test_supervision_reclaims_expired_leases_and_returns_monitor_report(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000021", "worker-test-token-000000000022"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-supervision.json"))
+    task = registry.create_task("Recover expired work", capability="analysis")
+    claimed = registry.claim("analyst", ["analysis"])
+    assert claimed and claimed["id"] == task["id"]
+    registry.tasks[task["id"]]["lease_until"] = "2000-01-01T00:00:00+00:00"
+    registry.save()
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        twin = DigitalTwinCoordinator(f"http://127.0.0.1:{httpd.server_port}", admin)
+        result = twin.supervise_once()
+        assert result["maintenance"]["requeued"] == [task["id"]]
+        assert result["report"]["twin"]["active_tasks"] == 1
+        assert any(event["type"] == "supervision_observed"
+                   for event in result["supervision_events"])
+        current = registry.snapshot()
+        assert next(item for item in current["tasks"] if item["id"] == task["id"])["status"] == "queued"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
+
 def test_twin_rejects_invalid_execution_parameters():
     twin = DigitalTwinCoordinator("http://127.0.0.1:1", "admin-test-token-000000000001")
     with pytest.raises(ValueError):
