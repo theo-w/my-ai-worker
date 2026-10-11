@@ -575,7 +575,7 @@ class DigitalTwinCoordinator:
                 from verification import verify_task_output
             for task in scoped:
                 if task["status"] == "completed":
-                    task["verification"] = verify_task_output(
+                    verification = verify_task_output(
                         {"id": task["task_id"], "title": task.get("title"),
                          "capability": task.get("capability"),
                          "output": task.get("output", ""),
@@ -588,6 +588,18 @@ class DigitalTwinCoordinator:
                                                if decision.verification == "independent_review"
                                                else None),
                     )
+                    # Independent review cannot be replaced by structural checks.
+                    if decision.verification == "independent_review" and not callable(independent_reviewer):
+                        verification["accepted"] = False
+                        verification["status"] = "rejected"
+                        verification["independent_review"] = "not_configured"
+                        verification["checks"].append({
+                            "name": "independent_review_configured", "passed": False,
+                        })
+                        verification["verification_note"] = (
+                            "Independent review was required but no reviewer callback is configured."
+                        )
+                    task["verification"] = verification
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "completed", "blocked", "failed",
                             "cancelled", "superseded", "approval_required")}
