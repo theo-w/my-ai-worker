@@ -334,8 +334,6 @@ class DigitalTwinCoordinator:
                 "approval_required": bool(item.get("approval_required", False)),
                 "success_criteria": item.get("success_criteria", {}),
                 "evidence_required": bool(item.get("evidence_required", capability.strip() == "research")),
-                "success_criteria": item.get("success_criteria", {}),
-                "evidence_required": bool(item.get("evidence_required", capability.strip() == "research")),
             }
             created.append(self._request("POST", "/api/workforce/tasks", payload)["task"])
         return {
@@ -443,7 +441,7 @@ class DigitalTwinCoordinator:
             "risk_level": 1,
             "evidence_required": evidence_required,
             "human_approval_required": human_approval_required,
-            "independent_review_available": False,
+            "independent_review_available": callable(independent_reviewer),
             "expected_parallel_quality_gain": 0.0,
             "expected_parallel_time_savings": 0.0,
             "team_cost_multiplier": 1.5,
