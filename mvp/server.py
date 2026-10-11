@@ -462,7 +462,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._json({"ok": False, "error": "Worker identity is derived from its token."}, 403)
                         return
                     task = WORKFORCE.report(body["task_id"], worker_id, body["status"],
-                                            str(body.get("output", "")), str(body.get("blocker", "")))
+                                            str(body.get("output", "")), str(body.get("blocker", "")),
+                                            body.get("lease_token"))
                     self._json({"ok": True, "task": task})
                 elif self.path == "/api/workforce/cancel":
                     task_id, reason = body.get("task_id"), body.get("reason")
