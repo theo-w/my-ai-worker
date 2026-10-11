@@ -399,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workers/heartbeat"):
+        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -410,7 +410,9 @@ class Handler(BaseHTTPRequestHandler):
             if body is None:
                 return
             try:
-                if self.path == "/api/workers/heartbeat":
+                if self.path == "/api/workforce/maintain":
+                    self._json({"ok": True, "maintenance": WORKFORCE.maintain()})
+                elif self.path == "/api/workers/heartbeat":
                     worker_id = actor["worker_id"]
                     if body.get("worker_id") not in (None, worker_id):
                         self._json({"ok": False, "error": "Worker identity is derived from its token."}, 403)
