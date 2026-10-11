@@ -399,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workers/heartbeat"):
+        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -460,6 +460,16 @@ class Handler(BaseHTTPRequestHandler):
                     task = WORKFORCE.report(body["task_id"], worker_id, body["status"],
                                             str(body.get("output", "")), str(body.get("blocker", "")))
                     self._json({"ok": True, "task": task})
+                elif self.path == "/api/workforce/cancel":
+                    task_id, reason = body.get("task_id"), body.get("reason")
+                    if not isinstance(task_id, str) or not isinstance(reason, str):
+                        raise ValueError("task_id and reason must be strings")
+                    self._json({"ok": True, "task": WORKFORCE.cancel_task(task_id, reason)})
+                elif self.path == "/api/workforce/merge":
+                    target_id, source_ids, reason = body.get("target_task_id"), body.get("source_task_ids"), body.get("reason")
+                    if not isinstance(target_id, str) or not isinstance(source_ids, list) or not isinstance(reason, str):
+                        raise ValueError("target_task_id, source_task_ids and reason are required")
+                    self._json({"ok": True, **WORKFORCE.merge_tasks(target_id, source_ids, reason)})
                 elif self.path == "/api/workforce/feedback":
                     for key in ("task_id", "actor", "message"):
                         if not isinstance(body.get(key), str):
