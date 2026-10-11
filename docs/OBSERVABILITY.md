@@ -49,6 +49,15 @@ decisions unless an explicit `recovery_policy` is supplied by code.
 - `tasks[].history`, `feedback`, and `recent_events`: lifecycle and communication trace.
 - `alerts`: expired leases, stale tasks (15 minutes without update), blocked/failed tasks, missing heartbeats, and workers whose heartbeat is older than the default 30-second threshold.
 
+## Lease renewal and late results
+
+While an employee is executing a task, its authenticated `working` heartbeat must
+include both the task ID and the lease token returned by claim. The server renews
+only the matching, unexpired lease. Missing or stale tokens are rejected, and a
+heartbeat cannot revive an expired lease. Task reports also run expiry maintenance
+before accepting output, so a late result cannot win a race just because the
+periodic supervisor has not run yet.
+
 ## Important limitations
 
 1. Heartbeat state is a liveness signal, not proof of process death. The monitor labels stale workers as suspected offline; network delays and host pauses can cause false positives. The heartbeat endpoint registers a worker only after its first authenticated beat.
