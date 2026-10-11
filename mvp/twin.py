@@ -360,6 +360,15 @@ class DigitalTwinCoordinator:
                         provenance = "simulated" if envelope["simulated"] else "executor_reported_live"
                 except (ValueError, TypeError):
                     pass
+            try:
+                from .verification import verify_task_output
+            except ImportError:
+                from verification import verify_task_output
+            verification = verify_task_output(
+                task,
+                require_evidence=(task.get("capability") == "research"
+                                  or bool(task.get("evidence_required"))),
+            )
             results.append({
                 "task_id": task.get("id"),
                 "title": task.get("title"),
@@ -371,11 +380,15 @@ class DigitalTwinCoordinator:
                 "has_output": bool(output),
                 "output": output,
                 "blocker": task.get("blocker", ""),
+                "verification": verification,
             })
         active = counts["queued"] + counts["assigned"]
         if active:
             status = "in_progress"
-        elif counts["blocked"] or counts["failed"]:
+        elif counts["blocked"] or counts["failed"] or any(
+            not item["verification"]["accepted"] for item in results
+            if item["status"] == "completed"
+        ):
             status = "needs_attention"
         elif counts["completed"]:
             status = "completed"
@@ -425,6 +438,14 @@ class DigitalTwinCoordinator:
             status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
         elif counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
             status = "needs_attention"
+        elif any(not t.get("verification", {}).get("accepted", False)
+                 for t in scoped if t.get("status") == "completed"):
+            status = "needs_attention"
+            events.append({"type": "verification_rejected",
+                           "task_ids": [t["task_id"] for t in scoped
+                                        if t.get("status") == "completed"
+                                        and not t.get("verification", {}).get("accepted", False)],
+                           "reason": "Completed worker output did not pass the required evidence gate."})
         else:
             status = "completed"
         events.append({"type": "goal_finished", "status": status, "counts": counts})
