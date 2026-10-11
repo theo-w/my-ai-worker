@@ -139,3 +139,20 @@ def test_fencing_token_rejects_stale_attempt_from_same_worker(tmp_path):
     assert accepted["output"] == "current result"
     assert accepted["status"] == "completed"
     assert "_lease_token" not in registry.snapshot()["tasks"][0]
+
+def test_active_lease_heartbeat_renews_lease_and_rejects_stale_token(tmp_path):
+    registry = WorkforceRegistry(
+        path=str(tmp_path / "renew.json"), lease_seconds=30, max_attempts=2,
+    )
+    task = registry.create_task("Long-running task", capability="analysis")
+    claimed = registry.claim("worker-a", ["analysis"])
+    before = datetime.fromisoformat(claimed["lease_until"])
+
+    renewed = registry.renew_lease(task["id"], "worker-a", claimed["lease_token"])
+    after = datetime.fromisoformat(renewed["lease_until"])
+    assert after > before
+    assert renewed["history"][-1]["event"] == "lease_renewed"
+
+    with pytest.raises(ValueError, match="lease token"):
+        registry.renew_lease(task["id"], "worker-a", "stale-token")
+
