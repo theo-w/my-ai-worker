@@ -79,6 +79,9 @@ def test_monitor_does_not_infer_worker_liveness_from_assignment_alone():
     assert employee["online"] is None
     assert employee["active_task_ids"] == ["task-a"]
     assert employee["assignment_consistent"] is None
+    assert any(alert["type"] == "assigned_worker_unobserved"
+               and alert["worker_id"] == "worker-no-heartbeat"
+               for alert in report["alerts"])
 
 
 def test_monitor_detects_stale_worker_heartbeat_and_keeps_idle_worker_visible():
