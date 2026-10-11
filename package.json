@@ -1,0 +1,14 @@
+{
+  "name": "my-ai-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JARVIS digital employee runtime MVP",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
