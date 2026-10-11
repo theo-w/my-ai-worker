@@ -53,7 +53,7 @@ completion.
 
 - [x] Add a deterministic, inspectable execution-mode policy as an initial decision seam.
 - [x] Connect the policy to the Digital Twin goal loop, capability-based worker selection, and bounded concurrent polling for justified parallel-team mode.
-- [ ] Add a verifier interface that consumes output, task criteria, provenance, and evidence.
+- [x] Add a verifier interface that consumes output, task criteria, provenance, and evidence.
 - [x] Require evidence-gate verification before goal-level completion for research/evidence-required tasks; semantic truth still needs domain checks or human review.
 - [x] Add authenticated worker heartbeat/registration and expose offline suspicion in the monitor.
 - [x] Add audited merge/cancel operations for pending tasks, with optional per-cycle revision policy hooks and bounded action counts. Automatic semantic replanning still depends on a trustworthy planner/revision policy.
