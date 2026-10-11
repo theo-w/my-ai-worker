@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from datetime import datetime, timezone
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 @dataclass
@@ -398,32 +399,114 @@ class DigitalTwinCoordinator:
                 "events": snapshot.get("events", [])}
 
     def execute_goal(self, goal: str, employees: list, max_cycles: int = 8,
-                     tasks: list[dict] | None = None) -> dict:
-        """Execute a bounded goal by coordinating authenticated employee agents."""
+                     tasks: list[dict] | None = None,
+                     execution_profile: dict | None = None) -> dict:
+        """Select a bounded execution mode, then supervise and verify the goal.
+
+        Parallel execution is opt-in via explicit estimated benefits; a larger
+        task list alone does not justify coordination overhead.
+        """
+        try:
+            from .execution_strategy import TaskProfile, choose_execution_mode
+        except ImportError:
+            from execution_strategy import TaskProfile, choose_execution_mode
         if not isinstance(max_cycles, int) or not 1 <= max_cycles <= 20:
             raise ValueError("max_cycles must be an integer between 1 and 20")
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal must be a non-empty string")
         if not employees or any(not callable(getattr(worker, "run_once", None))
                                 for worker in employees):
             raise ValueError("employees must contain agents exposing run_once()")
-        plan = self.start_goal(goal, tasks=tasks)
+
+        plan_items = list(tasks if tasks is not None else self.default_plan(goal))
+        supplied = dict(execution_profile or {})
+        evidence_required = bool(supplied.pop("evidence_required", False)) or any(
+            item.get("capability") == "research" or item.get("evidence_required", False)
+            for item in plan_items
+        )
+        human_approval_required = bool(supplied.pop("human_approval_required", False)) or any(
+            item.get("human_approval_required", False) for item in plan_items
+        )
+        profile_fields = {
+            "complexity": min(5, max(1, len(plan_items))),
+            "parallelizable": bool(len(plan_items) > 1 and all(
+                item.get("parallelizable", False) for item in plan_items
+            )),
+            "quality_requirement": 3,
+            "risk_level": 1,
+            "evidence_required": evidence_required,
+            "human_approval_required": human_approval_required,
+            "independent_review_available": bool(supplied.pop("independent_review_available", False)),
+            "expected_parallel_quality_gain": 0.0,
+            "expected_parallel_time_savings": 0.0,
+            "team_cost_multiplier": 1.5,
+        }
+        profile_fields.update(supplied)
+        profile_fields["evidence_required"] = evidence_required
+        profile_fields["human_approval_required"] = human_approval_required
+        profile = TaskProfile(**profile_fields)
+        decision = choose_execution_mode(profile)
+        events = [{"type": "goal_started", "task_count": len(plan_items)},
+                  {"type": "execution_mode_selected", **decision.to_dict()}]
+        if decision.mode == "approval_required":
+            events.append({"type": "approval_required",
+                           "reason": "The execution policy requires human approval before work starts."})
+            return {
+                "goal": goal.strip(), "status": "needs_approval", "cycles": 0,
+                "counts": {"queued": 0, "assigned": 0, "completed": 0, "blocked": 0, "failed": 0},
+                "tasks": [], "worker_runs": [], "events": events,
+                "execution_decision": decision.to_dict(),
+            }
+
+        plan = self.start_goal(goal, tasks=plan_items)
         ids = {task["id"] for task in plan["created_tasks"]}
-        worker_runs, events = [], [{"type": "goal_started", "task_count": len(ids)}]
+        worker_runs = []
         cycles = 0
         for cycle in range(1, max_cycles + 1):
             cycles = cycle
-            before = {t["task_id"]: t["status"] for t in self.inspect()["tasks"] if t["task_id"] in ids}
+            before = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
+                      if t["task_id"] in ids}
             if before and all(s in ("completed", "blocked", "failed") for s in before.values()):
                 break
-            cycle_results = []
-            for employee in employees:
-                try:
-                    result = employee.run_once()
-                except Exception as exc:
-                    result = {"status": "agent_error", "error": type(exc).__name__ + ": " + str(exc)}
-                cycle_results.append(result)
-                worker_runs.append({"cycle": cycle, **result})
-            events.append({"type": "cycle_finished", "cycle": cycle, "worker_results": cycle_results})
-            after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"] if t["task_id"] in ids}
+            pending = [t for t in self.inspect()["tasks"]
+                       if t["task_id"] in ids and t["status"] in ("queued", "assigned")]
+            needed = {t["capability"] for t in pending}
+            compatible = [worker for worker in employees
+                          if needed.intersection(set(getattr(worker, "capabilities", [])))
+                          or "general" in getattr(worker, "capabilities", [])]
+            if decision.mode == "single_agent":
+                # One polling agent per cycle keeps coordination overhead low;
+                # rotate by cycle so capability-specialized workers still get a turn.
+                compatible = compatible[(cycle - 1) % len(compatible):] + compatible[:(cycle - 1) % len(compatible)] if compatible else []
+                compatible = compatible[:1]
+            if decision.mode == "parallel_team":
+                # Only use concurrent polling when the profile explicitly
+                # justified parallelism. Each worker still claims its own task.
+                with ThreadPoolExecutor(max_workers=min(len(compatible), self.max_tasks)) as pool:
+                    futures = {pool.submit(worker.run_once): worker for worker in compatible}
+                    cycle_results = []
+                    for future in as_completed(futures):
+                        try:
+                            result = future.result()
+                        except Exception as exc:
+                            result = {"status": "agent_error",
+                                      "error": type(exc).__name__ + ": " + str(exc)}
+                        cycle_results.append(result)
+                        worker_runs.append({"cycle": cycle, **result})
+            else:
+                cycle_results = []
+                for employee in compatible:
+                    try:
+                        result = employee.run_once()
+                    except Exception as exc:
+                        result = {"status": "agent_error",
+                                  "error": type(exc).__name__ + ": " + str(exc)}
+                    cycle_results.append(result)
+                    worker_runs.append({"cycle": cycle, **result})
+            events.append({"type": "cycle_finished", "cycle": cycle,
+                           "execution_mode": decision.mode, "worker_results": cycle_results})
+            after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
+                     if t["task_id"] in ids}
             if after and all(s in ("completed", "blocked", "failed") for s in after.values()):
                 break
             if before == after and not any(x.get("status") == "completed" for x in cycle_results):
@@ -443,7 +526,7 @@ class DigitalTwinCoordinator:
             status = "needs_attention"
             events.append({"type": "verification_rejected",
                            "task_ids": [t["task_id"] for t in scoped
-                                        if t.get("status") == "completed"
+                                        if t["status"] == "completed"
                                         and not t.get("verification", {}).get("accepted", False)],
                            "reason": "Completed worker output did not pass the required evidence gate."})
         else:
@@ -452,6 +535,7 @@ class DigitalTwinCoordinator:
         return {
             "goal": goal.strip(), "status": status, "cycles": cycles, "counts": counts,
             "tasks": scoped, "worker_runs": worker_runs, "events": events,
+            "execution_decision": decision.to_dict(),
             "evidence_note": "执行器输出不自动等于已核实证据；必须检查来源与可复现性。",
         }
 
