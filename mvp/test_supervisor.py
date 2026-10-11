@@ -57,3 +57,27 @@ def test_supervision_loop_rejects_unsafe_intervals(interval):
 def test_supervision_loop_rejects_invalid_iteration_limit():
     with pytest.raises(ValueError):
         run_supervision_loop(FakeTwin([1]), max_iterations=0)
+
+def test_supervisor_cli_uses_configured_api_and_stops_after_one_cycle(monkeypatch, capsys):
+    import sys
+    import mvp.twin
+
+    class CliTwin:
+        def __init__(self, base_url, admin_token):
+            assert base_url == "http://127.0.0.1:8765"
+            assert admin_token == "admin-token-for-supervisor-test"
+
+        def supervise_once(self, recovery_policy=None):
+            return {"maintenance": {"requeued": [], "failed": []}}
+
+    monkeypatch.setenv("JARVIS_WORKFORCE_URL", "http://127.0.0.1:8765")
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", "admin-token-for-supervisor-test")
+    monkeypatch.setattr(sys, "argv", ["mvp.supervisor", "--max-iterations", "1"])
+    monkeypatch.setattr(mvp.twin, "DigitalTwinCoordinator", CliTwin)
+
+    from mvp.supervisor import main
+    assert main() == 0
+    output = capsys.readouterr().out
+    assert '"cycle_count": 1' in output
+    assert '"supervisor_stopped"' in output
+
