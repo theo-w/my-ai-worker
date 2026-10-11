@@ -19,7 +19,15 @@ def verify_task_output(task: dict, require_evidence: bool = False) -> dict:
     except (ValueError, TypeError):
         envelope = {}
     result["simulated"] = bool(envelope.get("simulated", False))
-    sources = envelope.get("accepted_evidence", envelope.get("sources", []))
+    inner = envelope.get("content", envelope)
+    if isinstance(inner, str):
+        try:
+            inner = json.loads(inner)
+        except (ValueError, TypeError):
+            inner = {}
+    if not isinstance(inner, dict):
+        inner = {}
+    sources = inner.get("accepted_evidence", inner.get("sources", []))
     if not isinstance(sources, list):
         sources = []
     valid = []
