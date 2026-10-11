@@ -31,7 +31,7 @@ def test_monitor_reports_twin_employee_task_io_and_provenance():
     assert report["twin"]["active_tasks"] == 1
     assert report["twin"]["completed_tasks"] == 1
     assert {employee["worker_id"]: employee["status"] for employee in report["employees"]} == {
-        "worker-analysis": "idle", "worker-research": "working",
+        "worker-analysis": "unknown", "worker-research": "working_unconfirmed",
     }
     completed = next(task for task in report["tasks"] if task["task_id"] == "task-b")
     assert completed["input"]["description"] == "Estimate inference costs"
