@@ -143,3 +143,25 @@ def test_worker_cannot_claim_capabilities_not_assigned_by_server(workforce_http)
     )
     assert status == 200
     assert claim["task"] is None
+
+
+def test_worker_heartbeat_is_authenticated_and_cannot_impersonate(workforce_http):
+    base, registry = workforce_http
+    status, heartbeat = request_json(
+        base, "/api/workers/heartbeat", RESEARCHER,
+        {"status": "idle", "progress": "Waiting for work"},
+    )
+    assert status == 200
+    assert heartbeat["worker"]["worker_id"] == "researcher"
+    assert heartbeat["worker"]["status"] == "idle"
+    assert "capabilities" in heartbeat["worker"]
+
+    status, spoofed = request_json(
+        base, "/api/workers/heartbeat", RESEARCHER,
+        {"worker_id": "analyst", "status": "working"},
+    )
+    assert status == 403
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    assert any(w["worker_id"] == "researcher" for w in snapshot["workers"])
