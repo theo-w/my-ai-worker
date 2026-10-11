@@ -203,6 +203,66 @@ class WorkforceRegistry:
         return {"requeued": requeued, "failed": failed}
 
 
+    def cancel_task(self, task_id: str, reason: str) -> dict:
+        """Cancel queued/assigned work; preserve an audit trail and reject late reports."""
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
+            raise ValueError("reason must be between 1 and 1000 characters")
+        with self.lock:
+            task = self._get(task_id)
+            if task["status"] not in {"queued", "assigned", "approval_required"}:
+                raise ValueError("only queued, assigned, or approval-required tasks can be cancelled")
+            prior_status = task["status"]
+            task["status"] = "cancelled"
+            task["lease_until"] = None
+            task["blocker"] = reason.strip()
+            task["updated_at"] = _stamp()
+            task["history"].append({"event": "cancelled", "reason": reason.strip(),
+                                    "previous_status": prior_status, "at": _stamp()})
+            self._event("task_cancelled", task_id=task_id, reason=reason.strip(),
+                        previous_status=prior_status)
+            self.save()
+            return dict(task)
+
+    def merge_tasks(self, target_task_id: str, source_task_ids: list[str],
+                    reason: str) -> dict:
+        """Supersede queued duplicate tasks into one target without losing history."""
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
+            raise ValueError("reason must be between 1 and 1000 characters")
+        if not isinstance(source_task_ids, list) or len(source_task_ids) > 20:
+            raise ValueError("source_task_ids must be a list of at most 20 task IDs")
+        if target_task_id in source_task_ids or len(set(source_task_ids)) != len(source_task_ids):
+            raise ValueError("target and source task IDs must be distinct")
+        with self.lock:
+            target = self._get(target_task_id)
+            if target["status"] not in {"queued", "approval_required"}:
+                raise ValueError("target task must not have started")
+            sources = [self._get(task_id) for task_id in source_task_ids]
+            if any(task["status"] not in {"queued", "approval_required"} for task in sources):
+                raise ValueError("source tasks must not have started")
+            if any(task["capability"] != target["capability"] for task in sources):
+                raise ValueError("only tasks with matching capabilities can be merged")
+            descriptions = [target.get("description", "").strip()]
+            descriptions.extend(
+                f"[Merged from {task['id']}] {task.get('title', '')}: {task.get('description', '').strip()}"
+                for task in sources
+            )
+            target["description"] = "\n\n".join(part for part in descriptions if part)[:5000]
+            target["priority"] = max([target["priority"]] + [task["priority"] for task in sources])
+            target["history"].append({"event": "tasks_merged", "source_task_ids": source_task_ids,
+                                      "reason": reason.strip(), "at": _stamp()})
+            target["updated_at"] = _stamp()
+            for task in sources:
+                task["status"] = "superseded"
+                task["lease_until"] = None
+                task["blocker"] = "Merged into " + target_task_id
+                task["updated_at"] = _stamp()
+                task["history"].append({"event": "superseded_by_merge", "target_task_id": target_task_id,
+                                        "reason": reason.strip(), "at": _stamp()})
+            self._event("tasks_merged", target_task_id=target_task_id,
+                        source_task_ids=source_task_ids, reason=reason.strip())
+            self.save()
+            return {"target": dict(target), "sources": [dict(task) for task in sources]}
+
     def heartbeat_worker(self, worker_id: str, status: str = "idle",
                          current_task_id: str | None = None, progress: str = "",
                          last_error: str = "") -> dict:
