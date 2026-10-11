@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -20,7 +21,8 @@ class WorkforceAPIError(RuntimeError):
 
 class DigitalEmployeeAgent:
     def __init__(self, base_url: str, token: str, capabilities: list[str],
-                 executor, goal: str, timeout: float = 10.0):
+                 executor, goal: str, timeout: float = 10.0,
+                 heartbeat_interval: float = 10.0):
         if not base_url.startswith(("http://", "https://")):
             raise ValueError("base_url must be an HTTP(S) URL")
         if not isinstance(token, str) or len(token) < 24:
@@ -33,6 +35,8 @@ class DigitalEmployeeAgent:
         self.executor = executor
         self.goal = goal
         self.timeout = max(1.0, float(timeout))
+        self.heartbeat_interval = max(0.1, float(heartbeat_interval))
+        self.last_heartbeat_error = None
 
     def _request(self, path: str, payload: dict) -> dict:
         request = Request(
@@ -61,16 +65,41 @@ class DigitalEmployeeAgent:
             raise WorkforceAPIError(response.status, str(result.get("error", "API request failed")))
         return result
 
+    def _heartbeat(self, status: str, task_id: str | None = None,
+                   progress: str = "", last_error: str = "") -> bool:
+        try:
+            self._request("/api/workers/heartbeat", {
+                "status": status, "current_task_id": task_id,
+                "progress": progress[:500], "last_error": last_error[:1000],
+            })
+            self.last_heartbeat_error = None
+            return True
+        except Exception as exc:
+            # Heartbeats are observability signals; their failure must not turn
+            # a valid task result into a false task failure.
+            self.last_heartbeat_error = type(exc).__name__
+            return False
+
     def run_once(self) -> dict:
         """Claim and execute at most one task; returns idle/completed/blocked."""
         claimed = self._request(
             "/api/workforce/claim", {"capabilities": self.capabilities}
         ).get("task")
         if claimed is None:
+            self._heartbeat("idle", progress="Polling for eligible work")
             return {"status": "idle", "task_id": None}
         task_id = claimed.get("id")
         if not isinstance(task_id, str) or not task_id:
             raise WorkforceAPIError(502, "Claim response did not include a task ID.")
+        stop_heartbeat = threading.Event()
+        self._heartbeat("working", task_id, "Task claimed; preparing execution")
+
+        def heartbeat_loop():
+            while not stop_heartbeat.wait(self.heartbeat_interval):
+                self._heartbeat("working", task_id, "Executor is running")
+
+        heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+        heartbeat_thread.start()
         try:
             result = self.executor.execute(claimed, self.goal)
             output = getattr(result, "output", None)
@@ -104,8 +133,14 @@ class DigitalEmployeeAgent:
                 return {"status": "report_failed", "task_id": task_id,
                         "error": reason,
                         "report_error": type(report_exc).__name__ + ": " + str(report_exc)}
+            self._heartbeat("blocked", task_id, "Task blocked", reason)
             return {"status": "blocked", "task_id": task_id,
                     "task": report.get("task"), "error": reason}
+        finally:
+            stop_heartbeat.set()
+            heartbeat_thread.join(timeout=min(1.0, self.heartbeat_interval))
+            if "report" in locals() and report.get("task", {}).get("status") == "completed":
+                self._heartbeat("idle", progress="Task completed")
 
 
 def build_executor_from_environment():
