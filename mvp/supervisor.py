@@ -78,3 +78,54 @@ def run_supervision_loop(
         "cycle_count": len(cycles),
         "elapsed_seconds": round(monotonic() - started, 4),
     }
+
+
+def main() -> int:
+    """Run supervision against a separately running workforce API."""
+    import argparse
+    import json
+    import os
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="Continuously monitor and recover the JARVIS workforce queue."
+    )
+    parser.add_argument("--interval-seconds", type=float, default=10.0)
+    parser.add_argument("--max-iterations", type=int, default=None,
+                        help="Stop after this many cycles; omit to run until interrupted.")
+    args = parser.parse_args()
+
+    base_url = os.getenv("JARVIS_WORKFORCE_URL", "").strip()
+    admin_token = os.getenv("JARVIS_ADMIN_TOKEN", "").strip()
+    if not base_url or not admin_token:
+        parser.error("Set JARVIS_WORKFORCE_URL and JARVIS_ADMIN_TOKEN.")
+    try:
+        try:
+            from .twin import DigitalTwinCoordinator
+        except ImportError:
+            from twin import DigitalTwinCoordinator
+        twin = DigitalTwinCoordinator(base_url, admin_token)
+        result = run_supervision_loop(
+            twin,
+            interval_seconds=args.interval_seconds,
+            max_iterations=args.max_iterations,
+            on_cycle=lambda cycle: print(json.dumps(cycle, ensure_ascii=False), flush=True),
+        )
+        print(json.dumps({
+            "event": "supervisor_stopped",
+            "status": result["status"],
+            "cycle_count": result["cycle_count"],
+            "elapsed_seconds": result["elapsed_seconds"],
+        }, ensure_ascii=False), flush=True)
+        return 0
+    except KeyboardInterrupt:
+        print(json.dumps({"event": "supervisor_interrupted"}, ensure_ascii=False), flush=True)
+        return 130
+    except (ValueError, RuntimeError) as exc:
+        print("Supervisor startup failed: " + str(exc), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
