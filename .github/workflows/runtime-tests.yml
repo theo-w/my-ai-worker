@@ -1,0 +1,35 @@
+name: Runtime tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run runtime tests
+        run: npm test
+      - name: Smoke-test server health endpoint
+        shell: bash
+        run: |
+          npm start > /tmp/jarvis-runtime.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:10000/health > /tmp/jarvis-health.json; then
+              cat /tmp/jarvis-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/jarvis-runtime.log
+          exit 1
