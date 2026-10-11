@@ -175,8 +175,10 @@ class WorkforceRegistry:
 
     def renew_lease(self, task_id: str, worker_id: str,
                     lease_token: str | None) -> dict:
-        """Renew an active task lease only for its current token holder."""
+        """Renew an active, unexpired task lease only for its current token holder."""
         worker_id = worker_id.strip()
+        # Do not allow a heartbeat to revive a lease after its deadline.
+        self.maintain()
         with self.lock:
             task = self._get(task_id)
             if task["status"] != "assigned" or task.get("assigned_to") != worker_id:
