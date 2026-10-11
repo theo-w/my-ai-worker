@@ -436,7 +436,7 @@ class DigitalTwinCoordinator:
             "risk_level": 1,
             "evidence_required": evidence_required,
             "human_approval_required": human_approval_required,
-            "independent_review_available": bool(supplied.pop("independent_review_available", False)),
+            "independent_review_available": False,
             "expected_parallel_quality_gain": 0.0,
             "expected_parallel_time_savings": 0.0,
             "team_cost_multiplier": 1.5,
@@ -515,6 +515,17 @@ class DigitalTwinCoordinator:
                 break
         snapshot = self.inspect()
         scoped = [t for t in snapshot["tasks"] if t["task_id"] in ids]
+        if decision.verification == "evidence_gate":
+            try:
+                from .verification import verify_task_output
+            except ImportError:
+                from verification import verify_task_output
+            for task in scoped:
+                if task["status"] == "completed":
+                    task["verification"] = verify_task_output(
+                        {"id": task["task_id"], "output": task.get("output", "")},
+                        require_evidence=True,
+                    )
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "completed", "blocked", "failed")}
         if counts["queued"] or counts["assigned"]:
