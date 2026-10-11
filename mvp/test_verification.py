@@ -42,3 +42,47 @@ def test_evidence_gate_rejects_incomplete_source():
         }),
     }, require_evidence=True)
     assert result["accepted"] is False
+
+
+def test_success_criteria_reject_missing_required_phrase_and_fields():
+    result = verify_task_output(
+        {"id": "t2", "output": json.dumps({"content": json.dumps({"summary": "alpha"})})},
+        success_criteria={"required_phrases": ["beta"], "required_fields": ["summary", "risks"]},
+    )
+    assert result["accepted"] is False
+    assert any(check["name"] == "required_phrases" and not check["passed"] for check in result["checks"])
+    assert any(check["name"] == "required_fields" and not check["passed"] for check in result["checks"])
+
+
+def test_success_criteria_accept_matching_phrase_and_minimum_length():
+    result = verify_task_output(
+        {"id": "t3", "output": "A report with Alpha finding"},
+        success_criteria={"required_phrases": ["alpha finding"], "min_output_chars": 10},
+    )
+    assert result["accepted"] is True
+    assert result["verified_truth"] is False
+
+
+def test_independent_review_requires_explicit_accept_decision():
+    task = {"id": "t4", "output": "Output to review"}
+    rejected = verify_task_output(task, independent_reviewer=lambda *_: {
+        "decision": "revise", "rationale": "Missing counter-evidence",
+    })
+    assert rejected["accepted"] is False
+    assert rejected["independent_review"] == "revise"
+
+    accepted = verify_task_output(task, independent_reviewer=lambda *_: {
+        "decision": "accept", "rationale": "Criteria checked",
+    })
+    assert accepted["accepted"] is True
+    assert accepted["independent_review"] == "accept"
+    assert accepted["verified_truth"] is False
+
+
+def test_independent_review_failure_closed():
+    result = verify_task_output(
+        {"id": "t5", "output": "Output to review"},
+        independent_reviewer=lambda *_: {"decision": "maybe"},
+    )
+    assert result["accepted"] is False
+    assert result["independent_review"] == "invalid_response"
