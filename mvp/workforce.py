@@ -307,8 +307,8 @@ class WorkforceRegistry:
 
     def heartbeat_worker(self, worker_id: str, status: str = "idle",
                          current_task_id: str | None = None, progress: str = "",
-                         last_error: str = "", lease_token: str | None = None) -> dict:
-        """Record an authenticated heartbeat and renew only its current valid lease."""
+                         last_error: str = "") -> dict:
+        """Persist a bounded, token-free heartbeat for an authenticated worker."""
         worker_id = worker_id.strip()
         if not worker_id or len(worker_id) > 120:
             raise ValueError("worker_id must be between 1 and 120 characters")
@@ -317,18 +317,6 @@ class WorkforceRegistry:
         if len(progress) > 500 or len(last_error) > 1000:
             raise ValueError("progress or last_error is too long")
         with self.lock:
-            lease_renewed = False
-            if status == "working" and current_task_id and isinstance(lease_token, str) and lease_token:
-                task = self.tasks.get(current_task_id)
-                if (task is not None and task.get("status") == "assigned"
-                        and task.get("assigned_to") == worker_id
-                        and task.get("_lease_token") == lease_token):
-                    task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
-                    task["updated_at"] = _stamp()
-                    task["history"].append({"event": "lease_renewed", "worker_id": worker_id,
-                                            "at": _stamp()})
-                    self._event("task_lease_renewed", task_id=current_task_id, worker_id=worker_id)
-                    lease_renewed = True
             prior = self.workers.get(worker_id, {})
             worker = {
                 "worker_id": worker_id,
@@ -338,13 +326,13 @@ class WorkforceRegistry:
                 "last_error": last_error.strip(),
                 "last_heartbeat_at": _stamp(),
                 "capabilities": prior.get("capabilities", []),
-                "lease_renewed": lease_renewed,
             }
             self.workers[worker_id] = worker
             self._event("worker_heartbeat", worker_id=worker_id, status=status,
-                        current_task_id=current_task_id, lease_renewed=lease_renewed)
+                        current_task_id=current_task_id)
             self.save()
             return dict(worker)
+
 
     def snapshot(self) -> dict:
         with self.lock:
