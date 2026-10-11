@@ -66,10 +66,12 @@ class DigitalEmployeeAgent:
         return result
 
     def _heartbeat(self, status: str, task_id: str | None = None,
-                   progress: str = "", last_error: str = "") -> bool:
+                   progress: str = "", last_error: str = "",
+                   lease_token: str | None = None) -> bool:
         try:
             self._request("/api/workers/heartbeat", {
                 "status": status, "current_task_id": task_id,
+                "lease_token": lease_token,
                 "progress": progress[:500], "last_error": last_error[:1000],
             })
             self.last_heartbeat_error = None
@@ -92,11 +94,14 @@ class DigitalEmployeeAgent:
         if not isinstance(task_id, str) or not task_id:
             raise WorkforceAPIError(502, "Claim response did not include a task ID.")
         stop_heartbeat = threading.Event()
-        self._heartbeat("working", task_id, "Task claimed; preparing execution")
+        lease_token = claimed.get("lease_token")
+        self._heartbeat("working", task_id, "Task claimed; preparing execution",
+                        lease_token=lease_token)
 
         def heartbeat_loop():
             while not stop_heartbeat.wait(self.heartbeat_interval):
-                self._heartbeat("working", task_id, "Executor is running")
+                self._heartbeat("working", task_id, "Executor is running",
+                                lease_token=lease_token)
 
         heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
         heartbeat_thread.start()
