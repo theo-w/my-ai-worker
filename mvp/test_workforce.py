@@ -111,6 +111,6 @@ def test_merge_rejects_incompatible_or_started_tasks(tmp_path):
     source = registry.create_task("Research", capability="research")
     with pytest.raises(ValueError, match="matching capabilities"):
         registry.merge_tasks(target["id"], [source["id"]], "Unsafe merge")
-    registry.claim(target["id"] if False else "worker-a", ["analysis"])
+    registry.claim("worker-a", ["analysis"])
     with pytest.raises(ValueError, match="must not have started"):
         registry.merge_tasks(target["id"], [source["id"]], "Too late")
