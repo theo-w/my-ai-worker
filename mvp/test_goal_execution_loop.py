@@ -148,3 +148,49 @@ def test_twin_parallel_mode_runs_capability_matched_workers(monkeypatch, tmp_pat
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=2)
+
+
+def test_twin_can_cancel_low_value_pending_work_after_feedback(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000001", "worker-test-token-000000000002"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-replan.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_port}"
+    try:
+        twin = DigitalTwinCoordinator(base, admin)
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], FakeExecutor(), "changing goal")
+        revision_calls = []
+
+        def revise(goal, live_tasks, cycle):
+            revision_calls.append((cycle, [task["task_id"] for task in live_tasks]))
+            if cycle == 1:
+                pending = next(task for task in live_tasks if task["status"] == "queued")
+                return {"cancel": [{
+                    "task_id": pending["task_id"],
+                    "reason": "Earlier result made this follow-up redundant",
+                }]}
+            return {}
+
+        result = twin.execute_goal(
+            "changing goal", [worker], max_cycles=3,
+            tasks=[
+                {"title": "Primary analysis", "capability": "analysis", "priority": 5},
+                {"title": "Optional follow-up", "capability": "analysis", "priority": 1},
+            ],
+            revision_policy=revise,
+        )
+        assert revision_calls
+        assert result["status"] == "completed"
+        assert result["counts"]["completed"] == 1
+        assert any(event["type"] == "task_cancelled" for event in result["events"])
+        snapshot = registry.snapshot()
+        assert sum(task["status"] == "cancelled" for task in snapshot["tasks"]) == 1
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
