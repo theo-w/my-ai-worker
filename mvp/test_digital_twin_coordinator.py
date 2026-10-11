@@ -62,6 +62,7 @@ def test_twin_plans_goal_and_inspects_real_worker_progress(twin_system):
                          {"capabilities": ["research"]})
     assert status == 200
     assert claim["task"]["id"] == first["id"]
+    lease_token = claim["task"]["lease_token"]
 
     progress = twin.inspect()
     assert progress["status"] == "in_progress"
@@ -69,7 +70,7 @@ def test_twin_plans_goal_and_inspects_real_worker_progress(twin_system):
     assert progress["counts"]["queued"] == 3
 
     status, result = post(base, "/api/workforce/report", RESEARCHER, {
-        "task_id": first["id"], "status": "completed",
+        "task_id": first["id"], "status": "completed", "lease_token": lease_token,
         "output": json.dumps({
             "content": "Example evidence placeholder; verify source URLs before decisions.",
             "simulated": True, "metadata": {"source_count": 0},
