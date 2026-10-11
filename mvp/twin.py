@@ -385,6 +385,8 @@ class DigitalTwinCoordinator:
                 "has_output": bool(output),
                 "output": output,
                 "blocker": task.get("blocker", ""),
+                "success_criteria": task.get("success_criteria", {}),
+                "evidence_required": task.get("evidence_required", False),
                 "verification": verification,
             })
         active = counts["queued"] + counts["assigned"]
