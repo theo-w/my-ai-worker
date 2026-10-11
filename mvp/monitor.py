@@ -18,7 +18,8 @@ ACTIVE = {"queued", "assigned", "approval_required"}
 TERMINAL = {"completed", "blocked", "failed", "superseded"}
 
 
-def build_monitor_report(snapshot: dict, now: datetime | None = None) -> dict:
+def build_monitor_report(snapshot: dict, now: datetime | None = None,
+                         heartbeat_timeout_seconds: int = 30) -> dict:
     """Build a safe status view from a workforce snapshot without changing it."""
     now = now or datetime.now(timezone.utc)
     tasks = snapshot.get("tasks", [])
@@ -91,7 +92,58 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None) -> dict:
         twin_status = "completed"
     else:
         twin_status = "idle"
+    raw_workers = snapshot.get("workers", [])
+    if isinstance(raw_workers, dict):
+        raw_workers = list(raw_workers.values())
+    workers = []
+    for worker in raw_workers:
+        last = worker.get("last_heartbeat_at")
+        age = None
+        try:
+            age = max(0, int((now - datetime.fromisoformat(last)).total_seconds()))
+        except (TypeError, ValueError):
+            pass
+        online = age is not None and age <= heartbeat_timeout_seconds
+        item = {
+            "worker_id": worker.get("worker_id"),
+            "status": worker.get("status", "unknown"),
+            "online": online,
+            "availability": "online" if online else ("suspected_offline" if age is not None else "heartbeat_missing"),
+            "last_heartbeat_at": last,
+            "heartbeat_age_seconds": age,
+            "current_task_id": worker.get("current_task_id"),
+            "progress": worker.get("progress", ""),
+            "last_error": worker.get("last_error", ""),
+            "capabilities": worker.get("capabilities", []),
+        }
+        workers.append(item)
+        if age is None:
+            alerts.append({"severity": "warning", "type": "worker_heartbeat_missing",
+                           "worker_id": worker.get("worker_id"),
+                           "message": "Worker is registered but has not sent a readable heartbeat."})
+        elif age > heartbeat_timeout_seconds:
+            alerts.append({"severity": "warning", "type": "worker_suspected_offline",
+                           "worker_id": worker.get("worker_id"),
+                           "message": f"Worker heartbeat is {age}s old; process may be unavailable."})
     events = snapshot.get("events", [])
+    employee_ids = ({w.get("worker_id") for w in workers} |
+                    {t.get("assigned_to") for t in rows if t.get("assigned_to")})
+    worker_by_id = {w["worker_id"]: w for w in workers if w.get("worker_id")}
+    employees = []
+    for worker_id in sorted(x for x in employee_ids if x):
+        active_ids = [t["task_id"] for t in rows
+                      if t["assigned_to"] == worker_id and t["status"] == "assigned"]
+        worker = worker_by_id.get(worker_id, {})
+        employees.append({
+            "worker_id": worker_id,
+            "status": ("working" if active_ids else worker.get("status", "idle")),
+            "online": worker.get("online"),
+            "availability": worker.get("availability", "unknown"),
+            "last_heartbeat_at": worker.get("last_heartbeat_at"),
+            "active_task_ids": active_ids,
+            "progress": worker.get("progress", ""),
+            "last_error": worker.get("last_error", ""),
+        })
     return {
         "observed_at": now.isoformat(),
         "twin": {
@@ -102,14 +154,8 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None) -> dict:
             "blocked_or_failed_tasks": blocked_count,
             "counts_by_status": counts,
         },
-        "employees": [
-            {"worker_id": worker_id,
-             "status": "working" if any(t["assigned_to"] == worker_id and t["status"] == "assigned" for t in rows)
-                      else "idle",
-             "active_task_ids": [t["task_id"] for t in rows
-                                 if t["assigned_to"] == worker_id and t["status"] == "assigned"]}
-            for worker_id in sorted({t.get("assigned_to") for t in rows if t.get("assigned_to")})
-        ],
+        "employees": employees,
+        "workers": workers,
         "tasks": rows,
         "alerts": alerts,
         "recent_events": events[-100:],
