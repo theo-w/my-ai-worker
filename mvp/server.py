@@ -541,8 +541,20 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=execute, args=(goal,), daemon=True).start()
         self._json({"ok": True})
 
+def supervise_workforce():
+    """Continuously recover expired worker leases and persist supervisor events."""
+    while True:
+        try:
+            WORKFORCE.maintain()
+        except Exception as exc:
+            # Supervisor failures must be visible in logs, not silently kill the loop.
+            print("JARVIS workforce supervisor error:", type(exc).__name__, flush=True)
+        time.sleep(5)
+
+
 if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8765"))
-    print(f"JARVIS Dashboard listening on {host}:{port}")
+    threading.Thread(target=supervise_workforce, name="jarvis-workforce-supervisor", daemon=True).start()
+    print(f"JARVIS Dashboard listening on {host}:{port}", flush=True)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
