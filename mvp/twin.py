@@ -369,6 +369,7 @@ class DigitalTwinCoordinator:
                 "attempts": task.get("attempts"),
                 "provenance": provenance,
                 "has_output": bool(output),
+                "output": output,
                 "blocker": task.get("blocker", ""),
             })
         active = counts["queued"] + counts["assigned"]
@@ -382,6 +383,56 @@ class DigitalTwinCoordinator:
             status = "idle"
         return {"status": status, "counts": counts, "tasks": results,
                 "events": snapshot.get("events", [])}
+
+    def execute_goal(self, goal: str, employees: list, max_cycles: int = 8,
+                     tasks: list[dict] | None = None) -> dict:
+        """Execute a bounded goal by coordinating authenticated employee agents."""
+        if not isinstance(max_cycles, int) or not 1 <= max_cycles <= 20:
+            raise ValueError("max_cycles must be an integer between 1 and 20")
+        if not employees or any(not callable(getattr(worker, "run_once", None))
+                                for worker in employees):
+            raise ValueError("employees must contain agents exposing run_once()")
+        plan = self.start_goal(goal, tasks=tasks)
+        ids = {task["id"] for task in plan["created_tasks"]}
+        worker_runs, events = [], [{"type": "goal_started", "task_count": len(ids)}]
+        cycles = 0
+        for cycle in range(1, max_cycles + 1):
+            cycles = cycle
+            before = {t["task_id"]: t["status"] for t in self.inspect()["tasks"] if t["task_id"] in ids}
+            if before and all(s in ("completed", "blocked", "failed") for s in before.values()):
+                break
+            cycle_results = []
+            for employee in employees:
+                try:
+                    result = employee.run_once()
+                except Exception as exc:
+                    result = {"status": "agent_error", "error": type(exc).__name__ + ": " + str(exc)}
+                cycle_results.append(result)
+                worker_runs.append({"cycle": cycle, **result})
+            events.append({"type": "cycle_finished", "cycle": cycle, "worker_results": cycle_results})
+            after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"] if t["task_id"] in ids}
+            if after and all(s in ("completed", "blocked", "failed") for s in after.values()):
+                break
+            if before == after and not any(x.get("status") == "completed" for x in cycle_results):
+                events.append({"type": "stalled", "cycle": cycle,
+                               "reason": "No progress; check worker capability and credentials."})
+                break
+        snapshot = self.inspect()
+        scoped = [t for t in snapshot["tasks"] if t["task_id"] in ids]
+        counts = {s: sum(t["status"] == s for t in scoped)
+                  for s in ("queued", "assigned", "completed", "blocked", "failed")}
+        if counts["queued"] or counts["assigned"]:
+            status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
+        elif counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
+            status = "needs_attention"
+        else:
+            status = "completed"
+        events.append({"type": "goal_finished", "status": status, "counts": counts})
+        return {
+            "goal": goal.strip(), "status": status, "cycles": cycles, "counts": counts,
+            "tasks": scoped, "worker_runs": worker_runs, "events": events,
+            "evidence_note": "执行器输出不自动等于已核实证据；必须检查来源与可复现性。",
+        }
 
     def give_feedback(self, task_id: str, message: str, kind: str = "correction") -> dict:
         if not isinstance(task_id, str) or not task_id.strip():
