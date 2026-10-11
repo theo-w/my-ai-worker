@@ -220,3 +220,176 @@ class PersistentTwinMemory:
         self.lessons.append(item)
         self.save()
         return item
+class DigitalTwinAPIError(RuntimeError):
+    """A structured error returned by the authenticated workforce API."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+class DigitalTwinCoordinator:
+    """Authenticated Digital Twin controller for goal planning and supervision.
+
+    The coordinator creates capability-tagged work items, reads workforce
+    state, and summarizes verified workflow status. It does not claim that
+    queued work has been executed or that model-generated output is evidence.
+    """
+
+    def __init__(self, base_url: str, admin_token: str, timeout: float = 8.0,
+                 max_tasks: int = 8):
+        from urllib.parse import urlparse
+
+        parsed = urlparse(base_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("base_url must be an HTTP(S) URL")
+        if not isinstance(admin_token, str) or len(admin_token) < 24:
+            raise ValueError("admin token must be at least 24 characters")
+        self.base_url = base_url.rstrip("/")
+        self.admin_token = admin_token
+        self.timeout = max(1.0, float(timeout))
+        self.max_tasks = max(1, min(int(max_tasks), 20))
+
+    def _request(self, method: str, path: str, payload: dict | None = None) -> dict:
+        from urllib.error import HTTPError, URLError
+        from urllib.request import Request, urlopen
+
+        data = None if payload is None else json.dumps(
+            payload, ensure_ascii=False
+        ).encode("utf-8")
+        request = Request(
+            self.base_url + path,
+            data=data,
+            headers={
+                "Authorization": "Bearer " + self.admin_token,
+                "Content-Type": "application/json",
+            },
+            method=method,
+        )
+        try:
+            response = urlopen(request, timeout=self.timeout)
+        except HTTPError as exc:
+            try:
+                message = json.loads(exc.read().decode("utf-8")).get("error", "API request failed")
+            except (ValueError, AttributeError):
+                message = "API request failed"
+            raise DigitalTwinAPIError(exc.code, str(message)) from exc
+        except (URLError, TimeoutError) as exc:
+            raise DigitalTwinAPIError(503, "Workforce API unavailable: " + str(exc)) from exc
+        with response:
+            try:
+                result = json.loads(response.read().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise DigitalTwinAPIError(502, "Workforce API returned invalid JSON") from exc
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            raise DigitalTwinAPIError(response.status, str(result.get("error", "API request failed")))
+        return result
+
+    @staticmethod
+    def default_plan(goal: str) -> list[dict]:
+        """Create a small, reusable first-pass plan from a natural-language goal."""
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal must be a non-empty string")
+        normalized = goal.casefold()
+        if any(word in normalized for word in ("game", "游戏", "rpg", "npc", "玩家", "ai-native")):
+            return [
+                {"title": "研究目标用户与市场需求", "capability": "research", "priority": 5,
+                 "description": "寻找可追溯的市场、玩家需求与竞品资料；标注来源和不确定性。"},
+                {"title": "分析玩家痛点与差异化机会", "capability": "research", "priority": 4,
+                 "description": "分析玩家问题、现有替代方案与潜在差异化，不把假设当事实。"},
+                {"title": "评估 AI 技术可行性与成本风险", "capability": "analysis", "priority": 4,
+                 "description": "拆解关键 AI 能力、延迟、成本、安全与技术验证风险。"},
+                {"title": "评估商业模式与验证路线", "capability": "analysis", "priority": 3,
+                 "description": "比较变现假设、最小可行实验、成功指标与停止条件。"},
+            ]
+        return [
+            {"title": "收集与目标相关的可靠信息", "capability": "research", "priority": 5,
+             "description": "收集可追溯资料，标注来源、日期和不确定性。"},
+            {"title": "分析可行方案、成本与主要风险", "capability": "analysis", "priority": 4,
+             "description": "比较方案、约束、风险与可验证假设。"},
+            {"title": "形成建议与下一步验证计划", "capability": "analysis", "priority": 3,
+             "description": "基于已回传结果整理建议，明确证据缺口，不补造事实。"},
+        ]
+
+    def start_goal(self, goal: str, tasks: list[dict] | None = None) -> dict:
+        """Create an auditable task plan in the real workforce queue."""
+        plan = list(tasks if tasks is not None else self.default_plan(goal))
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal must be a non-empty string")
+        if not plan or len(plan) > self.max_tasks:
+            raise ValueError("task plan must contain between 1 and max_tasks items")
+        created = []
+        for item in plan:
+            if not isinstance(item, dict) or not str(item.get("title", "")).strip():
+                raise ValueError("each task needs a non-empty title")
+            capability = item.get("capability", "general")
+            if not isinstance(capability, str) or not capability.strip():
+                raise ValueError("task capability must be a non-empty string")
+            payload = {
+                "title": str(item["title"]).strip(),
+                "description": str(item.get("description", ""))[:8000],
+                "capability": capability.strip(),
+                "priority": item.get("priority", 3),
+                "approval_required": bool(item.get("approval_required", False)),
+            }
+            created.append(self._request("POST", "/api/workforce/tasks", payload)["task"])
+        return {
+            "goal": goal.strip(),
+            "status": "planned",
+            "created_tasks": created,
+            "task_count": len(created),
+            "note": "任务已进入真实队列；创建成功不代表员工已执行或结果已验证。",
+        }
+
+    def inspect(self) -> dict:
+        """Read queue state and report only states backed by the server snapshot."""
+        snapshot = self._request("GET", "/api/workforce")
+        tasks = snapshot.get("tasks", [])
+        counts = {"queued": 0, "assigned": 0, "completed": 0, "blocked": 0, "failed": 0}
+        results = []
+        for task in tasks:
+            status = task.get("status", "queued")
+            if status in counts:
+                counts[status] += 1
+            output = task.get("output", "")
+            provenance = "unknown"
+            if isinstance(output, str) and output:
+                try:
+                    envelope = json.loads(output)
+                    if isinstance(envelope, dict) and isinstance(envelope.get("simulated"), bool):
+                        provenance = "simulated" if envelope["simulated"] else "executor_reported_live"
+                except (ValueError, TypeError):
+                    pass
+            results.append({
+                "task_id": task.get("id"),
+                "title": task.get("title"),
+                "capability": task.get("capability"),
+                "status": status,
+                "assigned_to": task.get("assigned_to"),
+                "attempts": task.get("attempts"),
+                "provenance": provenance,
+                "has_output": bool(output),
+                "blocker": task.get("blocker", ""),
+            })
+        active = counts["queued"] + counts["assigned"]
+        if active:
+            status = "in_progress"
+        elif counts["blocked"] or counts["failed"]:
+            status = "needs_attention"
+        elif counts["completed"]:
+            status = "completed"
+        else:
+            status = "idle"
+        return {"status": status, "counts": counts, "tasks": results,
+                "events": snapshot.get("events", [])}
+
+    def give_feedback(self, task_id: str, message: str, kind: str = "correction") -> dict:
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task_id must be a non-empty string")
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError("message must be a non-empty string")
+        return self._request("POST", "/api/workforce/feedback", {
+            "task_id": task_id, "actor": "digital-twin",
+            "message": message.strip()[:4000], "kind": kind,
+        })
+
