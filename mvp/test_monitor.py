@@ -61,3 +61,26 @@ def test_monitor_flags_expired_leases_and_stale_or_blocked_tasks():
 def test_monitor_accepts_dictionary_task_snapshots():
     report = build_monitor_report({"tasks": {"x": {"id": "x", "status": "completed"}}, "events": []})
     assert report["twin"]["completed_tasks"] == 1
+
+
+def test_monitor_detects_stale_worker_heartbeat_and_keeps_idle_worker_visible():
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
+    report = build_monitor_report({
+        "tasks": [],
+        "events": [],
+        "workers": [
+            {"worker_id": "worker-idle", "status": "idle",
+             "last_heartbeat_at": (now - timedelta(seconds=45)).isoformat(),
+             "current_task_id": None, "progress": "Waiting"},
+            {"worker_id": "worker-never-beat", "status": "idle"},
+        ],
+    }, now=now, heartbeat_timeout_seconds=30)
+    assert len(report["workers"]) == 2
+    states = {w["worker_id"]: w["availability"] for w in report["workers"]}
+    assert states["worker-idle"] == "suspected_offline"
+    assert states["worker-never-beat"] == "heartbeat_missing"
+    alert_types = {a["type"] for a in report["alerts"]}
+    assert {"worker_suspected_offline", "worker_heartbeat_missing"} <= alert_types
+    assert {e["worker_id"] for e in report["employees"]} == {
+        "worker-idle", "worker-never-beat",
+    }
