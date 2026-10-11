@@ -26,6 +26,19 @@ python -m mvp.monitor --interval 5
 The monitor emits one JSON object per poll, suitable for a terminal, log collector,
 or later dashboard adapter. Stop it with Ctrl-C.
 
+## Run the continuous supervisor as a process
+
+With the JARVIS API already running and the same environment variables set:
+
+```bash
+python -m mvp.supervisor --interval-seconds 10
+```
+
+For a finite smoke test, add `--max-iterations 3`. Each cycle emits a JSON record;
+Ctrl-C stops the process. The supervisor reclaims expired task leases and reports
+worker/task health. It does **not** autonomously invent cancellation or merge
+decisions unless an explicit `recovery_policy` is supplied by code.
+
 ## Fields
 
 - `twin`: derived workflow status and counts by task status.
