@@ -137,6 +137,12 @@ def test_agent_sends_periodic_working_heartbeats_during_long_task(system):
         and event.get("status") == "working"
     ]
     assert len(working) >= 2
+    renewals = [
+        event for event in snapshot["events"]
+        if event["type"] == "task_lease_renewed"
+        and event.get("task_id") == plan["created_tasks"][0]["id"]
+    ]
+    assert len(renewals) >= 2
     worker = next(item for item in snapshot["workers"] if item["worker_id"] == "analyst")
     assert worker["status"] == "idle"
     assert worker["current_task_id"] is None
