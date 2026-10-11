@@ -346,3 +346,42 @@ def test_working_heartbeat_renews_only_the_current_lease(workforce_http):
     })
     assert status == 400
     assert "lease token" in rejected["error"] or "not leased" in rejected["error"]
+
+
+def test_http_retry_exhaustion_marks_task_failed_and_visible_to_monitor(workforce_http):
+    from datetime import datetime, timedelta, timezone
+    from mvp.monitor import build_monitor_report
+
+    base, registry = workforce_http
+    registry.max_attempts = 1
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Fail after one lost lease", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+
+    status, claim = request_json(
+        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
+    )
+    assert status == 200
+    token = claim["task"]["lease_token"]
+
+    with registry.lock:
+        registry.tasks[task_id]["lease_until"] = (
+            datetime.now(timezone.utc) - timedelta(seconds=1)
+        ).isoformat()
+
+    status, late = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed", "lease_token": token,
+        "output": "too late",
+    })
+    assert status == 400
+    failed = next(t for t in registry.snapshot()["tasks"] if t["id"] == task_id)
+    assert failed["status"] == "failed"
+    assert failed["attempts"] == 1
+
+    report = build_monitor_report(registry.snapshot())
+    assert report["twin"]["status"] == "needs_attention"
+    assert any(alert["type"] == "failed" and alert["task_id"] == task_id
+               for alert in report["alerts"])
+
