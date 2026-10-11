@@ -188,6 +188,11 @@ def test_twin_can_cancel_low_value_pending_work_after_feedback(monkeypatch, tmp_
         assert result["status"] == "completed"
         assert result["counts"]["completed"] == 1
         assert any(event["type"] == "task_cancelled" for event in result["events"])
+        assert result["counts"]["cancelled"] == 1
+        assert result["metrics"]["cancelled_tasks"] == 1
+        assert len(result["tasks"]) == 2
+        assert any(task["status"] == "cancelled" for task in result["tasks"])
+        assert any(event["type"] == "execution_metrics" for event in result["events"])
         snapshot = registry.snapshot()
         assert sum(task["status"] == "cancelled" for task in snapshot["tasks"]) == 1
     finally:
