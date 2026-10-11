@@ -29,6 +29,7 @@ class WorkforceRegistry:
         self.lock = RLock()
         self.tasks: dict[str, dict] = {}
         self.events: list[dict] = []
+        self.workers: dict[str, dict] = {}
         self.load()
 
     def _event(self, event_type: str, **details):
@@ -41,16 +42,17 @@ class WorkforceRegistry:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
                 self.tasks = data.get("tasks", {})
                 self.events = data.get("events", [])
+                self.workers = data.get("workers", {})
             except FileNotFoundError:
                 return
             except (OSError, ValueError, TypeError):
-                self.tasks, self.events = {}, []
+                self.tasks, self.events, self.workers = {}, [], {}
                 self._event("state_recovered", reason="invalid_or_unreadable_store")
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps({"tasks": self.tasks, "events": self.events},
+        tmp.write_text(json.dumps({"tasks": self.tasks, "events": self.events, "workers": self.workers},
                                   ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.path)
 
@@ -200,6 +202,35 @@ class WorkforceRegistry:
                 self.save()
         return {"requeued": requeued, "failed": failed}
 
+
+    def heartbeat_worker(self, worker_id: str, status: str = "idle",
+                         current_task_id: str | None = None, progress: str = "",
+                         last_error: str = "") -> dict:
+        """Persist a bounded, token-free heartbeat for an authenticated worker."""
+        worker_id = worker_id.strip()
+        if not worker_id or len(worker_id) > 120:
+            raise ValueError("worker_id must be between 1 and 120 characters")
+        if status not in {"idle", "working", "waiting_tool", "blocked"}:
+            raise ValueError("unsupported worker status")
+        if len(progress) > 500 or len(last_error) > 1000:
+            raise ValueError("progress or last_error is too long")
+        with self.lock:
+            prior = self.workers.get(worker_id, {})
+            worker = {
+                "worker_id": worker_id,
+                "status": status,
+                "current_task_id": current_task_id,
+                "progress": progress.strip(),
+                "last_error": last_error.strip(),
+                "last_heartbeat_at": _stamp(),
+                "capabilities": prior.get("capabilities", []),
+            }
+            self.workers[worker_id] = worker
+            self._event("worker_heartbeat", worker_id=worker_id, status=status,
+                        current_task_id=current_task_id)
+            self.save()
+            return dict(worker)
+
     def snapshot(self) -> dict:
         with self.lock:
             self.maintain(save=False)
@@ -208,7 +239,7 @@ class WorkforceRegistry:
                 counts[task["status"]] = counts.get(task["status"], 0) + 1
             self.save()
             return {"counts": counts, "tasks": list(self.tasks.values()),
-                    "events": self.events[-100:], "lease_seconds": self.lease_seconds}
+                    "events": self.events[-100:], "workers": list(self.workers.values()), "lease_seconds": self.lease_seconds}
 
     def _get(self, task_id: str) -> dict:
         task = self.tasks.get(task_id)
