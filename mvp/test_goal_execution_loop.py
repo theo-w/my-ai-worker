@@ -39,6 +39,7 @@ def test_twin_coordinates_worker_and_reports_goal(monkeypatch, tmp_path):
             {"title": "Summarize test input", "capability": "analysis", "priority": 5},
         ])
         assert result["status"] == "completed"
+        assert result["execution_decision"]["mode"] == "single_agent"
         assert result["counts"]["completed"] == 1
         assert result["tasks"][0]["provenance"] == "simulated"
     finally:
@@ -77,6 +78,72 @@ def test_twin_does_not_accept_simulated_research_as_goal_success(monkeypatch, tm
         assert task["verification"]["accepted"] is False
         assert task["verification"]["simulated"] is True
         assert any(event["type"] == "verification_rejected" for event in result["events"])
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
+
+
+def test_twin_requires_approval_before_creating_or_running_tasks():
+    twin = DigitalTwinCoordinator("http://127.0.0.1:1", "admin-test-token-000000000001")
+    worker = DigitalEmployeeAgent(
+        "http://127.0.0.1:1", "worker-test-token-000000000002",
+        ["analysis"], FakeExecutor(), "sensitive goal",
+    )
+    result = twin.execute_goal(
+        "sensitive goal", [worker], tasks=[
+            {"title": "Publish announcement", "capability": "analysis",
+             "human_approval_required": True},
+        ],
+    )
+    assert result["status"] == "needs_approval"
+    assert result["execution_decision"]["mode"] == "approval_required"
+    assert result["counts"]["completed"] == 0
+    assert not result["tasks"]
+
+
+def test_twin_parallel_mode_runs_capability_matched_workers(monkeypatch, tmp_path):
+    admin = "admin-test-token-000000000001"
+    tokens = {
+        "analyst_a": "worker-test-token-000000000002",
+        "analyst_b": "worker-test-token-000000000003",
+    }
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps(tokens))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({
+        "analyst_a": ["analysis"], "analyst_b": ["analysis"],
+    }))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-parallel.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{httpd.server_port}"
+    try:
+        twin = DigitalTwinCoordinator(base, admin)
+        workers = [
+            DigitalEmployeeAgent(base, tokens["analyst_a"], ["analysis"], FakeExecutor(), "parallel goal"),
+            DigitalEmployeeAgent(base, tokens["analyst_b"], ["analysis"], FakeExecutor(), "parallel goal"),
+        ]
+        result = twin.execute_goal(
+            "parallel goal", workers, max_cycles=3,
+            tasks=[
+                {"title": "Analyze input A", "capability": "analysis", "parallelizable": True},
+                {"title": "Analyze input B", "capability": "analysis", "parallelizable": True},
+            ],
+            execution_profile={
+                "complexity": 5, "parallelizable": True,
+                "expected_parallel_quality_gain": 0.8,
+                "expected_parallel_time_savings": 0.8,
+                "team_cost_multiplier": 1.5,
+            },
+        )
+        assert result["execution_decision"]["mode"] == "parallel_team"
+        assert result["counts"]["completed"] == 2
+        assert result["status"] == "completed"
+        assert any(event.get("execution_mode") == "parallel_team"
+                   for event in result["events"] if event["type"] == "cycle_finished")
     finally:
         httpd.shutdown()
         httpd.server_close()
