@@ -118,6 +118,7 @@ class DigitalEmployeeAgent:
             }
             report = self._request("/api/workforce/report", {
                 "task_id": task_id, "status": "completed",
+                "lease_token": claimed.get("lease_token"),
                 "output": json.dumps(envelope, ensure_ascii=False),
             })
             return {"status": "completed", "task_id": task_id,
@@ -127,6 +128,7 @@ class DigitalEmployeeAgent:
             try:
                 report = self._request("/api/workforce/report", {
                     "task_id": task_id, "status": "blocked",
+                    "lease_token": claimed.get("lease_token"),
                     "output": "", "blocker": reason[:2900],
                 })
             except Exception as report_exc:
