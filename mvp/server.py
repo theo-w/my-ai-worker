@@ -399,8 +399,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve"):
-            role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report") else "admin"
+        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workers/heartbeat"):
+            role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
             except WorkforceAuthError as exc:
@@ -410,7 +410,24 @@ class Handler(BaseHTTPRequestHandler):
             if body is None:
                 return
             try:
-                if self.path == "/api/workforce/tasks":
+                if self.path == "/api/workers/heartbeat":
+                    worker_id = actor["worker_id"]
+                    if body.get("worker_id") not in (None, worker_id):
+                        self._json({"ok": False, "error": "Worker identity is derived from its token."}, 403)
+                        return
+                    status = body.get("status", "idle")
+                    task_id = body.get("current_task_id")
+                    if task_id is not None and not isinstance(task_id, str):
+                        raise ValueError("current_task_id must be a string or null")
+                    worker = WORKFORCE.heartbeat_worker(
+                        worker_id, str(status), task_id,
+                        str(body.get("progress", "")), str(body.get("last_error", "")),
+                    )
+                    worker["capabilities"] = _worker_capabilities(worker_id)
+                    WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
+                    WORKFORCE.save()
+                    self._json({"ok": True, "worker": worker})
+                elif self.path == "/api/workforce/tasks":
                     task = WORKFORCE.create_task(
                         title=str(body.get("title", "")),
                         description=str(body.get("description", "")),
