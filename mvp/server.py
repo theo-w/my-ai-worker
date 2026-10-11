@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import hmac
 import os
 import threading
 import time
@@ -220,6 +221,73 @@ def validate_autonomous_request(body: dict) -> dict:
     }
 
 
+
+class WorkforceAuthError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def _worker_tokens() -> dict[str, str]:
+    raw = os.getenv("JARVIS_WORKER_TOKENS", "").strip()
+    if raw:
+        try:
+            values = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise WorkforceAuthError(503, "JARVIS_WORKER_TOKENS must be valid JSON.") from exc
+        if not isinstance(values, dict):
+            raise WorkforceAuthError(503, "JARVIS_WORKER_TOKENS must be a JSON object.")
+        for worker_id, token in values.items():
+            if not isinstance(worker_id, str) or not worker_id.strip() or not isinstance(token, str) or len(token) < 24:
+                raise WorkforceAuthError(503, "Each worker token must be at least 24 characters and have a worker ID.")
+        return {key.strip(): value for key, value in values.items()}
+    token, worker_id = os.getenv("JARVIS_WORKER_TOKEN", ""), os.getenv("JARVIS_WORKER_ID", "")
+    if token or worker_id:
+        if not worker_id.strip() or len(token) < 24:
+            raise WorkforceAuthError(503, "Single-worker auth requires JARVIS_WORKER_ID and a token of at least 24 characters.")
+        return {worker_id.strip(): token}
+    return {}
+
+
+def _worker_capabilities(worker_id: str) -> list[str]:
+    raw = os.getenv("JARVIS_WORKER_CAPABILITIES", "").strip()
+    if not raw:
+        return []
+    try:
+        mapping = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise WorkforceAuthError(503, "JARVIS_WORKER_CAPABILITIES must be valid JSON.") from exc
+    if not isinstance(mapping, dict):
+        raise WorkforceAuthError(503, "JARVIS_WORKER_CAPABILITIES must map worker IDs to arrays.")
+    capabilities = mapping.get(worker_id, [])
+    if not isinstance(capabilities, list) or any(not isinstance(x, str) or not x.strip() for x in capabilities):
+        raise WorkforceAuthError(503, "Worker capabilities must be an array of strings.")
+    return sorted(set(x.strip() for x in capabilities))
+
+
+def authenticate_workforce(headers, required_role: str) -> dict:
+    admin_token = os.getenv("JARVIS_ADMIN_TOKEN", "")
+    worker_tokens = _worker_tokens()
+    if not admin_token and not worker_tokens:
+        raise WorkforceAuthError(503, "Workforce API locked: configure admin/worker tokens.")
+    scheme, _, candidate = headers.get("Authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not candidate:
+        raise WorkforceAuthError(401, "Bearer token required.")
+    actor = None
+    if admin_token and hmac.compare_digest(candidate, admin_token):
+        actor = {"role": "admin", "worker_id": None}
+    else:
+        for worker_id, token in worker_tokens.items():
+            if hmac.compare_digest(candidate, token):
+                actor = {"role": "worker", "worker_id": worker_id}
+                break
+    if actor is None:
+        raise WorkforceAuthError(401, "Invalid bearer token.")
+    if actor["role"] != required_role:
+        raise WorkforceAuthError(403, required_role + " role required.")
+    return actor
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, payload, code=200):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -269,6 +337,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/workforce":
+            try:
+                authenticate_workforce(self.headers, "admin")
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
             self._json({"ok": True, **WORKFORCE.snapshot()})
             return
         if self.path == "/api/state":
@@ -327,6 +400,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve"):
+            role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report") else "admin"
+            try:
+                actor = authenticate_workforce(self.headers, role)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
             body = self._read_json(max_bytes=131072)
             if body is None:
                 return
@@ -342,24 +421,33 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     self._json({"ok": True, "task": task}, 201)
                 elif self.path == "/api/workforce/claim":
-                    worker_id = body.get("worker_id")
-                    capabilities = body.get("capabilities", [])
-                    if not isinstance(worker_id, str) or not isinstance(capabilities, list):
-                        raise ValueError("worker_id must be a string and capabilities an array")
+                    worker_id = actor["worker_id"]
+                    if body.get("worker_id") not in (None, worker_id):
+                        self._json({"ok": False, "error": "Worker identity is derived from its token."}, 403)
+                        return
+                    allowed = _worker_capabilities(worker_id)
+                    requested = body.get("capabilities", allowed)
+                    if not isinstance(requested, list) or any(not isinstance(x, str) for x in requested):
+                        raise ValueError("capabilities must be an array of strings")
+                    capabilities = [x for x in requested if x in allowed]
                     task = WORKFORCE.claim(worker_id, capabilities)
                     self._json({"ok": True, "task": task, "message": "No eligible task" if task is None else "Task assigned"})
                 elif self.path == "/api/workforce/report":
-                    for key in ("task_id", "worker_id", "status"):
+                    for key in ("task_id", "status"):
                         if not isinstance(body.get(key), str):
                             raise ValueError(key + " must be a string")
-                    task = WORKFORCE.report(body["task_id"], body["worker_id"], body["status"],
+                    worker_id = actor["worker_id"]
+                    if body.get("worker_id") not in (None, worker_id):
+                        self._json({"ok": False, "error": "Worker identity is derived from its token."}, 403)
+                        return
+                    task = WORKFORCE.report(body["task_id"], worker_id, body["status"],
                                             str(body.get("output", "")), str(body.get("blocker", "")))
                     self._json({"ok": True, "task": task})
                 elif self.path == "/api/workforce/feedback":
                     for key in ("task_id", "actor", "message"):
                         if not isinstance(body.get(key), str):
                             raise ValueError(key + " must be a string")
-                    item = WORKFORCE.feedback(body["task_id"], body["actor"], body["message"],
+                    item = WORKFORCE.feedback(body["task_id"], "digital-twin", body["message"],
                                               str(body.get("kind", "note")))
                     self._json({"ok": True, "feedback": item})
                 else:
