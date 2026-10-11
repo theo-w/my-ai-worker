@@ -345,6 +345,57 @@ class DigitalTwinCoordinator:
             "note": "任务已进入真实队列；创建成功不代表员工已执行或结果已验证。",
         }
 
+    def supervise_once(self, recovery_policy=None) -> dict:
+        """Observe workforce health, reclaim expired leases, then triage alerts.
+
+        Monitoring remains read-only. Lease reclamation is a bounded registry
+        operation; optional cancellation/merge decisions are validated separately.
+        """
+        maintenance = self._request("POST", "/api/workforce/maintain", {})
+        try:
+            from .monitor import build_monitor_report
+        except ImportError:
+            from monitor import build_monitor_report
+        snapshot = self._request("GET", "/api/workforce")
+        report = build_monitor_report(snapshot)
+        events = [{"type": "supervision_observed", "alert_count": len(report["alerts"]),
+                   "maintenance": maintenance.get("maintenance", {})}]
+        if callable(recovery_policy):
+            try:
+                actions = recovery_policy(report) or {}
+                if not isinstance(actions, dict):
+                    raise ValueError("recovery policy must return an object")
+                cancels = actions.get("cancel", [])
+                merges = actions.get("merge", [])
+                if not isinstance(cancels, list) or len(cancels) > 10:
+                    raise ValueError("cancel actions must be a list of at most 10")
+                if not isinstance(merges, list) or len(merges) > 10:
+                    raise ValueError("merge actions must be a list of at most 10")
+                known = {str(task.get("id")) for task in snapshot.get("tasks", [])}
+                for item in cancels:
+                    if not isinstance(item, dict) or item.get("task_id") not in known:
+                        raise ValueError("cancel action references an unknown task")
+                    self.cancel_task(item["task_id"], str(item.get("reason", "Twin recovery policy")))
+                    events.append({"type": "supervision_task_cancelled", "task_id": item["task_id"]})
+                for item in merges:
+                    if not isinstance(item, dict) or item.get("target_task_id") not in known:
+                        raise ValueError("merge action references an unknown target")
+                    sources = item.get("source_task_ids")
+                    if not isinstance(sources, list) or any(source not in known for source in sources):
+                        raise ValueError("merge action references an unknown source")
+                    self.merge_tasks(item["target_task_id"], sources,
+                                     str(item.get("reason", "Twin recovery policy")))
+                    events.append({"type": "supervision_tasks_merged",
+                                   "target_task_id": item["target_task_id"]})
+            except Exception as exc:
+                events.append({"type": "supervision_policy_error", "error": type(exc).__name__,
+                               "message": str(exc)[:500]})
+        final_snapshot = self._request("GET", "/api/workforce")
+        report = build_monitor_report(final_snapshot)
+        return {"report": report, "maintenance": maintenance.get("maintenance", {}),
+                "supervision_events": events,
+                "note": "监控负责观测；租约维护负责有界回收；分身策略负责取消或合并决策。"}
+
     def inspect(self) -> dict:
         """Read queue state and report only states backed by the server snapshot."""
         snapshot = self._request("GET", "/api/workforce")
