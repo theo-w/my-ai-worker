@@ -264,7 +264,7 @@ class WorkforceRegistry:
             self._event("task_cancelled", task_id=task_id, reason=reason.strip(),
                         previous_status=prior_status)
             self.save()
-            return dict(task)
+            return {key: value for key, value in task.items() if key != "_lease_token"}
 
     def merge_tasks(self, target_task_id: str, source_task_ids: list[str],
                     reason: str) -> dict:
@@ -305,7 +305,8 @@ class WorkforceRegistry:
             self._event("tasks_merged", target_task_id=target_task_id,
                         source_task_ids=source_task_ids, reason=reason.strip())
             self.save()
-            return {"target": dict(target), "sources": [dict(task) for task in sources]}
+            public = lambda task: {key: value for key, value in task.items() if key != "_lease_token"}
+            return {"target": public(target), "sources": [public(task) for task in sources]}
 
     def heartbeat_worker(self, worker_id: str, status: str = "idle",
                          current_task_id: str | None = None, progress: str = "",
