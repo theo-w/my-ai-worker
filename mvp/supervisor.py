@@ -121,8 +121,12 @@ def main() -> int:
     except KeyboardInterrupt:
         print(json.dumps({"event": "supervisor_interrupted"}, ensure_ascii=False), flush=True)
         return 130
-    except (ValueError, RuntimeError) as exc:
-        print("Supervisor startup failed: " + str(exc), file=sys.stderr)
+    except Exception as exc:
+        # Surface API/auth/configuration failures as one concise process error.
+        print(
+            "Supervisor stopped with an error (" + type(exc).__name__ + "): " + str(exc),
+            file=sys.stderr,
+        )
         return 2
 
 
