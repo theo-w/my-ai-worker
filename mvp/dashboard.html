@@ -9,7 +9,7 @@
 </style>
 </head>
 <body><div class="app">
-<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">流程追踪与验收 ↗</a><div id="status" class="status">IDLE</div></div></div>
+<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">流程追踪与验收 ↗</a><div id="status" class="status">IDLE</div></div></div>
 
 <div class="panel wide">
  <div class="hero">
@@ -86,6 +86,12 @@
 </div>
 <script>
 let state=null,selected=0;
+function apiFetch(url,options={}){
+ const headers=new Headers(options.headers||{});
+ const token=document.getElementById("adminToken").value.trim();
+ if(token)headers.set("Authorization","Bearer "+token);
+ return fetch(url,{...options,headers,cache:"no-store"});
+}
 const phases=["planning","team","evaluation","decision","prototype"];
 const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Business Execution"};
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
@@ -111,8 +117,15 @@ function render(){
  const p=state.prototype;
  document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
 }
-async function poll(){try{const r=await fetch("/api/state");state=await r.json();render()}catch(e){}}
-document.getElementById("run").onclick=async()=>{const b=document.getElementById("run");b.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});b.disabled=false};
+async function poll(){
+ try{
+  const r=await apiFetch("/api/state");
+  const data=await r.json();
+  if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
+  state=data;render();
+ }catch(e){document.getElementById("status").textContent="API unavailable";}
+}
+document.getElementById("run").onclick=async()=>{const b=document.getElementById("run");b.disabled=true;await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});b.disabled=false};
 async function refreshProviderStatus(){
  try{
   const results=await Promise.all([
@@ -130,7 +143,7 @@ document.getElementById("researchRun").onclick=async function(){
  const out=document.getElementById("researchResult");
  button.disabled=true;out.textContent="正在执行研究请求…";
  try{
-  const response=await fetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
+  const response=await apiFetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
   const result=await response.json();
   const quality=result.quality||{}, det=result.synthesis||{}, llm=result.llm_synthesis||{};
   const sources=(result.sources||[]).map(function(s){
@@ -147,7 +160,7 @@ document.getElementById("designRun").onclick=async function(){
  const out=document.getElementById("designResult");
  button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
  try{
-  const response=await fetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
+  const response=await apiFetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
   const result=await response.json();
   if(!response.ok||!result.ok){out.textContent="生成失败："+(result.error||response.status);return;}
   const b=result.brief||{}, concept=b.original_concept||{}, trust=result.trust||{};
@@ -171,6 +184,8 @@ document.getElementById("designRun").onclick=async function(){
  }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
 };
-async function startPrototype(){const r=await fetch("/api/prototype",{method:"POST"});if(r.ok)poll()}
+async function startPrototype(){const r=await apiFetch("/api/prototype",{method:"POST"});if(r.ok)poll();else document.getElementById("status").textContent="Prototype API "+r.status}
+document.getElementById("adminToken").addEventListener("input",()=>{poll()});
+document.getElementById("adminToken").addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
 setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
 </script></body></html>
