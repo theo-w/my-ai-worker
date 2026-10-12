@@ -788,6 +788,15 @@ def test_twin_goal_defaults_to_single_employee_task(workforce_http):
     assert response["project_id"] in task["success_criteria"]["project_id"]
     assert response["next_step"].startswith("员工领取任务")
 
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    decision = next(event for event in snapshot["events"] if event["type"] == "twin_decision")
+    planned = next(event for event in snapshot["events"] if event["type"] == "twin_goal_planned")
+    assert decision["decision"] == "single_agent_first"
+    assert decision["planner"] == "deterministic_rules"
+    assert decision["llm_used"] is False
+    assert planned["llm_used"] is False
+
 
 def test_twin_can_explicitly_decompose_goal_into_temporary_tasks(workforce_http, monkeypatch):
     base, _ = workforce_http
@@ -813,6 +822,15 @@ def test_twin_can_explicitly_decompose_goal_into_temporary_tasks(workforce_http,
     assert {task["capability"] for task in response["tasks"]} == {"research", "analysis"}
     assert all(task["success_criteria"]["project_id"] == response["project_id"]
                for task in response["tasks"])
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    decision = next(event for event in snapshot["events"] if event["type"] == "twin_decision")
+    planned_event = next(event for event in snapshot["events"] if event["type"] == "twin_goal_planned")
+    assert decision["decision"] == "decompose"
+    assert decision["planner"] == "deterministic_rules"
+    assert decision["llm_used"] is False
+    assert planned_event["plan_mode"] == "deterministic_fallback"
+    assert planned_event["llm_used"] is False
     snapshot_status, snapshot = request_json(base, "/api/workforce", ADMIN)
     assert snapshot_status == 200
     assert any(event["type"] == "twin_goal_planned" and event["project_id"] == response["project_id"]
