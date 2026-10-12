@@ -107,6 +107,11 @@ class DigitalEmployeeAgent:
         heartbeat_thread.start()
         try:
             result = self.executor.execute(claimed, self.goal)
+            # Stop lease-renewal requests before submitting the terminal report.
+            # Otherwise an in-flight heartbeat can race with completion and try
+            # to renew a lease that has already been closed by the report.
+            stop_heartbeat.set()
+            heartbeat_thread.join(timeout=min(1.0, self.heartbeat_interval))
             output = getattr(result, "output", None)
             metadata = getattr(result, "metadata", {})
             simulated = getattr(result, "simulated", False)
@@ -129,6 +134,8 @@ class DigitalEmployeeAgent:
             return {"status": "completed", "task_id": task_id,
                     "task": report.get("task"), "simulated": bool(simulated)}
         except Exception as exc:
+            stop_heartbeat.set()
+            heartbeat_thread.join(timeout=min(1.0, self.heartbeat_interval))
             reason = type(exc).__name__ + ": " + str(exc)
             try:
                 report = self._request("/api/workforce/report", {
