@@ -38,7 +38,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
  const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",awaiting_validation:"等待验证",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
- const tone=s=>["completed"].includes(s)?"good":["blocked","queued","assigned","approval_required","running","working"].includes(s)?"warn":["failed"].includes(s)?"bad":"";
+ const tone=s=>["completed"].includes(s)?"good":["blocked","queued","assigned","approval_required","awaiting_validation","running","working"].includes(s)?"warn":["failed"].includes(s)?"bad":"";
  function setStatus(msg,cls=""){ $("status").className="notice "+cls; $("status").textContent=msg; }
  function rows(){return Array.isArray(snapshot&&snapshot.tasks)?snapshot.tasks:[];}
  function eventRows(){return Array.isArray(snapshot&&snapshot.events)?snapshot.events:[];}
