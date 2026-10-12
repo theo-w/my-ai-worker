@@ -462,7 +462,10 @@ class Handler(BaseHTTPRequestHandler):
                     if not isinstance(requested, list) or any(not isinstance(x, str) for x in requested):
                         raise ValueError("capabilities must be an array of strings")
                     capabilities = [x for x in requested if x in allowed]
-                    task = WORKFORCE.claim(worker_id, capabilities)
+                    task_id = body.get("task_id")
+                    if task_id is not None and not isinstance(task_id, str):
+                        raise ValueError("task_id must be a string")
+                    task = WORKFORCE.claim(worker_id, capabilities, task_id=task_id)
                     self._json({"ok": True, "task": task, "message": "No eligible task" if task is None else "Task assigned"})
                 elif self.path == "/api/workforce/report":
                     for key in ("task_id", "status"):
