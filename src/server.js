@@ -120,6 +120,7 @@ function createRuntimeStore(filePath) {
         attempt: 0,
         max_attempts: Number.isInteger(input.max_attempts) ? Math.min(10, Math.max(1, input.max_attempts)) : 3,
         worker_id: null,
+        last_heartbeat_at: null,
         result: null,
         blocker: null
       };
@@ -135,9 +136,24 @@ function createRuntimeStore(filePath) {
       const now = new Date().toISOString();
       task.status = 'accepted';
       task.worker_id = validateText(workerId, 'worker_id', 200);
+      task.last_heartbeat_at = now;
       task.blocker = null;
       task.updated_at = now;
       data.events.push({ event_id: randomUUID(), task_id: id, actor_id: actor.id, worker_id: task.worker_id, event_type: 'accepted', summary: 'Worker accepted task', timestamp: now });
+      return task;
+    }),
+    heartbeat: (id, input, actor) => mutate((data) => {
+      const task = data.tasks[id];
+      if (!task) throw httpError(404, 'Task not found');
+      if (TERMINAL_STATES.has(task.status)) throw httpError(409, 'Task is already terminal');
+      if (!task.worker_id) throw httpError(409, 'Task must be accepted before sending a heartbeat');
+      if (actor.role === 'worker' && task.worker_id !== actor.id) throw httpError(403, 'Worker does not own this task');
+      if (input.worker_id && input.worker_id !== task.worker_id) throw httpError(403, 'Worker does not own this task');
+      const now = new Date().toISOString();
+      task.last_heartbeat_at = now;
+      if (task.status === 'accepted') task.status = 'running';
+      task.updated_at = now;
+      data.events.push({ event_id: randomUUID(), task_id: id, actor_id: actor.id, worker_id: task.worker_id, event_type: 'heartbeat', summary: typeof input.summary === 'string' ? input.summary.slice(0, 1000) : 'Worker heartbeat received', timestamp: now });
       return task;
     }),
     addEvent: (id, input, actor) => mutate((data) => {
@@ -240,6 +256,17 @@ function createServer(options = {}) {
         const tasks = await store.listTasks();
         return json(res, 200, { tasks: actor.role === 'admin' ? tasks : tasks.filter((task) => task.status === 'queued' || task.worker_id === actor.id) });
       }
+      if (req.method === 'GET' && pathname === '/monitoring/workers') {
+        if (actor.role !== 'admin') throw httpError(403, 'Admin role required');
+        const timeoutMs = Math.max(5000, Number(process.env.JARVIS_HEARTBEAT_TIMEOUT_MS) || 60000);
+        const tasks = (await store.listTasks()).filter((task) => task.worker_id && !TERMINAL_STATES.has(task.status));
+        const now = Date.now();
+        const workers = tasks.map((task) => {
+          const last = task.last_heartbeat_at ? Date.parse(task.last_heartbeat_at) : NaN;
+          return { task_id: task.task_id, goal: task.goal, worker_id: task.worker_id, status: task.status, last_heartbeat_at: task.last_heartbeat_at || null, heartbeat_stale: !Number.isFinite(last) || now - last > timeoutMs, heartbeat_timeout_ms: timeoutMs, blocker: task.blocker };
+        });
+        return json(res, 200, { workers, stale_count: workers.filter((worker) => worker.heartbeat_stale).length, timestamp: new Date().toISOString() });
+      }
       if (req.method === 'POST' && pathname === '/tasks') {
         if (actor.role !== 'admin') throw httpError(403, 'Admin role required');
         const body = await readJson(req);
@@ -247,7 +274,7 @@ function createServer(options = {}) {
         return json(res, 201, { task });
       }
 
-      const taskRoute = pathname.match(/^\/tasks\/([^/]+)(?:\/(accept|events|approve|retry))?$/);
+      const taskRoute = pathname.match(/^\/tasks\/([^/]+)(?:\/(accept|heartbeat|events|approve|retry))?$/);
       if (taskRoute) {
         const id = decodeURIComponent(taskRoute[1]);
         const action = taskRoute[2] || '';
@@ -260,6 +287,10 @@ function createServer(options = {}) {
         if (req.method === 'POST' && action === 'accept') {
           const body = await readJson(req);
           return json(res, 200, { task: await store.acceptTask(id, body.worker_id || actor.id, actor) });
+        }
+        if (req.method === 'POST' && action === 'heartbeat') {
+          const body = await readJson(req);
+          return json(res, 200, { task: await store.heartbeat(id, body, actor) });
         }
         if (req.method === 'POST' && action === 'events') {
           const body = await readJson(req);
