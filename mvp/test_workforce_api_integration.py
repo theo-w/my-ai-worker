@@ -740,7 +740,9 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
         assert 'id="createTwinGoal"' in trace_page
         assert 'id="reviewTwinProject"' in trace_page
         assert 'fetch("/api/twin/review"' in trace_page
-        assert "此按钮不会自动重试、取消或修改员工任务" in trace_page
+        assert "未知阻塞会升级人工诊断" in trace_page
+        assert 'id="advanceTwinProject"' in trace_page
+        assert 'fetch("/api/twin/advance"' in trace_page
         assert "分身与员工验收清单" in page
         assert "TWIN_EMPLOYEE_ACCEPTANCE.md" in page
 
@@ -982,7 +984,7 @@ def test_twin_advance_retries_only_recognized_transient_blockers(workforce_http)
     assert advanced["action_task_id"] == task_id
     assert advanced["llm_used"] is False
     assert advanced["next_actions"][0]["status"] == "queued"
-    assert "not auto-accepted" in advanced["safety_note"]
+    assert "No result is auto-accepted" in advanced["safety_note"]
 
     status, snapshot = request_json(base, "/api/workforce", ADMIN)
     assert status == 200
