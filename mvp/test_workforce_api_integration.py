@@ -88,7 +88,21 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
          "output": "Found three candidate sources; independent verification still required."},
     )
     assert status == 200
-    assert completed["task"]["status"] == "completed"
+    assert completed["task"]["status"] == "awaiting_validation"
+    assert completed["task"]["assigned_to"] is None
+
+    status, premature = request_json(base, "/api/workforce/verify", RESEARCHER, {
+        "task_id": task_id, "verification": {"accepted": True},
+    })
+    assert status == 403
+
+    status, verified = request_json(base, "/api/workforce/verify", ADMIN, {
+        "task_id": task_id,
+        "verification": {"accepted": True, "checks": [{"name": "result_recorded", "passed": True}]},
+    })
+    assert status == 200
+    assert verified["task"]["status"] == "completed"
+    assert verified["task"]["verified_truth"] is False
 
     status, snapshot = request_json(base, "/api/workforce", ADMIN)
     assert status == 200
@@ -121,6 +135,7 @@ def test_worker_report_requires_current_lease_token(workforce_http):
     })
     assert status == 200
     assert accepted["task"]["output"] == "current lease result"
+    assert accepted["task"]["status"] == "awaiting_validation"
 
 
 def test_worker_cannot_impersonate_another_worker_or_admin(workforce_http):
@@ -277,6 +292,7 @@ def test_http_rejects_late_report_from_previous_lease(workforce_http):
     })
     assert status == 200
     assert current["task"]["output"] == "result from current attempt"
+    assert current["task"]["status"] == "awaiting_validation"
 
 def test_working_heartbeat_renews_lease_only_with_current_token(workforce_http):
     from datetime import datetime
@@ -455,6 +471,7 @@ def test_admin_verification_endpoint_records_check_without_claiming_truth(workfo
     })
     assert status == 200
     assert verified["task"]["verification"]["accepted"] is True
+    assert verified["task"]["status"] == "completed"
     assert verified["task"]["verified_truth"] is False
     assert any(e["type"] == "verification_recorded" and e["task_id"] == task_id
                for e in registry.snapshot()["events"])
