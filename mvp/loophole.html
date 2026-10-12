@@ -9,7 +9,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top"><div><div class="tag">JARVIS · PLAYTEST BUILD 0.1</div><h1>潮痕档案馆：涨潮仓库</h1><div class="muted">目标：进入旧仓库。观察线索，提出自己的解法；失败也可以帮助你理解规则。</div></div><span class="pill">试玩服务 · 不保存服务端对话</span></div>
+<div class="top"><div><div class="tag">JARVIS · PLAYTEST BUILD 0.1</div><h1>潮痕档案馆：涨潮仓库</h1><div class="muted">目标：进入旧仓库。观察线索，提出自己的解法；失败也可以帮助你理解规则。</div></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" aria-label="管理员 Token" placeholder="管理员 Token（认证模式）" style="max-width:230px;background:#091321;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px"><span class="pill">试玩服务 · 不保存服务端对话</span></div></div>
 <div class="layout">
 <section class="panel wide" id="comboPanel"><h2>组合玩法方案</h2><p class="muted">不必先写文字。选择你想组合的玩法要素，平台会生成一个可测试的行动方案。组合选择只是设计假设，不会自动视为已调查线索或已完成对话。</p><div class="itemrow" id="mechanicChoices">
 <button class="item" type="button" data-mechanic="key"><b>🗝 物件：钥匙</b><span class="muted">直接解锁、可靠但信息少</span></button>
@@ -102,7 +102,7 @@ $("submitHandoff").onclick=async()=>{
  if(!modelReply.trim()){$("handoffResult").className="result warn";$("handoffResult").textContent="请先粘贴 ChatGPT 回复。";return}
  $("submitHandoff").disabled=true;$("handoffResult").className="result";$("handoffResult").textContent="正在校验模型输出格式，并独立验证游戏规则…";
  try{
-  const response=await fetch("/api/model-handoff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,state:currentState(),model_reply:modelReply})});
+  const response=await apiFetch("/api/model-handoff",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,state:currentState(),model_reply:modelReply})});
   const data=await response.json();
   if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次模型输出");
   const r=data.validation, p=data.interpretation; if(r.ok){opened=true;animateWorld(r.type)}
@@ -129,7 +129,7 @@ async function attempt(text,source){
  $("try").disabled=true;$("key").disabled=true;$("bell").disabled=true;
  $("result").className="result";$("result").textContent="正在解释行动并校验世界状态…";
  try{
-  const response=await fetch("/api/game-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:text,state:{inspected:[...found],talked:[...npcs],selected:[...selected]}})});
+  const response=await apiFetch("/api/game-action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:text,state:{inspected:[...found],talked:[...npcs],selected:[...selected]}})});
   const data=await response.json();
   if(!response.ok||!data.ok)throw new Error(data.error||"服务拒绝了这次行动");
   const r=data.validation,mode=data.trust.interpretation_mode==="llm_proposed"?"LLM 提议 + 规则校验":"规则解释 + 规则校验"; if(r.ok){opened=true;animateWorld(r.type)}
