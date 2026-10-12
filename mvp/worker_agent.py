@@ -153,7 +153,7 @@ class DigitalEmployeeAgent:
         finally:
             stop_heartbeat.set()
             heartbeat_thread.join(timeout=min(1.0, self.heartbeat_interval))
-            if "report" in locals() and report.get("task", {}).get("status") == "completed":
+            if "report" in locals() and report.get("task", {}).get("status") in ("completed", "awaiting_validation"):
                 self._heartbeat("idle", progress="Task completed")
 
 
