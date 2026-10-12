@@ -154,3 +154,25 @@ A task status of `completed` is not by itself proof that its claims are true.
 Review source evidence and verification state separately. The trace view shows
 what the runtime has recorded; it does not claim that an unrecorded model action
 occurred.
+
+## Acceptance walkthrough: blocked → retry → completion → verification
+
+A repeatable HTTP integration test now exercises the full observable lifecycle:
+`test_acceptance_scenario_blocker_retry_completion_and_verification` in
+`mvp/test_workforce_api_integration.py`. It creates a research task, lets an
+authenticated employee claim it, records a temporary blocker, requires an
+administrator-authorized retry, claims the task with a new lease token, records
+a completion result, and then records an explicit structural verification.
+
+When running the service locally, open `/trace`, enter the configured admin
+token, and select the test-created task. Inspect:
+1. the original blocker and its timestamp;
+2. the twin/admin retry reason and attempt count;
+3. the second claim and updated lease;
+4. the final employee output;
+5. the verification record and the separate `verified_truth: false` flag;
+6. the global event timeline.
+
+This scenario verifies the recorded workflow and API boundaries. It does not
+assert that the sample research claim is factually true, and it does not replace
+a live-model end-to-end acceptance run.
