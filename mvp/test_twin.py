@@ -81,3 +81,40 @@ def test_persistent_twin_memory_round_trips_preferences_decisions_and_lessons(tm
     assert reloaded.decisions[0]["goal"] == "Ship MVP"
     assert reloaded.decisions[0]["recommendation"] == decision["recommendation"]
     assert reloaded.lessons[0]["context"] == "CI"
+
+
+
+def test_project_loop_exposes_verified_outcome_summary_for_recursive_review():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [
+        {
+            "id": "verified",
+            "title": "Evidence-backed result",
+            "status": "queued",
+            "verified": True,
+            "provenance": "live",
+        },
+        {
+            "id": "blocked",
+            "title": "Research without sources",
+            "status": "queued",
+            "verified": False,
+            "provenance": "llm",
+            "failure_category": "missing_sources",
+        },
+    ]
+
+    def executor(task):
+        return "result with evidence reference" if task["id"] == "verified" else ""
+
+    report = loop.run("Assess an AI-native game", tasks, executor)
+
+    assert report["improvement_summary"]["sample_count"] == 2
+    assert report["improvement_summary"]["verified_successes"] == 1
+    assert report["improvement_summary"]["failure_categories"] == {
+        "missing_sources": 1,
+    }
+    assert any(
+        event["type"] == "improvement_review_snapshot"
+        for event in report["events"]
+    )
