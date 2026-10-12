@@ -718,6 +718,14 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
         assert "研究任务要求真实搜索 provider" in page
         assert "任务状态、权限、心跳、租约、重试次数、验收门槛" in page
         assert "不自动改代码或上线" in page
+
+    # Trace-specific assertions belong to /trace, not the /logic map.
+    with urlopen(base + "/trace", timeout=3) as response:
+        trace_page = response.read().decode("utf-8")
+        assert response.status == 200
+        assert "流程追踪与验收" in trace_page
+        assert "最近心跳" in trace_page
+        assert 'id="improvementReport"' in trace_page
         assert "分身与员工验收清单" in page
         assert "TWIN_EMPLOYEE_ACCEPTANCE.md" in page
 
