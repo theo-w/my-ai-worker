@@ -92,6 +92,13 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     assert completed["task"]["status"] == "awaiting_validation"
     assert completed["task"]["assigned_to"] is None
 
+    project_id = created["task"]["success_criteria"].get("project_id")
+    if project_id:
+        status, twin_review = request_json(base, "/api/twin/review", ADMIN, {"project_id": project_id})
+        assert status == 200
+        assert twin_review["decision"] == "awaiting_independent_validation"
+        assert twin_review["llm_used"] is False
+
     status, premature = request_json(base, "/api/workforce/verify", RESEARCHER, {
         "task_id": task_id, "verification": {"accepted": True},
     })
@@ -870,3 +877,41 @@ def test_digital_twin_coordinator_drives_employee_feedback_and_acceptance(workfo
     assert any(event.get("type") == "worker_reported" for event in registry.events)
     assert any(event.get("type") == "goal_finished" and event.get("status") == "completed"
                for event in result["events"])
+
+
+
+def test_twin_reviews_blocked_employee_feedback_without_auto_retry(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Search provider returned no accepted evidence",
+    })
+    assert status == 200
+    assert blocked["task"]["status"] == "blocked"
+
+    status, review = request_json(base, "/api/twin/review", ADMIN, {"project_id": project_id})
+    assert status == 200
+    assert review["decision"] == "replan_required"
+    assert review["next_actions"][0]["task_id"] == task_id
+    assert "不会自动重试" in review["reason"]
+    assert review["llm_used"] is False
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    assert any(event["type"] == "twin_reviewed" and event["project_id"] == project_id
+               for event in snapshot["events"])
