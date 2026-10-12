@@ -4,11 +4,14 @@ JARVIS 数字分身与数字员工 MVP：以目标为中心动态组织员工、
 
 ## 本地启动与查看流程
 
-需要 Python 3.11+；核心运行时不需要额外 Web 框架依赖。
+需要 Python 3.12+；核心运行时不需要额外 Web 框架依赖。
 
 ```bash
 git clone https://github.com/theo-w/my-ai-worker.git
 cd my-ai-worker
+
+# 仅用于本机模拟工作台；不要配置真实模型/搜索凭证
+export JARVIS_PUBLIC_DEMO=true
 python -m mvp.server
 ```
 
@@ -18,7 +21,7 @@ python -m mvp.server
 - **流程追踪与验收：`http://localhost:8765/trace`**
 - 游戏体验原型：`http://localhost:8765/playtest`
 
-流程追踪页支持每 5 秒刷新、按任务状态筛选、查看任务输入/输出、员工反馈、阻塞原因、重试次数、任务历史和全局事件时间线。访问工作流数据需要在页面输入服务端配置的管理员 Token；请勿将 Token 提交到代码库或通过不可信网络传输。
+纯模拟工作台不需要 Token，但不会启用工作流 API。要使用数字员工队列和流程追踪页，请关闭 `JARVIS_PUBLIC_DEMO`，配置管理员 Token 与员工 Token（见下方安全文档），然后在工作台/试玩页顶部或 `/trace` 页面输入管理员 Token。认证模式下，任务输入/输出、反馈、阻塞原因、重试次数、任务历史和全局事件时间线只对管理员开放。请勿将 Token 提交到代码库或通过不可信网络传输。
 
 ### 运行一次可验收的端到端流程
 
