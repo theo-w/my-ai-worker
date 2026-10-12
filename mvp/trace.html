@@ -21,12 +21,12 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字员工心跳与运行状态</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
-<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工心跳与运行状态</h2><span class="muted">心跳缺失不等于员工在线</span></div><div id="workers" class="empty">连接后显示员工状态与最近心跳。</div></section>
+
 <div class="grid">
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务与员工状态</h2><select id="filter"><option value="all">全部任务</option><option value="active">进行中 / 排队</option><option value="blocked">阻塞 / 失败</option><option value="completed">已完成</option></select></div><div id="tasks" class="empty">连接后显示实时任务。</div></section>
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务过程详情</h2><span id="selectedStatus" class="pill">未选择</span></div><div id="detail" class="empty">选择左侧任务，查看输入、输出、阻塞原因和完整任务历史。</div></section>
 </div>
-<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工心跳与运行状态</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态。</div></div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">全局事件时间线</h2><span id="eventCount" class="muted">0 条事件</span></div><div id="events" class="events empty">连接后显示事件。</div></section>
 <div class="notice">安全说明：管理员 Token 不写入 localStorage 或 URL；数据通过带 Authorization 的只读接口获取。请只在可信环境使用管理员凭证。模型输出、员工反馈和已验证结论应分别判断，不要仅凭状态为 completed 就认定事实正确。</div>
 </main>
