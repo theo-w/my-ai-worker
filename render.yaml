@@ -10,3 +10,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
+      - key: HOST
+        value: 0.0.0.0
+      - key: JARVIS_PUBLIC_DEMO
+        value: "false"
+      - key: JARVIS_ADMIN_TOKEN
+        sync: false
