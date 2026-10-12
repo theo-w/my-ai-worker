@@ -534,7 +534,7 @@ def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce
     event_types = [event["type"] for event in snapshot["events"] if event.get("task_id") == task_id]
     assert "task_created" in event_types
     assert "worker_reported" in event_types
-    assert "retry_approved" in event_types
+    assert "task_retry_approved" in event_types
     assert "verification_recorded" in event_types
     assert len(task["history"]) >= 4
 
