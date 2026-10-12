@@ -8,7 +8,8 @@
 export HOST=127.0.0.1
 export PORT=8765
 export JARVIS_ADMIN_TOKEN='你的管理员令牌'
-export JARVIS_WORKER_TOKENS='{"researcher":"你的researcher令牌"}'
+export RESEARCHER_TOKEN='你的researcher令牌'
+export JARVIS_WORKER_TOKENS="{\"researcher\":\"$RESEARCHER_TOKEN\"}"
 export JARVIS_WORKER_CAPABILITIES='{"researcher":["research"]}'
 export JARVIS_WORKFORCE_STORE='./data/acceptance-workforce.json'
 python -m mvp.server
