@@ -441,6 +441,8 @@ def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_htt
         assert 'id="workers"' in page
         assert "最近心跳" in page
         assert 'fetch("/api/workforce"' in page
+        assert 'id="improvementReport"' in page
+        assert 'fetch("/api/improvement/report"' in page
         assert "localStorage.setItem" not in page
         assert "localStorage.getItem" not in page
     status, protected = request_json(base, "/api/workforce")
