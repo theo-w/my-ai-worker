@@ -522,14 +522,25 @@ class Handler(BaseHTTPRequestHandler):
                         decision = "needs_twin_review"
                         reason = "任务状态组合不符合自动关闭条件，需要分身进一步检查。"
                         next_actions = [{"task_id": task["id"], "status": task.get("status")} for task in project_tasks]
+                    status_counts = {status: statuses.count(status) for status in sorted(set(statuses))}
+                    # Persist the same explanation and actionable task references returned
+                    # to the caller, so the Twin's reasoning is inspectable after the response.
                     with WORKFORCE.lock:
-                        WORKFORCE._event("twin_reviewed", project_id=project_id, decision=decision,
-                                         task_ids=[task["id"] for task in project_tasks])
+                        WORKFORCE._event(
+                            "twin_reviewed",
+                            project_id=project_id,
+                            decision=decision,
+                            reason=reason,
+                            task_ids=[task["id"] for task in project_tasks],
+                            status_counts=status_counts,
+                            next_actions=next_actions,
+                            llm_used=False,
+                        )
                         WORKFORCE.save()
                     self._json({
                         "ok": True, "project_id": project_id, "decision": decision,
                         "reason": reason, "task_count": len(project_tasks),
-                        "status_counts": {status: statuses.count(status) for status in sorted(set(statuses))},
+                        "status_counts": status_counts,
                         "next_actions": next_actions,
                         "llm_used": False,
                         "safety_note": "本次分身复核由确定性规则完成；没有调用 LLM，也不会自动重试、改派或验收。",
