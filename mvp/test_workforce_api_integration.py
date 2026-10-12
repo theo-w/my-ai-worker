@@ -538,3 +538,30 @@ def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce
     assert "verification_recorded" in event_types
     assert len(task["history"]) >= 4
 
+def test_worker_can_claim_only_requested_eligible_task_without_bypassing_capabilities(workforce_http):
+    base, _ = workforce_http
+    status, first = request_json(
+        base, "/api/workforce/tasks", ADMIN,
+        {"title": "Earlier task", "capability": "research", "priority": 3},
+    )
+    assert status == 201
+    status, target = request_json(
+        base, "/api/workforce/tasks", ADMIN,
+        {"title": "Target task", "capability": "research", "priority": 3},
+    )
+    assert status == 201
+
+    status, claimed = request_json(
+        base, "/api/workforce/claim", RESEARCHER,
+        {"capabilities": ["research"], "task_id": target["task"]["id"]},
+    )
+    assert status == 200
+    assert claimed["task"]["id"] == target["task"]["id"]
+
+    status, denied = request_json(
+        base, "/api/workforce/claim", RESEARCHER,
+        {"capabilities": ["research"], "task_id": first["task"]["id"]},
+    )
+    assert status == 200
+    assert denied["task"] is None
+
