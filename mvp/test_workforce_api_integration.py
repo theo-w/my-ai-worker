@@ -711,6 +711,10 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
         assert response.status == 200
         assert "整体逻辑流程与规则 / LLM 生效时机" in page
         assert "当前有三条并存的执行路径" in page
+        assert "数字分身 ↔ 数字员工：双向协作闭环" in page
+        assert "员工不能自己批准自己的结果" in page
+        assert "心跳只代表存活，不代表工作成功" in page
+        assert "真正持续管理" in page
         assert "研究任务要求真实搜索 provider" in page
         assert "任务状态、权限、心跳、租约、重试次数、验收门槛" in page
         assert "不自动改代码或上线" in page
