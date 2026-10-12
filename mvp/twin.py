@@ -618,6 +618,25 @@ class DigitalTwinCoordinator:
                         except (DigitalTwinAPIError, ValueError) as exc:
                             events.append({"type": "revision_rejected", "action": "merge",
                                            "reason": str(exc)[:300]})
+                    for action in revision.get("retry", [])[:10]:
+                        task_id = action.get("task_id")
+                        reason = str(action.get("reason", "Retry after reviewing blocker"))
+                        if task_id not in ids:
+                            events.append({"type": "revision_rejected", "action": "retry",
+                                           "task_id": task_id,
+                                           "reason": "Task ID must belong to the current goal."})
+                            continue
+                        try:
+                            retried = self.retry_task(task_id, reason)
+                            events.append({
+                                "type": "task_retry_approved",
+                                "task_id": task_id,
+                                "reason": reason,
+                                "attempts": retried.get("task", {}).get("attempts"),
+                            })
+                        except (DigitalTwinAPIError, ValueError) as exc:
+                            events.append({"type": "revision_rejected", "action": "retry",
+                                           "task_id": task_id, "reason": str(exc)[:300]})
                     for action in revision.get("cancel", [])[:10]:
                         task_id = action.get("task_id")
                         reason = str(action.get("reason", "No longer valuable"))
@@ -725,6 +744,16 @@ class DigitalTwinCoordinator:
             "execution_decision": decision.to_dict(), "metrics": metrics,
             "evidence_note": "执行器输出不自动等于已核实证据；必须检查来源与可复现性。",
         }
+
+    def retry_task(self, task_id: str, reason: str) -> dict:
+        """Explicitly retry blocked work after reviewing its blocker."""
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task_id must be a non-empty string")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("reason must be a non-empty string")
+        return self._request("POST", "/api/workforce/retry", {
+            "task_id": task_id, "reason": reason.strip()[:1000],
+        })
 
     def cancel_task(self, task_id: str, reason: str) -> dict:
         """Cancel pending work through the authenticated admin API."""
