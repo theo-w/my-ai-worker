@@ -399,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -476,6 +476,11 @@ class Handler(BaseHTTPRequestHandler):
                                             str(body.get("output", "")), str(body.get("blocker", "")),
                                             body.get("lease_token"))
                     self._json({"ok": True, "task": task})
+                elif self.path == "/api/workforce/verify":
+                    task_id, verification = body.get("task_id"), body.get("verification")
+                    if not isinstance(task_id, str) or not isinstance(verification, dict):
+                        raise ValueError("task_id and verification object are required")
+                    self._json({"ok": True, "task": WORKFORCE.record_verification(task_id, verification)})
                 elif self.path == "/api/workforce/retry":
                     task_id, reason = body.get("task_id"), body.get("reason")
                     if not isinstance(task_id, str) or not isinstance(reason, str):
