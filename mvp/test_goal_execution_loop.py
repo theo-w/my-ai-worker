@@ -405,13 +405,14 @@ def test_twin_persists_verification_into_traceable_workforce_history(monkeypatch
         )
         result = twin.execute_goal(
             "trace verification goal", [worker], max_cycles=3,
-            tasks=[{"title": "Trace a checked result", "capability": "analysis"}],
+            tasks=[{"title": "Trace a checked result", "capability": "analysis", "evidence_required": True}],
         )
         task_id = result["tasks"][0]["task_id"]
         snapshot = registry.snapshot()
         task = next(item for item in snapshot["tasks"] if item["id"] == task_id)
         assert "verification" in task
-        assert task["verification"]["accepted"] is True
+        assert task["verification"]["accepted"] is False
+        assert task["verification"]["status"] == "rejected"
         assert task["verified_truth"] is False
         assert any(
             event["type"] == "verification_recorded" and event["task_id"] == task_id
