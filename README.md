@@ -41,6 +41,8 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 - `GET /tasks` — admin lists all tasks; worker sees queued or assigned tasks
 - `GET /tasks/:id` — task detail and events, subject to role checks
 - `POST /tasks/:id/accept` — worker accepts as its configured identity
+- `POST /tasks/:id/heartbeat` — assigned worker refreshes its heartbeat; heartbeat events are persisted in task history
+- `GET /monitoring/workers` — admin-only worker/task heartbeat view, including stale-heartbeat flags (default timeout 60 seconds; set `JARVIS_HEARTBEAT_TIMEOUT_MS` to override, minimum 5 seconds)
 - `POST /tasks/:id/events` — assigned worker reports `progress`, `result`, `blocked`, or `failed`
 - `POST /tasks/:id/approve` — admin approves/rejects a gated result
 - `POST /tasks/:id/retry` — admin requeues eligible tasks within the attempt limit
