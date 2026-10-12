@@ -105,3 +105,20 @@ def test_monitor_detects_stale_worker_heartbeat_and_keeps_idle_worker_visible():
     assert {e["worker_id"] for e in report["employees"]} == {
         "worker-idle", "worker-never-beat",
     }
+
+def test_monitor_flags_result_waiting_for_validation():
+    now = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
+    report = build_monitor_report({
+        "tasks": [{
+            "id": "pending-review", "status": "awaiting_validation",
+            "updated_at": now.isoformat(), "output": "Candidate output",
+            "verification": None, "verified_truth": False,
+        }],
+        "events": [],
+    }, now=now)
+    assert report["twin"]["status"] == "needs_attention"
+    assert report["twin"]["counts_by_status"]["awaiting_validation"] == 1
+    assert any(alert["type"] == "awaiting_validation"
+               and alert["task_id"] == "pending-review"
+               for alert in report["alerts"])
+    assert report["tasks"][0]["verified_truth"] is False
