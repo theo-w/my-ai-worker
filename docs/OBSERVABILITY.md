@@ -139,7 +139,9 @@ and is cleared when the page is closed.
 When the goal loop applies an evidence gate or configured independent review, it also attempts to persist that verification record to the task history and global event stream. The record explicitly keeps `verified_truth=false`; accepted structural checks must not be confused with proof of factual truth. If persistence fails, the goal result includes a `verification_persistence_failed` event rather than silently claiming the audit was saved.
 
 The view refreshes every five seconds by default and supports manual refresh and
-task-state filters. Select a task to inspect its goal/input, assignment, output,
+task-state filters. A separate employee panel shows worker-reported status, last heartbeat,
+current task, capabilities, progress, and last error; missing heartbeat is not treated as
+proof that a worker is alive. Select a task to inspect its goal/input, assignment, output,
 blocker/feedback fields, attempt count, task history, and the recent global event
 timeline. The endpoint remains admin-authenticated; the trace page itself does not
 embed credentials and does not mutate task state.
