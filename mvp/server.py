@@ -572,6 +572,26 @@ class Handler(BaseHTTPRequestHandler):
         if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
             return
+        if self.path == "/api/run":
+            body = self._read_json(max_bytes=131072)
+            if body is None:
+                return
+            goal = body.get("goal")
+            if not isinstance(goal, str) or not goal.strip():
+                self._json({"ok": False, "error": "A non-empty goal is required."}, 400)
+                return
+            goal = goal.strip()
+            if len(goal) > 2000:
+                self._json({"ok": False, "error": "Goal must be at most 2000 characters."}, 400)
+                return
+            with LOCK:
+                if STATE.get("phase") in {"planning", "team", "evaluation"}:
+                    self._json({"ok": False, "error": "A dashboard run is already active."}, 409)
+                    return
+                STATE["phase"] = "planning"
+            threading.Thread(target=execute, args=(goal,), daemon=True).start()
+            self._json({"ok": True, "accepted": True, "phase": "planning"}, 202)
+            return
         if self.path == "/api/model-handoff":
             body = self._read_json(max_bytes=131072)
             if body is None:
