@@ -25,7 +25,7 @@ python -m mvp.server
 
 ### 运行一次可验收的端到端流程
 
-先启动服务，并按 [安全与认证说明](docs/SECURITY_AND_AUTH.md) 配置管理员 Token、员工 Token 和员工能力。随后在同一终端环境运行：
+纯模拟模式只演示公开工作台，不开放员工队列 API。要验收分身/员工闭环，请先停止模拟服务器，在启动服务器的同一终端执行 `unset JARVIS_PUBLIC_DEMO`，再按 [安全与认证说明](docs/SECURITY_AND_AUTH.md) 配置管理员 Token、员工 Token 和员工能力，重新启动服务。随后在同一终端环境运行：
 
 ```bash
 python -m mvp.demo_workflow
