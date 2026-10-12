@@ -576,3 +576,43 @@ def test_worker_can_claim_only_requested_eligible_task_without_bypassing_capabil
     assert status == 200
     assert denied["task"] is None
 
+def test_verification_endpoint_records_review_without_claiming_truth(workforce_http):
+    base, _ = workforce_http
+    status, created = request_json(
+        base, "/api/workforce/tasks", ADMIN,
+        {"title": "Verify candidate claim", "capability": "research"},
+    )
+    assert status == 201
+    task_id = created["task"]["id"]
+    status, claimed = request_json(
+        base, "/api/workforce/claim", RESEARCHER,
+        {"capabilities": ["research"], "task_id": task_id},
+    )
+    assert status == 200
+    status, reported = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "completed",
+        "lease_token": claimed["task"]["lease_token"],
+        "output": "Candidate result, awaiting evidence review",
+    })
+    assert status == 200
+
+    status, result = request_json(base, "/api/workforce/verify", ADMIN, {
+        "task_id": task_id,
+        "verification": {
+            "accepted": True,
+            "checks": [{"name": "output_present", "passed": True}],
+            "evidence": ["source-reference-1"],
+        },
+    })
+    assert status == 200
+    assert result["task"]["verification"]["accepted"] is True
+    assert result["task"]["verified_truth"] is False
+
+    status, denied = request_json(base, "/api/workforce/verify", RESEARCHER, {
+        "task_id": task_id,
+        "verification": {"accepted": True},
+    })
+    assert status == 403
+    assert denied["ok"] is False
+
