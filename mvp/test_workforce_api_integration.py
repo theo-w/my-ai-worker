@@ -633,3 +633,31 @@ def test_verification_endpoint_records_review_without_claiming_truth(workforce_h
     assert status == 403
     assert denied["ok"] is False
 
+
+
+def test_dashboard_state_and_execution_routes_require_admin_when_auth_is_configured(workforce_http):
+    base, _ = workforce_http
+
+    status, denied_state = request_json(base, "/api/state")
+    assert status == 401
+    assert denied_state["ok"] is False
+
+    status, denied_worker_state = request_json(base, "/api/state", RESEARCHER)
+    assert status == 403
+
+    status, state = request_json(base, "/api/state", ADMIN)
+    assert status == 200
+    assert "goal" in state
+
+    status, denied_research = request_json(
+        base, "/api/research", payload={"query": "unauthorized request"},
+    )
+    assert status == 401
+    assert denied_research["ok"] is False
+
+    status, denied_action = request_json(
+        base, "/api/game-action",
+        payload={"action": "use key", "state": {}},
+    )
+    assert status == 401
+    assert denied_action["ok"] is False
