@@ -58,3 +58,31 @@ test('worker heartbeat is persisted, visible to admin monitoring, and access-con
   const forbiddenResponse = await fetch(base + '/monitoring/workers', { headers: worker });
   assert.equal(forbiddenResponse.status, 403);
 });
+
+test('monitoring excludes results awaiting validation because worker execution has ended', async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'jarvis-monitor-state-'));
+  const server = createServer({
+    storePath: path.join(dir, 'runtime.json'),
+    adminToken: 'test-admin-secret',
+    workerToken: 'test-worker-secret',
+    workerId: 'worker-alpha'
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+  const base = 'http://127.0.0.1:' + server.address().port;
+  const admin = { authorization: 'Bearer test-admin-secret', 'content-type': 'application/json' };
+  const worker = { authorization: 'Bearer test-worker-secret', 'content-type': 'application/json' };
+  const created = await (await fetch(base + '/tasks', { method: 'POST', headers: admin, body: JSON.stringify({ goal: 'Return a result' }) })).json();
+  const id = created.task.task_id;
+  await fetch(base + '/tasks/' + id + '/accept', { method: 'POST', headers: worker, body: '{}' });
+  const result = await fetch(base + '/tasks/' + id + '/events', {
+    method: 'POST', headers: worker,
+    body: JSON.stringify({ event_type: 'result', summary: 'Result ready', result: { ok: true } })
+  });
+  assert.equal((await result.json()).task.status, 'awaiting_validation');
+  const monitoring = await (await fetch(base + '/monitoring/workers', { headers: admin })).json();
+  assert.equal(monitoring.workers.length, 0);
+});
