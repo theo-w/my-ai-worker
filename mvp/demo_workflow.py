@@ -80,7 +80,7 @@ def main() -> int:
     print(f"1. Twin created task: {task_id} ({task['status']})")
 
     claimed_result = request_json(
-        base, "/api/workforce/claim", worker_token, {"capabilities": [capability]}
+        base, "/api/workforce/claim", worker_token, {"capabilities": [capability], "task_id": task_id}
     )
     claimed = claimed_result.get("task")
     if not claimed or claimed.get("id") != task_id:
