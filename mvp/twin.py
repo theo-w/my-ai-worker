@@ -400,7 +400,7 @@ class DigitalTwinCoordinator:
         """Read queue state and report only states backed by the server snapshot."""
         snapshot = self._request("GET", "/api/workforce")
         tasks = snapshot.get("tasks", [])
-        counts = {"queued": 0, "assigned": 0, "completed": 0, "blocked": 0, "failed": 0}
+        counts = {"queued": 0, "assigned": 0, "awaiting_validation": 0, "completed": 0, "blocked": 0, "failed": 0}
         results = []
         for task in tasks:
             status = task.get("status", "queued")
@@ -445,7 +445,7 @@ class DigitalTwinCoordinator:
         active = counts["queued"] + counts["assigned"]
         if active:
             status = "in_progress"
-        elif counts["blocked"] or counts["failed"] or any(
+        elif counts["awaiting_validation"] or counts["blocked"] or counts["failed"] or any(
             not item["verification"]["accepted"] for item in results
             if item["status"] == "completed"
         ):
@@ -531,7 +531,7 @@ class DigitalTwinCoordinator:
             cycles = cycle
             before = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
                       if t["task_id"] in ids}
-            if before and all(s in ("completed", "blocked", "failed") for s in before.values()):
+            if before and all(s in ("completed", "awaiting_validation", "blocked", "failed") for s in before.values()):
                 break
             pending = [t for t in self.inspect()["tasks"]
                        if t["task_id"] in ids and t["status"] in ("queued", "assigned")]
@@ -657,7 +657,7 @@ class DigitalTwinCoordinator:
                                    "cycle": cycle, "error": type(exc).__name__})
             after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
                      if t["task_id"] in ids}
-            if after and all(s in ("completed", "blocked", "failed") for s in after.values()):
+            if after and all(s in ("completed", "awaiting_validation", "blocked", "failed") for s in after.values()):
                 break
             retry_was_approved = any(
                 event.get("type") == "task_retry_approved" and event.get("cycle") == cycle
@@ -672,53 +672,55 @@ class DigitalTwinCoordinator:
         snapshot = self.inspect()
         # Keep terminally cancelled/superseded work visible in the final audit.
         scoped = [t for t in snapshot["tasks"] if t["task_id"] in all_goal_ids]
-        if decision.verification in ("evidence_gate", "independent_review"):
+        # Every worker-submitted result must pass a recorded validation gate,
+        # even when policy does not require source evidence or an independent reviewer.
+        try:
+            from .verification import verify_task_output
+        except ImportError:
+            from verification import verify_task_output
+        for task in scoped:
+            if task["status"] != "awaiting_validation":
+                continue
+            verification = verify_task_output(
+                {"id": task["task_id"], "title": task.get("title"),
+                 "capability": task.get("capability"),
+                 "output": task.get("output", ""),
+                 "success_criteria": task.get("success_criteria", {})},
+                require_evidence=(decision.verification == "evidence_gate"
+                                  or task.get("capability") == "research"
+                                  or bool(task.get("evidence_required"))),
+                success_criteria=task.get("success_criteria"),
+                independent_reviewer=(independent_reviewer
+                                       if decision.verification == "independent_review"
+                                       else None),
+            )
+            if decision.verification == "independent_review" and not callable(independent_reviewer):
+                verification["accepted"] = False
+                verification["status"] = "rejected"
+                verification["independent_review"] = "not_configured"
+                verification["checks"].append({
+                    "name": "independent_review_configured", "passed": False,
+                })
+                verification["verification_note"] = (
+                    "Independent review was required but no reviewer callback is configured."
+                )
+            task["verification"] = verification
             try:
-                from .verification import verify_task_output
-            except ImportError:
-                from verification import verify_task_output
-            for task in scoped:
-                if task["status"] == "completed":
-                    verification = verify_task_output(
-                        {"id": task["task_id"], "title": task.get("title"),
-                         "capability": task.get("capability"),
-                         "output": task.get("output", ""),
-                         "success_criteria": task.get("success_criteria", {})},
-                        require_evidence=(decision.verification == "evidence_gate"
-                                          or task.get("capability") == "research"
-                                          or bool(task.get("evidence_required"))),
-                        success_criteria=task.get("success_criteria"),
-                        independent_reviewer=(independent_reviewer
-                                               if decision.verification == "independent_review"
-                                               else None),
-                    )
-                    # Independent review cannot be replaced by structural checks.
-                    if decision.verification == "independent_review" and not callable(independent_reviewer):
-                        verification["accepted"] = False
-                        verification["status"] = "rejected"
-                        verification["independent_review"] = "not_configured"
-                        verification["checks"].append({
-                            "name": "independent_review_configured", "passed": False,
-                        })
-                        verification["verification_note"] = (
-                            "Independent review was required but no reviewer callback is configured."
-                        )
-                    task["verification"] = verification
-                    # Persist the same verification record to the workforce audit
-                    # timeline so the read-only trace page reflects actual checks.
-                    try:
-                        self._request("POST", "/api/workforce/verify", {
-                            "task_id": task["task_id"],
-                            "verification": verification,
-                        })
-                    except Exception as exc:
-                        events.append({
-                            "type": "verification_persistence_failed",
-                            "task_id": task["task_id"],
-                            "reason": type(exc).__name__ + ": " + str(exc)[:300],
-                        })
+                persisted = self._request("POST", "/api/workforce/verify", {
+                    "task_id": task["task_id"],
+                    "verification": verification,
+                })
+                saved_task = persisted.get("task", {})
+                task["status"] = saved_task.get("status", task["status"])
+                task["blocker"] = saved_task.get("blocker", task.get("blocker", ""))
+            except Exception as exc:
+                events.append({
+                    "type": "verification_persistence_failed",
+                    "task_id": task["task_id"],
+                    "reason": type(exc).__name__ + ": " + str(exc)[:300],
+                })
         counts = {s: sum(t["status"] == s for t in scoped)
-                  for s in ("queued", "assigned", "completed", "blocked", "failed",
+                  for s in ("queued", "assigned", "awaiting_validation", "completed", "blocked", "failed",
                             "cancelled", "superseded", "approval_required")}
         if not ids:
             # A goal with no remaining active work must not be reported as completed
@@ -727,14 +729,14 @@ class DigitalTwinCoordinator:
                       "superseded" if counts["superseded"] else "needs_attention")
         elif counts["queued"] or counts["assigned"]:
             status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
-        elif counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
+        elif counts["awaiting_validation"] or counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
             status = "needs_attention"
         elif any(not t.get("verification", {}).get("accepted", False)
-                 for t in scoped if t.get("status") == "completed"):
+                 for t in scoped if t.get("verification") is not None):
             status = "needs_attention"
             events.append({"type": "verification_rejected",
                            "task_ids": [t["task_id"] for t in scoped
-                                        if t["status"] == "completed"
+                                        if t.get("verification") is not None
                                         and not t.get("verification", {}).get("accepted", False)],
                            "reason": "Completed worker output did not pass the required evidence gate."})
         else:
@@ -750,7 +752,7 @@ class DigitalTwinCoordinator:
                 for t in scoped
             ),
             "rejected_outputs": sum(
-                t["status"] == "completed" and not t.get("verification", {}).get("accepted", False)
+                t.get("verification") is not None and not t.get("verification", {}).get("accepted", False)
                 for t in scoped
             ),
             "cancelled_tasks": counts["cancelled"],
