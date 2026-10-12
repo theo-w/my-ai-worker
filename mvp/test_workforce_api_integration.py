@@ -413,3 +413,17 @@ def test_admin_retry_endpoint_requires_triage_reason_and_worker_cannot_call(work
     assert retried["task"]["status"] == "queued"
     assert retried["task"]["history"][-1]["event"] == "retry_approved"
 
+def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_http):
+    from urllib.request import urlopen
+
+    base, _ = workforce_http
+    with urlopen(base + "/trace", timeout=3) as response:
+        page = response.read().decode("utf-8")
+        assert response.status == 200
+        assert "流程追踪与验收" in page
+        assert 'fetch("/api/workforce"' in page
+        assert "localStorage" not in page
+    status, protected = request_json(base, "/api/workforce")
+    assert status == 401
+    assert protected["ok"] is False
+
