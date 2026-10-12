@@ -40,6 +40,11 @@ def main() -> int:
     admin = os.getenv("JARVIS_ADMIN_TOKEN", "").strip()
     worker_id = os.getenv("JARVIS_DEMO_WORKER_ID", "").strip()
     capability = os.getenv("JARVIS_DEMO_CAPABILITY", "research").strip()
+    evidence_required_raw = os.getenv("JARVIS_DEMO_EVIDENCE_REQUIRED", "").strip().lower()
+    evidence_required = (
+        evidence_required_raw in {"1", "true", "yes"}
+        if evidence_required_raw else capability == "research"
+    )
     tokens_raw = os.getenv("JARVIS_WORKER_TOKENS", "").strip()
 
     if not admin:
@@ -73,7 +78,7 @@ def main() -> int:
             "required_sections": ["假设", "待验证证据", "下一步"],
             "demo_only": True,
         },
-        "evidence_required": True,
+        "evidence_required": evidence_required,
     })
     task = created["task"]
     task_id = task["id"]
@@ -123,7 +128,7 @@ def main() -> int:
         "evidence": [],
         "evidence_count": 0,
         "checks": [
-            { "name": "source_structure", "passed": False },
+            { "name": "source_structure", "passed": not evidence_required },
         ],
         "notes": "Demo only: structural checks passed, but no source evidence was supplied.",
         "verified_truth": False,
@@ -133,7 +138,7 @@ def main() -> int:
         "task_id": task_id,
         "verification": verification,
     })
-    print("4. Admin recorded validation; missing source evidence keeps the task blocked and verified_truth false.")
+    print("4. Admin recorded validation; evidence-required tasks without sources remain blocked. verified_truth stays false.")
     snapshot = request_json(base, "/api/workforce", admin)
     final = next((item for item in snapshot.get("tasks", []) if item.get("id") == task_id), None)
     if final is None:
