@@ -340,3 +340,59 @@ def test_twin_recommends_replan_for_blocked_task_without_auto_retry(monkeypatch,
         httpd.server_close()
         thread.join(timeout=2)
 
+def test_twin_can_explicitly_retry_after_revision_policy_reviews_blocker(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000041", "worker-test-token-000000000042"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-explicit-retry.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    class FailOnceExecutor:
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self, task, goal):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("source temporarily unavailable")
+            return WorkerExecutionResult(
+                task_id=task["id"], capability=task["capability"],
+                status="completed", output="Source recovered; result collected.",
+                simulated=False, metadata={"attempt": self.calls},
+            )
+
+    try:
+        base = f"http://127.0.0.1:{httpd.server_port}"
+        twin = DigitalTwinCoordinator(base, admin)
+        executor = FailOnceExecutor()
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], executor, "recover goal")
+        policy_calls = []
+
+        def revision_policy(goal, tasks, cycle):
+            policy_calls.append((cycle, [(task["status"], task.get("blocker", "")) for task in tasks]))
+            if cycle == 1 and tasks and tasks[0]["status"] == "blocked":
+                return {"retry": [{
+                    "task_id": tasks[0]["task_id"],
+                    "reason": "Confirmed temporary outage; retry within configured limit",
+                }]}
+            return {}
+
+        result = twin.execute_goal(
+            "recover goal", [worker], max_cycles=3,
+            tasks=[{"title": "Analyze source", "capability": "analysis"}],
+            revision_policy=revision_policy,
+        )
+        assert result["status"] == "completed"
+        assert result["counts"]["completed"] == 1
+        assert executor.calls == 2
+        assert any(event["type"] == "task_retry_approved" for event in result["events"])
+        assert len(policy_calls) >= 2
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
