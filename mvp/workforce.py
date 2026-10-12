@@ -163,9 +163,12 @@ class WorkforceRegistry:
                 task["lease_until"] = None
                 task["assigned_to"] = None
             else:
-                task["status"] = status
+                # Worker completion is a submitted candidate result, not acceptance.
+                # The task stays non-terminal until the admin records validation.
+                task["status"] = "awaiting_validation" if status == "completed" else status
                 task["lease_until"] = None
                 task["_lease_token"] = None
+                task["assigned_to"] = None
             task["history"].append({"event": "worker_report", "worker_id": worker_id,
                                     "status": status, "at": _stamp(),
                                     "blocker": blocker})
@@ -258,10 +261,15 @@ class WorkforceRegistry:
         safe["verified_truth"] = False
         with self.lock:
             task = self._get(task_id)
-            if task["status"] not in {"completed", "blocked", "failed"}:
-                raise ValueError("only terminal tasks can be verified")
+            if task["status"] != "awaiting_validation":
+                raise ValueError("task must be awaiting_validation before verification")
             task["verification"] = safe
             task["verified_truth"] = False
+            task["status"] = "completed" if safe["accepted"] else "blocked"
+            if not safe["accepted"]:
+                task["blocker"] = str(safe.get("notes") or "Validation rejected the submitted result")[:3000]
+            else:
+                task["blocker"] = ""
             task["updated_at"] = _stamp()
             task["history"].append({
                 "event": "verification_recorded",
