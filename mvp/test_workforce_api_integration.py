@@ -662,3 +662,40 @@ def test_dashboard_state_and_execution_routes_require_admin_when_auth_is_configu
     )
     assert status == 401
     assert denied_action["ok"] is False
+
+
+
+def test_improvement_report_endpoint_is_admin_only_and_observe_only(workforce_http):
+    base, _ = workforce_http
+    status, denied = request_json(base, "/api/improvement/report", RESEARCHER)
+    assert status == 403
+    assert denied["ok"] is False
+
+    # Create two matching blockers so the observe-only report has a supported signal.
+    for title in ("Research source A", "Research source B"):
+        status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+            "title": title, "capability": "research",
+        })
+        assert status == 201
+        task_id = created["task"]["id"]
+        status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+            "capabilities": ["research"], "task_id": task_id,
+        })
+        assert status == 200
+        status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+            "task_id": task_id,
+            "status": "blocked",
+            "lease_token": claimed["task"]["lease_token"],
+            "blocker": "Source temporarily unavailable",
+        })
+        assert status == 200
+        assert blocked["task"]["status"] == "blocked"
+
+    status, response = request_json(base, "/api/improvement/report", ADMIN)
+    assert status == 200
+    report = response["report"]
+    assert report["mode"] == "observe_only"
+    assert report["actions_taken"] == []
+    assert any(item["signal"] == "repeated_blocker_text" for item in report["observations"])
+    assert all(item["adoption"] == "requires_independent_evaluation_and_human_approval"
+               for item in report["proposals"])
