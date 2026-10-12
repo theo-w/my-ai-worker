@@ -58,6 +58,7 @@ completion.
 - [x] Add authenticated worker heartbeat/registration and expose offline suspicion in the monitor.
 - [x] Add audited merge/cancel operations for pending tasks and explicit, bounded retry of blocked/failed tasks. The revision-policy hook can request retry only with a reason; the registry enforces task scope, state, and attempt limits.
 - [x] Keep blocked reports blocked by default. The twin must inspect feedback and explicitly authorize retry; retry approval is audited and the goal loop does not mistake that decision for a stalled cycle.
+- [x] Add an opt-in conservative transient-failure policy. It recommends a retry only for recognized temporary network/service failures with remaining retry budget; the server still enforces task state, scope, and attempt limits. It is a deterministic heuristic, not an LLM diagnosis, and unknown blockers remain blocked.
 - [ ] Add a production-grade semantic planner/revision policy. Current hooks safely execute approved actions but do not themselves infer high-quality plans from arbitrary feedback.
 - [ ] Benchmark single-agent versus team mode on representative tasks; tune thresholds from
   observed outcomes.
