@@ -68,6 +68,11 @@ class WorkforceRegistry:
         if not capability.strip() or len(capability) > 100:
             raise ValueError("capability must be between 1 and 100 characters")
         priority = max(1, min(int(priority), 5))
+        # Research work must carry source records by default; callers cannot
+        # accidentally turn off the evidence gate by omitting a request flag.
+        evidence_required = bool(evidence_required) or capability.strip().lower() in {
+            "research", "market_research",
+        }
         if success_criteria is None:
             success_criteria = {}
         if not isinstance(success_criteria, dict) or len(json.dumps(success_criteria)) > 4000:
@@ -270,19 +275,39 @@ class WorkforceRegistry:
             task = self._get(task_id)
             if task["status"] != "awaiting_validation":
                 raise ValueError("task must be awaiting_validation before verification")
-            if safe.get("accepted") is True and task.get("evidence_required"):
-                evidence_count = safe.get("evidence_count", 0)
-                source_check = next((item for item in checks
-                                     if isinstance(item, dict) and item.get("name") == "source_structure"), None)
-                if (not isinstance(evidence_count, int) or isinstance(evidence_count, bool)
-                        or evidence_count < 1 or not isinstance(source_check, dict)
-                        or source_check.get("passed") is not True):
+            if task.get("evidence_required"):
+                # Recompute evidence from the persisted worker output. Never trust
+                # evidence_count/source_structure supplied by the verifier itself.
+                try:
+                    from .verification import verify_task_output
+                except ImportError:
+                    from verification import verify_task_output
+                evidence_result = verify_task_output(
+                    {
+                        "id": task["id"],
+                        "output": task.get("output", ""),
+                        "success_criteria": task.get("success_criteria", {}),
+                    },
+                    require_evidence=True,
+                    success_criteria=task.get("success_criteria", {}),
+                )
+                safe["evidence_count"] = evidence_result.get("evidence_count", 0)
+                checks = [
+                    item for item in checks
+                    if not (isinstance(item, dict) and item.get("name") in {
+                        "source_structure", "required_evidence_for_task",
+                        "non_empty_output", "non_simulated_evidence",
+                    })
+                ]
+                checks.extend(evidence_result.get("checks", []))
+                safe["checks"] = checks
+                if safe.get("accepted") is True and not evidence_result.get("accepted", False):
                     safe["accepted"] = False
                     safe["status"] = "rejected"
-                    checks.append({"name": "required_evidence_for_task", "passed": False})
+                    checks.append({"name": "server_evidence_gate", "passed": False})
                     safe["verification_note"] = (
-                        "This task requires at least one structurally valid source record; "
-                        "a structural checklist alone is insufficient."
+                        "Server-side evidence validation rejected this output. "
+                        "At least one structurally valid, non-simulated source record is required."
                     )
             task["verification"] = safe
             task["verified_truth"] = False
