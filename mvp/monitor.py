@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 
 ACTIVE = {"queued", "assigned", "approval_required"}
+VALIDATION_PENDING = {"awaiting_validation"}
 TERMINAL = {"completed", "blocked", "failed", "superseded"}
 
 
@@ -45,6 +46,10 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None,
         if status == "assigned" and lease_expired:
             alerts.append({"severity": "warning", "type": "lease_expired",
                            "task_id": task.get("id"), "message": "员工任务租约已过期，等待监督器回收。"})
+        if status in VALIDATION_PENDING:
+            alerts.append({"severity": "warning", "type": "awaiting_validation",
+                           "task_id": task.get("id"),
+                           "message": "员工已提交结果，任务仍需独立检查或管理员验证后才能完成。"})
         if status in ("blocked", "failed"):
             alerts.append({"severity": "warning", "type": status,
                            "task_id": task.get("id"),
@@ -84,7 +89,7 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None,
     active_count = sum(counts.get(key, 0) for key in ACTIVE)
     blocked_count = counts.get("blocked", 0) + counts.get("failed", 0)
     # An active queue can still require attention if any task is blocked/failed.
-    if blocked_count:
+    if blocked_count or counts.get("awaiting_validation", 0):
         twin_status = "needs_attention"
     elif active_count:
         twin_status = "in_progress"
