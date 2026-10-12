@@ -725,6 +725,17 @@ class DigitalTwinCoordinator:
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "awaiting_validation", "completed", "blocked", "failed",
                             "cancelled", "superseded", "approval_required")}
+        rejected_verification_ids = [
+            task["task_id"] for task in scoped
+            if task.get("verification_recorded")
+            and not task.get("verification", {}).get("accepted", False)
+        ]
+        if rejected_verification_ids:
+            events.append({
+                "type": "verification_rejected",
+                "task_ids": rejected_verification_ids,
+                "reason": "Worker output did not pass the required validation gate.",
+            })
         if not ids:
             # A goal with no remaining active work must not be reported as completed
             # merely because all work was cancelled or superseded.
@@ -734,14 +745,8 @@ class DigitalTwinCoordinator:
             status = "needs_attention" if any(e["type"] == "stalled" for e in events) else "in_progress"
         elif counts["awaiting_validation"] or counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
             status = "needs_attention"
-        elif any(not t.get("verification", {}).get("accepted", False)
-                 for t in scoped if t.get("verification_recorded")):
+        elif rejected_verification_ids:
             status = "needs_attention"
-            events.append({"type": "verification_rejected",
-                           "task_ids": [t["task_id"] for t in scoped
-                                        if t.get("verification_recorded")
-                                        and not t.get("verification", {}).get("accepted", False)],
-                           "reason": "Completed worker output did not pass the required evidence gate."})
         else:
             status = "completed"
         events.append({"type": "goal_finished", "status": status, "counts": counts})
