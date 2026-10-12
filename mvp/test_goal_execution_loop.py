@@ -300,3 +300,43 @@ def test_high_quality_goal_runs_independent_review_and_rejects_revision(monkeypa
         httpd.shutdown()
         httpd.server_close()
         thread.join(timeout=2)
+
+
+def test_twin_recommends_replan_for_blocked_task_without_auto_retry(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000031", "worker-test-token-000000000032"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-blocked-triage.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+
+    class FailingExecutor:
+        def execute(self, task, goal):
+            raise RuntimeError("upstream source unavailable")
+
+    try:
+        base = f"http://127.0.0.1:{httpd.server_port}"
+        twin = DigitalTwinCoordinator(base, admin)
+        worker = DigitalEmployeeAgent(base, token, ["analysis"], FailingExecutor(), "recover goal")
+        result = twin.execute_goal(
+            "recover goal", [worker], max_cycles=3,
+            tasks=[{"title": "Analyze source", "capability": "analysis"}],
+        )
+        assert result["status"] == "needs_attention"
+        recommendations = [e for e in result["events"] if e["type"] == "replan_recommended"]
+        assert len(recommendations) == 1
+        assert recommendations[0]["task_status"] == "blocked"
+        assert "upstream source unavailable" in recommendations[0]["reason"]
+        assert recommendations[0]["automatic_retry"] is False
+        snapshot = registry.snapshot()
+        task = next(t for t in snapshot["tasks"] if t["id"] == recommendations[0]["task_id"])
+        assert task["status"] == "blocked"
+        assert task["attempts"] == 1
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
