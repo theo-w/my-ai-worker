@@ -24,7 +24,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </section>
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字分身：目标规划</h2><span class="pill">管理员操作</span></div><div class="detailgrid"><div class="sub"><label for="twinGoal"><strong>目标</strong></label><textarea id="twinGoal" rows="3" maxlength="4000" placeholder="例如：评估一款 AI 原生游戏的海外市场需求与技术可行性"></textarea><div class="muted">默认单员工优先；需要明确分工收益时再拆分。创建任务不代表已执行或验收。</div></div><div class="sub"><label for="twinStrategy"><strong>任务组织方式</strong></label><select id="twinStrategy"><option value="single_agent">单员工优先</option><option value="decompose">拆分任务</option></select><div style="margin-top:10px"><button class="primary" id="createTwinGoal">规划目标并创建任务</button></div><div id="twinGoalResult" class="muted" style="margin-top:10px">尚未提交目标。</div></div></div></section>
 
-<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">分身检查员工反馈 · 下一步决策</h2><span class="pill">当前为确定性状态审查</span></div><div class="detailgrid"><div class="sub"><div class="muted">基于当前项目任务状态判断继续监控、等待独立验收或需要重新规划。此按钮不会自动重试、取消或修改员工任务。</div><button id="reviewTwinProject" class="primary" disabled style="margin-top:10px">检查分身下一步决策</button></div><div class="sub"><h3>分身决策结果</h3><pre id="twinReviewResult" class="content">创建目标后，可以检查分身如何处理员工反馈。尚未执行审查。</pre></div></div></section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">分身检查员工反馈 · 下一步决策</h2><span class="pill">当前为确定性状态审查</span></div><div class="detailgrid"><div class="sub"><div class="muted">“检查决策”只读分析状态；“推进一步”最多执行一个受限动作：仅对识别出的临时基础设施故障重试一次，未知阻塞会升级人工诊断，不会自动验收或部署。</div><button id="reviewTwinProject" class="primary" disabled style="margin-top:10px">检查分身下一步决策</button> <button id="advanceTwinProject" disabled style="margin-top:10px">让分身推进一步</button></div><div class="sub"><h3>分身决策结果</h3><pre id="twinReviewResult" class="content">创建目标后，可以检查分身如何处理员工反馈。尚未执行审查。</pre></div></div></section>
 
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工在线与心跳</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
 
@@ -54,18 +54,31 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   const goal=$("twinGoal").value.trim();
   if(!token){setStatus("请先连接管理员 Token。","error");return;}
   if(!goal){$("twinGoalResult").textContent="请先输入目标。";return;}
-  const button=$("createTwinGoal");button.disabled=true;$("twinGoalResult").textContent="正在规划…";
+  const button=$("createTwinGoal");button.disabled=true;$("reviewTwinProject").disabled=true;$("advanceTwinProject").disabled=true;$("twinGoalResult").textContent="正在规划…";
   try{
    const response=await fetch("/api/twin/goal",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({goal:goal,strategy:$("twinStrategy").value})});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
-   currentProjectId=data.project_id||"";
+   currentProjectId=data.project_id||"";$("reviewTwinProject").disabled=!currentProjectId;$("advanceTwinProject").disabled=!currentProjectId;
    $("twinGoalResult").textContent="项目 "+(data.project_id||"")+"；规划模式："+(data.plan_mode||"unknown")+"；创建任务："+((data.tasks||[]).length)+" 个。";
    $("reviewTwinProject").disabled=!currentProjectId;
    $("twinReviewResult").textContent="目标已创建。点击‘检查分身下一步决策’后，分身会读取该项目员工的状态和反馈。";
    setStatus("数字分身已创建员工任务；请查看任务状态和后续反馈。","ok");
    await load();
   }catch(e){$("twinGoalResult").textContent="规划失败："+e.message;setStatus("数字分身未能创建任务："+e.message,"error");}
+  finally{button.disabled=false;}
+ }
+ async function advanceTwinProject(){
+  if(!token){setStatus("请先连接管理员 Token。","error");return;}
+  if(!currentProjectId){$("twinReviewResult").textContent="请先通过上方表单创建一个目标。";return;}
+  const button=$("advanceTwinProject");button.disabled=true;$("twinReviewResult").textContent="分身正在评估是否存在安全、有限的推进动作…";
+  try{
+   const response=await fetch("/api/twin/advance",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({project_id:currentProjectId})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+   $("twinReviewResult").textContent=JSON.stringify({project_id:data.project_id,decision:data.decision,reason:data.reason,action_task_id:data.action_task_id,llm_used:data.llm_used,next_actions:data.next_actions,safety_note:data.safety_note},null,2);
+   await load();
+  }catch(e){$("twinReviewResult").textContent="推进失败："+e.message;}
   finally{button.disabled=false;}
  }
  async function reviewTwinProject(){
@@ -167,7 +180,7 @@ function renderTasks(){
  }
  function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();renderImprovement();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
- $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("createTwinGoal").addEventListener("click",createTwinGoal);$("reviewTwinProject").addEventListener("click",reviewTwinProject);$("filter").addEventListener("change",renderTasks);
+ $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("createTwinGoal").addEventListener("click",createTwinGoal);$("reviewTwinProject").addEventListener("click",reviewTwinProject);$("advanceTwinProject").addEventListener("click",advanceTwinProject);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
  $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
  timer=setInterval(load,5000);
