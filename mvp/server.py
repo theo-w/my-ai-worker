@@ -442,7 +442,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -483,6 +483,106 @@ class Handler(BaseHTTPRequestHandler):
                         WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
                         WORKFORCE.save()
                     self._json({"ok": True, "worker": worker})
+                elif self.path == "/api/twin/advance":
+                    project_id = body.get("project_id")
+                    if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
+                        raise ValueError("project_id must be a non-empty string up to 80 characters")
+                    with WORKFORCE.lock:
+                        project_tasks = [
+                            dict(task) for task in WORKFORCE.tasks.values()
+                            if isinstance(task.get("success_criteria"), dict)
+                            and task["success_criteria"].get("project_id") == project_id
+                        ]
+                    if not project_tasks:
+                        self._json({"ok": False, "error": "No tasks found for project_id."}, 404)
+                        return
+                    # One bounded deterministic action per call. Only known transient
+                    # infrastructure failures are retried; unknown blockers stay blocked.
+                    transient_markers = (
+                        "temporarily unavailable", "timeout", "timed out",
+                        "connection reset", "rate limit", "too many requests",
+                        "http 502", "http 503", "http 504", "status 502",
+                        "status 503", "status 504",
+                    )
+                    retry_candidate = next((
+                        task for task in project_tasks
+                        if task.get("status") in ("blocked", "failed")
+                        and task.get("attempts", 0) < task.get("max_attempts", 0)
+                        and any(marker in str(task.get("blocker", "")).lower()
+                                for marker in transient_markers)
+                    ), None)
+                    if retry_candidate:
+                        task_id = retry_candidate["id"]
+                        action_reason = (
+                            "Digital Twin bounded advance: retrying a recognized transient "
+                            "infrastructure blocker within the task's configured attempt limit. "
+                            "Original blocker: " + str(retry_candidate.get("blocker", ""))[:500]
+                        )
+                        retried = WORKFORCE.retry_task(task_id, action_reason)
+                        decision = "transient_retry_queued"
+                        next_actions = [{"task_id": task_id, "status": retried["status"],
+                                         "attempts": retried["attempts"]}]
+                    else:
+                        task_id = None
+                        retried = None
+                        needs_human = [
+                            {"task_id": task["id"], "status": task.get("status"),
+                             "blocker": task.get("blocker", ""),
+                             "attempts": task.get("attempts", 0)}
+                            for task in project_tasks
+                            if task.get("status") in ("blocked", "failed")
+                        ]
+                        awaiting = [task for task in project_tasks
+                                    if task.get("status") == "awaiting_validation"]
+                        active = [task for task in project_tasks
+                                  if task.get("status") in ("queued", "assigned", "approval_required")]
+                        if needs_human:
+                            decision = "human_review_required"
+                            next_actions = needs_human
+                        elif awaiting:
+                            decision = "awaiting_independent_validation"
+                            next_actions = [{"task_id": task["id"], "status": task["status"]}
+                                            for task in awaiting]
+                        elif active:
+                            decision = "continue_monitoring"
+                            next_actions = [{"task_id": task["id"], "status": task["status"]}
+                                            for task in active]
+                        elif all(task.get("status") == "completed" for task in project_tasks):
+                            decision = "goal_completed"
+                            next_actions = []
+                        else:
+                            decision = "needs_twin_review"
+                            next_actions = [{"task_id": task["id"], "status": task.get("status")}
+                                            for task in project_tasks]
+                    reason = (
+                        "A single bounded retry was queued for a recognized transient blocker."
+                        if decision == "transient_retry_queued" else
+                        "No safe automatic action was identified. Unknown blockers require diagnosis; "
+                        "candidate results still require independent validation."
+                    )
+                    with WORKFORCE.lock:
+                        WORKFORCE._event(
+                            "twin_advanced",
+                            project_id=project_id,
+                            decision=decision,
+                            reason=reason,
+                            task_ids=[task["id"] for task in project_tasks],
+                            next_actions=next_actions,
+                            action_task_id=task_id,
+                            llm_used=False,
+                        )
+                        WORKFORCE.save()
+                    self._json({
+                        "ok": True, "project_id": project_id, "decision": decision,
+                        "reason": reason, "task_count": len(project_tasks),
+                        "next_actions": next_actions, "action_task_id": task_id,
+                        "llm_used": False,
+                        "safety_note": (
+                            "One deterministic action maximum per call; only recognized transient "
+                            "blockers are retried within configured limits. No result is auto-accepted, "
+                            "and unknown blockers are not retried."
+                        ),
+                    })
                 elif self.path == "/api/twin/review":
                     project_id = body.get("project_id")
                     if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
