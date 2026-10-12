@@ -16,6 +16,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  <div class="auth"><input id="token" type="password" autocomplete="off" placeholder="管理员 Token（仅保存在当前页面内存）"><button class="primary" id="connect">连接并查看</button><button id="refresh" disabled>立即刷新</button><label style="display:flex;align-items:center;gap:6px"><input id="auto" type="checkbox" checked style="min-width:auto"> 每 5 秒刷新</label></div>
  <div id="status" class="notice">尚未连接。请使用运行中 JARVIS 服务配置的管理员 Token。</div>
 </section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">运行环境与真实性标记</h2><span id="runtimeMode" class="pill">尚未读取</span></div><div id="runtimeInfo" class="muted">连接后读取当前执行器配置。模拟执行、真实模型调用和外部搜索会明确区分。</div></section>
 <section class="metrics" id="metrics">
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
@@ -25,13 +26,14 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务与员工状态</h2><select id="filter"><option value="all">全部任务</option><option value="active">进行中 / 排队</option><option value="blocked">阻塞 / 失败</option><option value="completed">已完成</option></select></div><div id="tasks" class="empty">连接后显示实时任务。</div></section>
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务过程详情</h2><span id="selectedStatus" class="pill">未选择</span></div><div id="detail" class="empty">选择左侧任务，查看输入、输出、阻塞原因和完整任务历史。</div></section>
 </div>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工心跳与运行状态</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态。</div></div></section>
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">全局事件时间线</h2><span id="eventCount" class="muted">0 条事件</span></div><div id="events" class="events empty">连接后显示事件。</div></section>
 <div class="notice">安全说明：管理员 Token 不写入 localStorage 或 URL；数据通过带 Authorization 的只读接口获取。请只在可信环境使用管理员凭证。模型输出、员工反馈和已验证结论应分别判断，不要仅凭状态为 completed 就认定事实正确。</div>
 </main>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- let token="",snapshot=null,selectedId=null,timer=null,busy=false;
+ let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null;
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
  const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
@@ -45,9 +47,33 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
    const r=await fetch("/api/workforce",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
-   snapshot=data;render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
+   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
   }catch(e){setStatus("读取失败："+e.message+"。请检查 Token、服务状态和权限。","error");}
   finally{busy=false;$("refresh").disabled=false;}
+ }
+ function renderRuntime(){
+  const mode=runtime&&runtime.mode||"unknown";
+  const names={simulated:"模拟执行",hybrid:"混合执行",llm:"模型执行",unknown:"执行环境未知"};
+  $("runtimeMode").textContent=names[mode]||mode;
+  $("runtimeMode").className="pill "+(mode==="simulated"?"warn":mode==="unknown"?"bad":"good");
+  $("runtimeInfo").textContent=runtime?
+   "执行模式："+(names[mode]||mode)+"；搜索已配置："+(runtime.search_configured?"是":"否")+"；模型已配置："+(runtime.llm_configured?"是":"否")+"。配置状态不等于每个任务都真实调用了模型或搜索，需结合任务输出来源标记判断。":
+   "暂时无法读取执行环境配置。不要据此推断任务是真实执行还是模拟执行。";
+ }
+ function renderWorkers(){
+  const workers=Array.isArray(snapshot.workers)?snapshot.workers:[];
+  $("workerCount").textContent=workers.length+" 名员工";
+  if(!workers.length){$("workers").innerHTML='<div class="empty">尚无员工心跳记录。没有心跳记录不代表员工正在运行。</div>';return;}
+  $("workers").innerHTML=workers.map(w=>{
+   const id=w.worker_id||"unknown",status=w.status||"unknown",online=w.last_heartbeat_at?((Date.now()-Date.parse(w.last_heartbeat_at))<=30000):false;
+   const current=rows().find(t=>(t.id||t.task_id)===w.current_task_id);
+   return '<div class="sub"><div class="line"><strong>'+esc(id)+'</strong><span class="pill '+(online?"good":"bad")+'">'+(online?"心跳新鲜":"心跳过期 / 缺失")+'</span></div><div class="muted">状态：'+esc(label(status))+' · 最近心跳：'+esc(w.last_heartbeat_at||"无记录")+'</div><div style="margin-top:7px">当前任务：'+esc(current?(current.title||current.id):(w.current_task_id||"无"))+'</div><div class="muted">进度：'+esc(w.progress||"无进度反馈")+'</div>'+(w.last_error?'<div class="error">最近错误：'+esc(w.last_error)+'</div>':'')+'<div class="muted">能力：'+esc((w.capabilities||[]).join(", ")||"未声明")+'</div></div>';
+  }).join("");
+ }
+ function outputEnvelope(value){
+  if(typeof value!=="string")return {content:value,provenance:"unknown"};
+  try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object"&&("content" in parsed||"simulated" in parsed))return {content:parsed.content??parsed,provenance:parsed.simulated===true?"simulated":parsed.simulated===false?"executor_reported_live":"unknown"};}catch(e){}
+  return {content:value,provenance:"unknown"};
  }
  function renderMetrics(){
   const tasks=rows(), workers=Array.isArray(snapshot.workers)?snapshot.workers:[];
@@ -95,9 +121,9 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   const t=rows().find(x=>(x.id||x.task_id)===selectedId);
   if(!t){$("selectedStatus").textContent="未选择";$("detail").innerHTML='<div class="empty">选择左侧任务，查看详细过程。</div>';return;}
   $("selectedStatus").className="pill "+tone(t.status);$("selectedStatus").textContent=label(t.status);
-  const hist=historyOf(t);
+  const hist=historyOf(t); const envelope=outputEnvelope(t.output??t.result);
   const timeline=hist.length?'<ul class="timeline">'+hist.slice().reverse().map(h=>'<li><div class="when">'+esc(h.at||h.timestamp||"时间未知")+'</div><div class="what">'+esc(label(h.event||h.type||"event"))+'</div><div>'+esc(h.reason||h.blocker||h.message||h.status||"")+'</div><pre class="content">'+esc(pretty(h))+'</pre></li>').join("")+'</ul>':'<div class="empty">该任务暂无历史事件。</div>';
-  $("detail").innerHTML='<div class="detailgrid"><div class="sub"><h3>任务输入 / 目标</h3><pre class="content">'+esc(pretty({title:t.title,description:t.description,capability:t.capability,input:t.input,success_criteria:t.success_criteria}))+'</pre></div><div class="sub"><h3>执行信息</h3><pre class="content">'+esc(pretty({status:t.status,assigned_to:t.assigned_to,attempts:t.attempts,max_attempts:t.max_attempts,lease_until:t.lease_until,updated_at:t.updated_at}))+'</pre></div><div class="sub"><h3>员工输出</h3><pre class="content">'+esc(pretty(t.output??t.result))+'</pre></div><div class="sub"><h3>阻塞 / 反馈 / 验证</h3><pre class="content">'+esc(pretty({blocker:t.blocker,feedback:t.feedback,verification:t.verification,verified_truth:t.verified_truth}))+'</pre></div></div><div style="margin-top:15px"><h2>任务历史</h2>'+timeline+'</div>';
+  $("detail").innerHTML='<div class="detailgrid"><div class="sub"><h3>任务输入 / 目标</h3><pre class="content">'+esc(pretty({title:t.title,description:t.description,capability:t.capability,input:t.input,success_criteria:t.success_criteria}))+'</pre></div><div class="sub"><h3>执行信息</h3><pre class="content">'+esc(pretty({status:t.status,assigned_to:t.assigned_to,attempts:t.attempts,max_attempts:t.max_attempts,lease_until:t.lease_until,updated_at:t.updated_at}))+'</pre></div><div class="sub"><h3>员工输出 · 来源：'+esc(envelope.provenance==="simulated"?"模拟":envelope.provenance==="executor_reported_live"?"执行器报告为真实":"未知/未标记")+'</h3><pre class="content">'+esc(pretty(envelope.content))+'</pre></div><div class="sub"><h3>阻塞 / 反馈 / 验证</h3><pre class="content">'+esc(pretty({blocker:t.blocker,feedback:t.feedback,verification:t.verification,verified_truth:t.verified_truth}))+'</pre></div></div><div style="margin-top:15px"><h2>任务历史</h2>'+timeline+'</div>';
  }
  function renderEvents(){
   const ev=eventRows().slice().reverse();
