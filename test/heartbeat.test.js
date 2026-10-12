@@ -113,6 +113,11 @@ test('worker cannot mutate a result after it enters independent validation', asy
     method: 'POST', headers: worker, body: '{}'
   })).status, 200);
 
+  const adminHeartbeatWhileRunning = await fetch(base + '/tasks/' + id + '/heartbeat', {
+    method: 'POST', headers: admin, body: JSON.stringify({})
+  });
+  assert.equal(adminHeartbeatWhileRunning.status, 403);
+
   const firstResult = { verdict: 'original' };
   const submitted = await fetch(base + '/tasks/' + id + '/events', {
     method: 'POST', headers: worker,
