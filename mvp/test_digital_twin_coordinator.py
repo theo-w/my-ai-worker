@@ -77,11 +77,11 @@ def test_twin_plans_goal_and_inspects_real_worker_progress(twin_system):
         }),
     })
     assert status == 200
-    assert result["task"]["status"] == "completed"
+    assert result["task"]["status"] == "awaiting_validation"
 
     snapshot = twin.inspect()
     completed = next(item for item in snapshot["tasks"] if item["task_id"] == first["id"])
-    assert completed["status"] == "completed"
+    assert completed["status"] == "awaiting_validation"
     assert completed["provenance"] == "simulated"
     assert snapshot["counts"]["queued"] == 3
 
