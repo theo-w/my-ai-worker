@@ -726,6 +726,8 @@ def test_dashboard_run_route_starts_background_execution(workforce_http, monkeyp
 
     def fake_execute(goal):
         seen.append(goal)
+        with server.LOCK:
+            server.STATE["phase"] = "decision"
         started.set()
 
     monkeypatch.setattr(server, "execute", fake_execute)
