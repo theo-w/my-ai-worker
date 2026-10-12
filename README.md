@@ -16,7 +16,7 @@ The first domain pack is AI-native game feasibility and game-operations analysis
 - Node.js HTTP runtime: `src/server.js`, with task APIs, worker feedback, approval gates, retries, and health endpoint.
 - Bearer-token authentication and role-based access control are now implemented. Configure separate `JARVIS_ADMIN_TOKEN` and `JARVIS_WORKER_TOKEN` secrets. The worker identity is configured with `JARVIS_WORKER_ID`.
 - `GET /health` is public for deployment probes. All task routes require `Authorization: Bearer <token>`.
-- Admin can create tasks, inspect tasks, retry tasks, and approve/reject approval-gated results. Worker credentials can inspect available/assigned tasks, accept work only as their configured identity, and post events only for tasks assigned to that identity.
+- Admin can create tasks, inspect tasks, validate worker results, retry tasks, and approve/reject approval-gated results. Worker credentials can inspect available/assigned tasks, accept work only as their configured identity, and post events only for tasks assigned to that identity.
 - CI tests cover missing/invalid credentials, role boundaries, approval gating, and task lifecycle. Verify the latest GitHub Actions run before considering this revision fully tested.
 - **Security limitations:** this MVP uses long-lived bearer secrets, not individual user accounts, SSO, or short-lived sessions. Store secrets in the hosting provider's secret manager; never commit tokens. Use HTTPS in production. Worker tokens are shared within the configured worker identity and should later become per-worker credentials. Rate limiting, rotation workflow, and a production database remain future work.
 - **Not yet complete:** autonomous scheduling, LLM-powered worker execution, automatic stale-worker/acknowledgement-timeout reassignment, multi-worker dependency orchestration, and verified deployment. Authentication does not by itself make public deployment production-ready.
@@ -45,6 +45,7 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 - `POST /tasks/:id/heartbeat` — assigned worker refreshes its heartbeat; heartbeat events are persisted in task history
 - `GET /monitoring/workers` — admin-only worker/task heartbeat view, including stale-heartbeat flags (default timeout 60 seconds; set `JARVIS_HEARTBEAT_TIMEOUT_MS` to override, minimum 5 seconds)
 - `POST /tasks/:id/events` — assigned worker reports `progress`, `result`, `blocked`, or `failed`
+- `POST /tasks/:id/validate` — admin records a validation decision and evidence; successful results cannot skip this gate
 - `POST /tasks/:id/approve` — admin approves/rejects a gated result
 - `POST /tasks/:id/retry` — admin requeues eligible tasks within the attempt limit
 
@@ -61,4 +62,4 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 
 ## MVP success criteria
 
-A task can be created, accepted by an authenticated worker, updated with progress, completed with evidence, or marked blocked/failed; approval-gated results cannot be approved by a worker token; events persist on persistent storage; retries are bounded; and CI plus deployed health checks pass.
+A task can be created, accepted by an authenticated worker, updated with progress, submit a result that waits for admin validation with evidence, or be marked blocked/failed; approval-gated results cannot be approved by a worker token; events persist on persistent storage; retries are bounded; and CI plus deployed health checks pass.
