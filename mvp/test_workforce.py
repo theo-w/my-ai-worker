@@ -203,3 +203,23 @@ def test_verification_record_is_persisted_without_claiming_truth(tmp_path):
     assert restored.snapshot()["tasks"][0]["verification"]["accepted"] is True
     assert restored.snapshot()["tasks"][0]["verified_truth"] is False
 
+
+def test_rejected_validation_blocks_task_and_cannot_be_repeated(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "rejected-validation.json"))
+    task = registry.create_task("Check a claim", capability="research")
+    claimed = registry.claim("worker-a", ["research"])
+    submitted = registry.report(
+        task["id"], "worker-a", "completed", output="Unsupported claim",
+        lease_token=claimed["lease_token"],
+    )
+    assert submitted["status"] == "awaiting_validation"
+
+    rejected = registry.record_verification(task["id"], {
+        "accepted": False,
+        "notes": "No supporting source was supplied",
+        "checks": [{"name": "source_present", "passed": False}],
+    })
+    assert rejected["status"] == "blocked"
+    assert rejected["blocker"] == "No supporting source was supplied"
+    with pytest.raises(ValueError, match="awaiting_validation"):
+        registry.record_verification(task["id"], {"accepted": True})
