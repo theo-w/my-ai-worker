@@ -155,11 +155,12 @@ class WorkforceRegistry:
                 task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
                 task["status"] = "assigned"
             elif status == "blocked":
+                # A blocked result is a planning decision, not an implicit retry.
+                # The twin must inspect feedback and explicitly decide what happens next.
                 task["_lease_token"] = None
-                task["status"] = "queued" if task["attempts"] < task["max_attempts"] else "blocked"
+                task["status"] = "blocked"
                 task["lease_until"] = None
-                if task["status"] == "queued":
-                    task["assigned_to"] = None
+                task["assigned_to"] = None
             else:
                 task["status"] = status
                 task["lease_until"] = None
