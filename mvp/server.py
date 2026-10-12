@@ -291,8 +291,10 @@ def authenticate_dashboard(headers) -> dict:
 
 
 def authenticate_workforce(headers, required_role: str) -> dict:
-    admin_token = os.getenv("JARVIS_ADMIN_TOKEN", "")
+    admin_token = os.getenv("JARVIS_ADMIN_TOKEN", "").strip()
     worker_tokens = _worker_tokens()
+    if admin_token and len(admin_token) < 24:
+        raise WorkforceAuthError(503, "JARVIS_ADMIN_TOKEN must be at least 24 characters.")
     if not admin_token and not worker_tokens:
         raise WorkforceAuthError(503, "Workforce API locked: configure admin/worker tokens.")
     scheme, _, candidate = headers.get("Authorization", "").partition(" ")
