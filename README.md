@@ -51,3 +51,4 @@ python -m mvp.demo_workflow
 - [目标驱动架构](docs/GOAL_DRIVEN_ARCHITECTURE.md)
 - [安全与认证](docs/SECURITY_AND_AUTH.md)
 - [手动验收清单](docs/MANUAL_ACCEPTANCE.md)：按步骤查看任务创建、员工领取/反馈、结果验证和阻塞处理。
+- [递归自我改进](docs/RECURSIVE_SELF_IMPROVEMENT.md)：执行复盘、基准评估、回归拦截与人工晋级边界。
