@@ -125,32 +125,50 @@ class EmotionRadar:
         self.llm = llm_client
 
     def scan(self, game_title: str) -> EmotionalRadarReport:
-        """对指定游戏执行完整的情感雷达扫描。"""
+        """
+        对指定游戏执行完整的情感雷达扫描。
+
+        Step 1: 多维度搜索
+        Step 2: 聚类情感
+        Step 3: 诊断心理机制
+        Step 4: 找交汇点
+        """
         logger.info("🎯 开始情感雷达扫描: %s", game_title)
+
         report = EmotionalRadarReport(game_title=game_title)
 
+        # Step 1: 搜索玩家声音
         raw_voices = self._collect_voices(game_title)
         logger.info("  📥 收集到 %d 条玩家声音", len(raw_voices))
 
+        # Step 2: 聚类情感峰值和低谷
         report.peaks = self._cluster_peaks(raw_voices)
         report.valleys = self._cluster_valleys(raw_voices)
         logger.info("  🔺 情感峰值: %d, 情感低谷: %d", len(report.peaks), len(report.valleys))
 
+        # Step 3: 惊喜时刻
         report.wow_moments = self._cluster_wow(raw_voices)
         logger.info("  ⚡ 惊喜时刻: %d", len(report.wow_moments))
 
+        # Step 4: 留存循环
         report.retention_loops = self._diagnose_retention(game_title, raw_voices)
         logger.info("  🔄 留存循环: %d", len(report.retention_loops))
 
+        # Step 5: 找交汇点（最关键）
         report.crossroads = self._find_crossroads(report)
         logger.info("  🔀 玩法×叙事交汇点: %d", len(report.crossroads))
 
+        # Step 6: 总结
         report.summary = self._summarize(report)
+
         return report
+
+    # ── Step 1: 收集玩家声音 ──
 
     def _collect_voices(self, game_title: str) -> list[dict]:
         """从多个平台搜索玩家的情感表达。"""
         voices = []
+
         if self.research is None:
             logger.warning("  ⚠️ 无 research_provider，返回空数据")
             return voices
@@ -169,30 +187,40 @@ class EmotionRadar:
                     })
             except Exception as e:
                 logger.error("  搜索失败 [%s]: %s", label, e)
+
         return voices
 
+    # ── Step 2: 聚类 ──
+
     def _cluster_peaks(self, voices: list[dict]) -> list[EmotionalMoment]:
+        """从玩家声音中聚类出情感峰值（哭了/震撼了）。"""
         peak_voices = [v for v in voices if "peaks" in v["query_type"]]
         if self.llm is None or not peak_voices:
             return self._fallback_peaks()
+
         prompt = self._build_cluster_prompt(peak_voices, "情感峰值（玩家感动/哭了/震撼）")
         return self._llm_cluster(prompt, EmotionalMoment)
 
     def _cluster_valleys(self, voices: list[dict]) -> list[EmotionalMoment]:
+        """从玩家声音中聚类出情感低谷（空虚/愤怒/失望）。"""
         valley_voices = [v for v in voices if "valleys" in v["query_type"]]
         if self.llm is None or not valley_voices:
             return self._fallback_valleys()
+
         prompt = self._build_cluster_prompt(valley_voices, "情感低谷（玩家空虚/愤怒/孤独/失望）")
         return self._llm_cluster(prompt, EmotionalMoment)
 
     def _cluster_wow(self, voices: list[dict]) -> list[WowMoment]:
+        """从玩家声音中聚类出'卧槽'时刻。"""
         wow_voices = [v for v in voices if "wow" in v["query_type"]]
         if self.llm is None or not wow_voices:
             return self._fallback_wow()
+
         prompt = self._build_cluster_prompt(wow_voices, "惊喜时刻（玩家没想到/卧槽/脑洞）")
         return self._llm_cluster(prompt, WowMoment)
 
     def _diagnose_retention(self, game: str, voices: list[dict]) -> list[RetentionLoop]:
+        """诊断让玩家停不下来的底层心理机制。"""
         retention_voices = [v for v in voices if "retention" in v["query_type"]]
         if self.llm is None or not retention_voices:
             return self._fallback_retention()
@@ -218,9 +246,14 @@ class EmotionRadar:
         return self._llm_call(prompt, RetentionLoop)
 
     def _find_crossroads(self, report: EmotionalRadarReport) -> list[EmotionalMoment]:
-        """找出玩法线×叙事线交汇的那个点。"""
+        """
+        找出玩法线×叙事线交汇的那个点。
+        这是最关键的——玩家记住的不是单独的玩法或剧情，
+        而是两者同时击中的瞬间。
+        """
         crossroads = []
         for peak in report.peaks:
+            # 一个峰值如果同时有玩法探索和叙事揭示，就是交汇点
             if any(kw in peak.moment for kw in ["原来", "居然", "一直", "其实", "真相", "发现"]):
                 peak.is_crossroad = True
                 crossroads.append(peak)
@@ -236,6 +269,8 @@ class EmotionRadar:
         if report.crossroads:
             parts.append(f"最关键的交汇点是：{report.crossroads[0].moment}")
         return "；".join(parts)
+
+    # ── LLM 调用 ──
 
     def _build_cluster_prompt(self, voices: list[dict], dimension: str) -> str:
         texts = [v["text"][:300] for v in voices[:15]]
