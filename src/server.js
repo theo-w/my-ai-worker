@@ -7,7 +7,7 @@ const { randomUUID, timingSafeEqual } = require('node:crypto');
 
 const TASK_STATES = new Set([
   'queued', 'accepted', 'running', 'blocked', 'failed',
-  'awaiting_approval', 'succeeded', 'cancelled'
+  'awaiting_validation', 'awaiting_approval', 'succeeded', 'cancelled'
 ]);
 const TERMINAL_STATES = new Set(['succeeded', 'cancelled']);
 const EVENT_TYPES = new Set(['progress', 'result', 'blocked', 'failed']);
@@ -192,13 +192,32 @@ function createRuntimeStore(filePath) {
         if (input.result === undefined || input.result === null) throw httpError(400, 'result event requires a result payload');
         event.result = input.result;
         task.result = input.result;
-        task.status = task.approval_required ? 'awaiting_approval' : 'succeeded';
+        task.status = 'awaiting_validation';
       } else {
         task.status = 'running';
       }
       task.updated_at = now;
       data.events.push(event);
       return { task, event };
+    }),
+    validateTask: (id, input, actor) => mutate((data) => {
+      const task = data.tasks[id];
+      if (!task) throw httpError(404, 'Task not found');
+      if (task.status !== 'awaiting_validation') throw httpError(409, 'Task is not awaiting validation');
+      if (typeof input.validated !== 'boolean') throw httpError(400, 'validated must be a boolean');
+      const summary = validateText(input.summary, 'summary', 3000);
+      const evidence = Array.isArray(input.evidence) ? input.evidence.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()).slice(0, 50) : [];
+      if (input.validated && evidence.length === 0) throw httpError(400, 'A successful validation requires at least one evidence reference');
+      const now = new Date().toISOString();
+      task.validation = { validated: input.validated, summary, evidence, validated_by: actor.id, validated_at: now };
+      task.status = input.validated ? (task.approval_required ? 'awaiting_approval' : 'succeeded') : 'blocked';
+      task.blocker = input.validated ? null : summary;
+      task.updated_at = now;
+      data.events.push({
+        event_id: randomUUID(), task_id: id, actor_id: actor.id, event_type: 'validation',
+        validated: input.validated, summary, evidence, timestamp: now
+      });
+      return task;
     }),
     approveTask: (id, input, actor) => mutate((data) => {
       const task = data.tasks[id];
@@ -274,7 +293,7 @@ function createServer(options = {}) {
         return json(res, 201, { task });
       }
 
-      const taskRoute = pathname.match(/^\/tasks\/([^/]+)(?:\/(accept|heartbeat|events|approve|retry))?$/);
+      const taskRoute = pathname.match(/^\/tasks\/([^/]+)(?:\/(accept|heartbeat|events|validate|approve|retry))?$/);
       if (taskRoute) {
         const id = decodeURIComponent(taskRoute[1]);
         const action = taskRoute[2] || '';
@@ -296,6 +315,11 @@ function createServer(options = {}) {
           const body = await readJson(req);
           const result = await store.addEvent(id, body, actor);
           return json(res, 201, result);
+        }
+        if (req.method === 'POST' && action === 'validate') {
+          if (actor.role !== 'admin') throw httpError(403, 'Admin role required');
+          const body = await readJson(req);
+          return json(res, 200, { task: await store.validateTask(id, body, actor) });
         }
         if (req.method === 'POST' && action === 'approve') {
           if (actor.role !== 'admin') throw httpError(403, 'Admin role required');
