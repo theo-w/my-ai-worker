@@ -714,3 +714,27 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
         assert "研究任务要求真实搜索 provider" in page
         assert "任务状态、权限、心跳、租约、重试次数、验收门槛" in page
         assert "不自动改代码或上线" in page
+
+
+
+def test_dashboard_run_route_starts_background_execution(workforce_http, monkeypatch):
+    import threading
+
+    base, _ = workforce_http
+    started = threading.Event()
+    seen = []
+
+    def fake_execute(goal):
+        seen.append(goal)
+        started.set()
+
+    monkeypatch.setattr(server, "execute", fake_execute)
+    status, response = request_json(base, "/api/run", ADMIN, {"goal": "Test goal"})
+    assert status == 202
+    assert response["accepted"] is True
+    assert started.wait(2)
+    assert seen == ["Test goal"]
+
+    status, invalid = request_json(base, "/api/run", ADMIN, {"goal": " "})
+    assert status == 400
+    assert invalid["ok"] is False
