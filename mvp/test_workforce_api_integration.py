@@ -709,8 +709,8 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
     with urlopen(base + "/logic", timeout=3) as response:
         page = response.read().decode("utf-8")
         assert response.status == 200
-        assert "整体逻辑流程与 LLM 生效时机" in page
-        assert "当前有两条并存的执行路径" in page
+        assert "整体逻辑流程与规则 / LLM 生效时机" in page
+        assert "当前有三条并存的执行路径" in page
         assert "研究任务要求真实搜索 provider" in page
         assert "任务状态、权限、心跳、租约、重试次数、验收门槛" in page
         assert "不自动改代码或上线" in page
