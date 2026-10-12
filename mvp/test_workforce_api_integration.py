@@ -754,3 +754,55 @@ def test_dashboard_run_route_starts_background_execution(workforce_http, monkeyp
     status, invalid = request_json(base, "/api/run", ADMIN, {"goal": " "})
     assert status == 400
     assert invalid["ok"] is False
+
+
+
+def test_twin_goal_defaults_to_single_employee_task(workforce_http):
+    base, _ = workforce_http
+    status, denied = request_json(base, "/api/twin/goal", payload={"goal": "Research AI-native game demand"})
+    assert status == 401
+    assert denied["ok"] is False
+
+    status, response = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+    })
+    assert status == 201
+    assert response["strategy"] == "single_agent"
+    assert response["plan_mode"] == "single_agent_first"
+    assert len(response["tasks"]) == 1
+    task = response["tasks"][0]
+    assert task["capability"] == "research"
+    assert task["status"] == "queued"
+    assert task["evidence_required"] is True
+    assert response["project_id"] in task["success_criteria"]["project_id"]
+    assert response["next_step"].startswith("员工领取任务")
+
+
+def test_twin_can_explicitly_decompose_goal_into_temporary_tasks(workforce_http, monkeypatch):
+    base, _ = workforce_http
+    def fake_plan(goal, llm_client=None):
+        assert goal == "Evaluate an AI-native game"
+        return {
+            "mode": "deterministic_fallback",
+            "warnings": ["LLM planner unavailable; deterministic plan used."],
+            "tasks": [
+                {"id": "research", "title": "Collect source-backed market evidence", "capability": "research"},
+                {"id": "analysis", "title": "Analyze feasibility and risks", "capability": "analysis"},
+            ],
+        }
+    monkeypatch.setattr(server, "plan_project", fake_plan)
+
+    status, response = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Evaluate an AI-native game",
+        "strategy": "decompose",
+    })
+    assert status == 201
+    assert response["strategy"] == "decompose"
+    assert len(response["tasks"]) == 2
+    assert {task["capability"] for task in response["tasks"]} == {"research", "analysis"}
+    assert all(task["success_criteria"]["project_id"] == response["project_id"]
+               for task in response["tasks"])
+    snapshot_status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert snapshot_status == 200
+    assert any(event["type"] == "twin_goal_planned" and event["project_id"] == response["project_id"]
+               for event in snapshot["events"])
