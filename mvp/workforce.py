@@ -257,12 +257,33 @@ class WorkforceRegistry:
         if "accepted" not in verification or not isinstance(verification.get("accepted"), bool):
             raise ValueError("verification.accepted must be a boolean")
         safe = dict(verification)
+        # Enforce the task's evidence policy at the persistence boundary; a caller
+        # cannot mark evidence-required work accepted by sending a bare boolean.
+        checks = safe.get("checks", [])
+        if not isinstance(checks, list):
+            checks = []
+            safe["checks"] = checks
+        # The task-specific evidence policy is checked below under the registry lock.
         # Structural acceptance is not proof that the output is factually true.
         safe["verified_truth"] = False
         with self.lock:
             task = self._get(task_id)
             if task["status"] != "awaiting_validation":
                 raise ValueError("task must be awaiting_validation before verification")
+            if safe.get("accepted") is True and task.get("evidence_required"):
+                evidence_count = safe.get("evidence_count", 0)
+                source_check = next((item for item in checks
+                                     if isinstance(item, dict) and item.get("name") == "source_structure"), None)
+                if (not isinstance(evidence_count, int) or isinstance(evidence_count, bool)
+                        or evidence_count < 1 or not isinstance(source_check, dict)
+                        or source_check.get("passed") is not True):
+                    safe["accepted"] = False
+                    safe["status"] = "rejected"
+                    checks.append({"name": "required_evidence_for_task", "passed": False})
+                    safe["verification_note"] = (
+                        "This task requires at least one structurally valid source record; "
+                        "a structural checklist alone is insufficient."
+                    )
             task["verification"] = safe
             task["verified_truth"] = False
             task["status"] = "completed" if safe["accepted"] else "blocked"
