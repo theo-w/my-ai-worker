@@ -387,3 +387,42 @@ def test_twin_can_explicitly_retry_after_revision_policy_reviews_blocker(monkeyp
         httpd.server_close()
         thread.join(timeout=2)
 
+def test_twin_persists_verification_into_traceable_workforce_history(monkeypatch, tmp_path):
+    admin, token = "admin-test-token-000000000051", "worker-test-token-000000000052"
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", admin)
+    monkeypatch.setenv("JARVIS_WORKER_TOKENS", json.dumps({"analyst": token}))
+    monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", json.dumps({"analyst": ["analysis"]}))
+    registry = WorkforceRegistry(path=str(tmp_path / "workforce-verification-trace.json"))
+    monkeypatch.setattr(server, "WORKFORCE", registry)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        twin = DigitalTwinCoordinator(f"http://127.0.0.1:{httpd.server_port}", admin)
+        worker = DigitalEmployeeAgent(
+            f"http://127.0.0.1:{httpd.server_port}", token, ["analysis"],
+            FakeExecutor(), "trace verification goal",
+        )
+        result = twin.execute_goal(
+            "trace verification goal", [worker], max_cycles=3,
+            tasks=[{"title": "Trace a checked result", "capability": "analysis"}],
+        )
+        task_id = result["tasks"][0]["task_id"]
+        snapshot = registry.snapshot()
+        task = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+        assert "verification" in task
+        assert task["verification"]["accepted"] is True
+        assert task["verified_truth"] is False
+        assert any(
+            event["type"] == "verification_recorded" and event["task_id"] == task_id
+            for event in snapshot["events"]
+        )
+        assert any(
+            item.get("event") == "verification_recorded"
+            for item in task["history"]
+        )
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+
