@@ -18,7 +18,7 @@ The first domain pack is AI-native game feasibility and game-operations analysis
 - Admin can create tasks, inspect tasks, retry tasks, and approve/reject approval-gated results. Worker credentials can inspect available/assigned tasks, accept work only as their configured identity, and post events only for tasks assigned to that identity.
 - CI tests cover missing/invalid credentials, role boundaries, approval gating, and task lifecycle. Verify the latest GitHub Actions run before considering this revision fully tested.
 - **Security limitations:** this MVP uses long-lived bearer secrets, not individual user accounts, SSO, or short-lived sessions. Store secrets in the hosting provider's secret manager; never commit tokens. Use HTTPS in production. Worker tokens are shared within the configured worker identity and should later become per-worker credentials. Rate limiting, rotation workflow, and a production database remain future work.
-- **Not yet complete:** autonomous scheduling, LLM-powered worker execution, acknowledgement-timeout reassignment, multi-worker dependency orchestration, and verified deployment. Authentication does not by itself make public deployment production-ready.
+- **Not yet complete:** autonomous scheduling, LLM-powered worker execution, automatic stale-worker/acknowledgement-timeout reassignment, multi-worker dependency orchestration, and verified deployment. Authentication does not by itself make public deployment production-ready.
 
 ## Configure and run locally
 
