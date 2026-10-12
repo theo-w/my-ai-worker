@@ -26,7 +26,7 @@ def test_improvement_is_eligible_for_review_only_after_gate_passes():
     )
     assert result["accepted"] is True
     assert result["decision"] == "eligible_for_review"
-    assert result["gain"] == 0.08
+    assert abs(result["gain"] - 0.08) < 1e-9
     assert result["auto_applied"] is False
     assert result["requires_human_promotion"] is True
 
