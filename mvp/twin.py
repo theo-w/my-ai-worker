@@ -630,6 +630,7 @@ class DigitalTwinCoordinator:
                             retried = self.retry_task(task_id, reason)
                             events.append({
                                 "type": "task_retry_approved",
+                                "cycle": cycle,
                                 "task_id": task_id,
                                 "reason": reason,
                                 "attempts": retried.get("task", {}).get("attempts"),
@@ -657,7 +658,13 @@ class DigitalTwinCoordinator:
                      if t["task_id"] in ids}
             if after and all(s in ("completed", "blocked", "failed") for s in after.values()):
                 break
-            if before == after and not any(x.get("status") == "completed" for x in cycle_results):
+            retry_was_approved = any(
+                event.get("type") == "task_retry_approved" and event.get("cycle") == cycle
+                for event in events
+            )
+            if (before == after
+                    and not any(x.get("status") == "completed" for x in cycle_results)
+                    and not retry_was_approved):
                 events.append({"type": "stalled", "cycle": cycle,
                                "reason": "No progress; check worker capability and credentials."})
                 break
