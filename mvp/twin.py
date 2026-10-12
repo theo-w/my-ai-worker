@@ -9,6 +9,8 @@ import json
 from time import monotonic
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from mvp.self_improvement import summarize_outcomes
+
 
 @dataclass
 class TwinPolicy:
@@ -152,12 +154,27 @@ class AutonomousProjectLoop:
             questions.append("部分任务受阻；请补充缺失输入或批准调整后的计划。")
         if not active:
             status = "completed"
+        improvement_summary = summarize_outcomes([
+            {
+                "status": task.get("status"),
+                "verified": task.get("verified") is True,
+                "provenance": task.get("provenance", "unknown"),
+                "failure_category": task.get("failure_category"),
+            }
+            for task in active
+        ])
+        events.append({
+            "type": "improvement_review_snapshot",
+            "verified_successes": improvement_summary["verified_successes"],
+            "sample_count": improvement_summary["sample_count"],
+        })
         events.append({"type": "checkpoint_created", "completed": completed, "blocked": blocked})
         return {
             "goal": goal, "status": status, "completed_tasks": completed,
             "total_tasks": len(active), "superseded_tasks": len(tasks) - len(active),
             "options": options, "recommendation": options[0]["name"] if options else None,
             "tasks": tasks,
+            "improvement_summary": improvement_summary,
             "questions_for_human": questions, "events": events,
         }
 
