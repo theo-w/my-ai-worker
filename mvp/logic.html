@@ -15,13 +15,18 @@
 <div class="step"><strong>7. 分身反馈 / 重规划</strong><div class="muted">处理失败、重试、合并或取消低价值工作</div><span class="tag rule">次数与状态限制</span><span class="tag llm">特定路径可选 LLM 重规划</span></div>
 <div class="step"><strong>8. 观察式自我改进</strong><div class="muted">识别重复阻塞与重试，提出可证伪实验</div><span class="tag rule">只读分析</span><span class="tag blocked">不自动改代码或上线</span></div>
 </div></section>
-<section class="panel"><h2>当前有两条并存的执行路径（不要混为一条）</h2><div class="two">
+<section class="panel"><h2>当前有三条并存的执行路径（不要混为一条）</h2><div class="two">
 <div class="path"><h3>路径 A · 项目规划与执行</h3><div class="muted">入口：<code>POST /api/autonomous</code></div><div class="sequence">
 <div class="node"><b>请求校验</b>目标、任务格式、动作边界先由代码检查。</div><div class="down">↓</div>
 <div class="node"><b>规划</b>若请求已提供 tasks，则跳过自动规划；否则尝试 LLM 规划，未配置或响应无效时退回确定性计划。</div><div class="down">↓</div>
 <div class="node"><b>审批门槛</b>发布、预算承诺、对外发布、破坏性操作、法律承诺等受保护动作会先要求审批。</div><div class="down">↓</div>
 <div class="node"><b>执行器路由</b>研究任务要求真实搜索 provider；其他任务可走 LLM executor；没有任何实时集成时走明确标记的模拟执行。</div><div class="down">↓</div>
 <div class="node"><b>结果与准确性标记</b>返回任务、来源信任级别与未验证输出数；接口明确不授权基于这些输出直接作事实决策。</div>
+</div></div>
+<div class="path" style="grid-column:1/-1"><h3>路径 C · 工作台快速运行（演示/旧流程）</h3><div class="muted">入口：<code>POST /api/run</code>；本次修复已补齐该路由。</div><div class="sequence">
+<div class="node"><b>确定性组队</b><code>DigitalTwin.form_team()</code> 依据目标关键词选择候选员工，受最大并行人数策略限制；当前这个执行函数实际按顺序逐个运行。</div><div class="down">↓</div>
+<div class="node"><b>执行器</b>模拟模式运行演示 worker；配置 LLM/搜索后由 Hybrid executor 按能力路由。这个路径不会调用 <code>plan_project()</code> 生成 LLM 任务计划。</div><div class="down">↓</div>
+<div class="node"><b>汇总与演示决策</b>更新工作台状态、输出和证据列表。模拟模式可产生明确标记的 demo 决策；实时模型文字不会自动成为证据。</div>
 </div></div>
 <div class="path"><h3>路径 B · 数字分身 ↔ 员工任务信箱</h3><div class="muted">入口：<code>/api/workforce/*</code>、<code>/api/workers/heartbeat</code></div><div class="sequence">
 <div class="node"><b>管理员创建任务</b>确定性权限校验、能力与状态规则。</div><div class="down">↓</div>
