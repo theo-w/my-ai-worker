@@ -12,9 +12,9 @@ Turn JARVIS from a single-task demo into a digital-twin orchestrator that can as
 
 ## Task lifecycle
 
-`queued -> assigned -> accepted -> running -> succeeded | blocked | failed | cancelled`
+`queued -> accepted -> running -> awaiting_validation -> awaiting_approval (optional) -> succeeded | blocked | failed | cancelled`
 
-A blocked task may return to `queued` after the orchestrator resolves the blocker. Retry policy must be bounded and idempotent. A task must not be marked `succeeded` until a result payload has been persisted.
+A blocked task may return to `queued` after the orchestrator resolves the blocker. Retry policy must be bounded and idempotent. A worker result must first enter `awaiting_validation`. Only an admin validation decision with a non-empty evidence reference can move it to `succeeded` (or to `awaiting_approval` when human approval is also required). Failed validation moves the task to `blocked`. This MVP records a separate validation decision; it does not yet run an independent automated evaluator.
 
 ## MVP task contract
 
@@ -64,7 +64,10 @@ Every worker update should contain:
 - `POST /tasks` — create a task
 - `GET /tasks` and `GET /tasks/:id` — inspect queue and task state
 - `POST /tasks/:id/accept` — worker acknowledges assignment
+- `POST /tasks/:id/heartbeat` — worker refreshes its last-seen timestamp while assigned work is active
+- `GET /monitoring/workers` — admin-only view of active task ownership and stale-heartbeat flags
 - `POST /tasks/:id/events` — worker posts progress/result/blocker/failure events
+- `POST /tasks/:id/validate` — admin records a validation decision, summary, and evidence references
 - `POST /tasks/:id/approve` — record human approval or rejection
 - `POST /tasks/:id/retry` — explicitly requeue an eligible task
 - `GET /health` — runtime health check
@@ -72,6 +75,8 @@ Every worker update should contain:
 These endpoints are a target contract, not a claim that they are already implemented.
 
 ## Reliability and safety requirements
+
+- Heartbeats are operational liveness signals, not proof of task progress or correctness. The monitoring endpoint marks a heartbeat stale after the configured timeout; automated reassignment is not implemented by this change.
 
 - Persist tasks and events; do not rely on browser memory or process memory as the source of truth.
 - Use idempotency keys for task creation and worker event submission.
@@ -87,7 +92,7 @@ These endpoints are a target contract, not a claim that they are already impleme
 1. Orchestrator creates a task and it appears in the persistent queue.
 2. A worker claims the task and the state becomes `accepted`.
 3. Worker posts progress; the event is visible in task history.
-4. Worker submits a result with artifacts/evidence; the task becomes `succeeded` only after validation.
+4. Worker submits a result; the task enters `awaiting_validation` and cannot self-certify. Admin validation requires evidence references; only a validated result may proceed to `succeeded` or `awaiting_approval`.
 5. Worker reports a blocker; the orchestrator exposes it and proposes/requires a next action.
 6. A worker that does not acknowledge before timeout can be reassigned without duplicate completion.
 7. A retryable failure is retried only up to `max_attempts`.
