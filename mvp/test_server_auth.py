@@ -47,3 +47,27 @@ def test_worker_capabilities_are_server_configured(monkeypatch):
     monkeypatch.setenv("JARVIS_WORKER_CAPABILITIES", '{"researcher":["research","analysis"]}')
     assert _worker_capabilities("researcher") == ["analysis", "research"]
     assert _worker_capabilities("unknown-worker") == []
+
+
+def test_public_demo_requires_explicit_opt_in_and_disallows_live_credentials(monkeypatch):
+    for key in (
+        "JARVIS_ADMIN_TOKEN", "JARVIS_WORKER_TOKEN", "JARVIS_WORKER_ID",
+        "JARVIS_WORKER_TOKENS", "JARVIS_WORKER_CAPABILITIES",
+        "JARVIS_SEARCH_ENDPOINT", "JARVIS_SEARCH_API_KEY",
+        "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("JARVIS_PUBLIC_DEMO", raising=False)
+
+    from mvp.server import authenticate_dashboard
+    with pytest.raises(WorkforceAuthError) as error:
+        authenticate_dashboard(Headers())
+    assert error.value.status == 503
+
+    monkeypatch.setenv("JARVIS_PUBLIC_DEMO", "true")
+    assert authenticate_dashboard(Headers()) == {"role": "demo", "worker_id": None}
+
+    monkeypatch.setenv("JARVIS_SEARCH_ENDPOINT", "https://search.example.test/api")
+    with pytest.raises(WorkforceAuthError) as unsafe:
+        authenticate_dashboard(Headers())
+    assert unsafe.value.status == 503
