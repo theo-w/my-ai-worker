@@ -56,7 +56,9 @@ completion.
 - [x] Add a verifier interface that consumes output, task criteria, provenance, and evidence.
 - [x] Require evidence-gate verification before goal-level completion for research/evidence-required tasks; semantic truth still needs domain checks or human review.
 - [x] Add authenticated worker heartbeat/registration and expose offline suspicion in the monitor.
-- [x] Add audited merge/cancel operations for pending tasks, with optional per-cycle revision policy hooks and bounded action counts. Automatic semantic replanning still depends on a trustworthy planner/revision policy.
+- [x] Add audited merge/cancel operations for pending tasks and explicit, bounded retry of blocked/failed tasks. The revision-policy hook can request retry only with a reason; the registry enforces task scope, state, and attempt limits.
+- [x] Keep blocked reports blocked by default. The twin must inspect feedback and explicitly authorize retry; retry approval is audited and the goal loop does not mistake that decision for a stalled cycle.
+- [ ] Add a production-grade semantic planner/revision policy. Current hooks safely execute approved actions but do not themselves infer high-quality plans from arbitrary feedback.
 - [ ] Benchmark single-agent versus team mode on representative tasks; tune thresholds from
   observed outcomes.
 
