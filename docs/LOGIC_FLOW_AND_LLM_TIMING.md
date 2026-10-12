@@ -39,7 +39,62 @@ flowchart TD
   Z --> AA[Independent evaluation + human approval before adoption]
 ```
 
-## 2. When deterministic rules run vs. when an LLM runs
+## 2. Digital Twin and digital employee collaboration
+
+The Digital Twin is the goal owner and dynamic coordinator; employees are task-scoped workers, not permanently fixed job titles. The Twin should first ask whether one capable worker can complete the goal. It creates a multi-worker plan only when parallelism, independent review, or specialized capabilities provide a clear benefit.
+
+```mermaid
+flowchart TD
+  U[User goal + constraints] --> T[Digital Twin: clarify goal and success criteria]
+  T --> S{Can one worker do it safely and well?}
+  S -->|Yes| W[Assign one capable employee]
+  S -->|No, clear benefit to parallelism| P[Create temporary task team]
+  P --> W1[Worker A: research / build / analyze]
+  P --> W2[Worker B: independent review / specialist task]
+  W --> E[Employee accepts task and records lease / heartbeat]
+  W1 --> E1[Employee records progress, output and blockers]
+  W2 --> E2[Employee records progress, output and blockers]
+  E --> F[Feedback + result + provenance]
+  E1 --> F
+  E2 --> F
+  F --> T2[Digital Twin reviews progress and feedback]
+  T2 --> D{Continue, re-plan, merge, cancel, or escalate?}
+  D -->|Continue| W
+  D -->|Re-plan / merge / cancel| R[Revised task plan with reason recorded]
+  R --> T
+  D -->|Ready for acceptance| V[Independent verification / human approval if required]
+  V -->|Rejected| T
+  V -->|Accepted| O[Record outcome and close task]
+  E -. heartbeat / stale lease .-> M[Monitoring]
+  F -. input/output/event trace .-> M
+  O --> I[Observe-only improvement signals]
+```
+
+### Responsibilities and boundaries
+
+- **Digital Twin (goal owner):** maintains the goal and acceptance criteria; decomposes work only as needed; monitors worker progress; consumes blockers and proposals; can re-plan, merge or cancel low-value tasks when the relevant orchestration path is wired and permitted. It must record why it changed the plan.
+- **Digital employee (task worker):** accepts only authorized tasks matching its configured capabilities; reports progress, blockers, output and provenance; cannot validate its own result as trusted truth or grant itself permissions.
+- **Independent acceptance:** evaluates the result against the goal and evidence requirements. Worker completion is a lifecycle event, not proof of correctness.
+- **Monitoring:** tracks state transitions, heartbeat freshness, inputs/outputs, events and validation decisions. A heartbeat proves recent liveness only, not useful work or correctness.
+- **Team formation:** default to one worker. Add more only when the expected quality, speed or risk reduction justifies the extra coordination and cost.
+
+### Where rules and LLMs affect the Twin/employee loop
+
+| Moment | Rule / code behavior | Possible LLM behavior |
+|---|---|---|
+| Goal intake | Validate required goal, constraints, permissions and acceptance criteria | Ask clarifying questions or suggest measurable success criteria when an LLM is configured |
+| Decomposition | Enforce capability allowlist, task limits, dependency validity and approval policy | Propose task breakdown and temporary team composition |
+| Assignment | Match capability, task status, lease and worker availability | Recommend a worker only if the orchestration implementation explicitly asks the model |
+| Worker execution | Enforce state transitions, lease/fencing, attempt limits and event schema | Generate research synthesis, code, analysis or other task artifacts via configured executor |
+| Feedback / replanning | Preserve state history; bound retries; reject unauthorized transitions | Interpret blocker reports and propose continue, merge, cancel, escalate or re-plan actions |
+| Acceptance | Enforce required fields, evidence records, reviewer separation and approval gates | Assist an independent reviewer only when explicitly configured; never self-approve |
+| Learning loop | Aggregate historical outcomes and require thresholds | Current improvement report makes no LLM call and takes no action; later experiments need independent evaluation and human approval |
+
+### Current implementation caveat
+
+The repository has a persistent workforce lifecycle and a separate dashboard/executor path. Do not assume the Digital Twin automatically orchestrates every persistent employee task end-to-end yet. The collaboration flow above is the target operating model; each integration edge must be demonstrated by tests and trace events before being called complete.
+
+## 3. When deterministic rules run vs. when an LLM runs
 
 | Stage | Deterministic rules / code | LLM call timing | Important boundary |
 |---|---|---|---|
