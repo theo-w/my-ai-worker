@@ -558,9 +558,20 @@ def test_worker_can_claim_only_requested_eligible_task_without_bypassing_capabil
     assert status == 200
     assert claimed["task"]["id"] == target["task"]["id"]
 
+    # The earlier research task remains queued because this claim was task-scoped.
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    statuses = {item["id"]: item["status"] for item in snapshot["tasks"]}
+    assert statuses[first["task"]["id"]] == "queued"
+
+    status, other = request_json(
+        base, "/api/workforce/tasks", ADMIN,
+        {"title": "Analysis-only task", "capability": "analysis", "priority": 5},
+    )
+    assert status == 201
     status, denied = request_json(
         base, "/api/workforce/claim", RESEARCHER,
-        {"capabilities": ["research"], "task_id": first["task"]["id"]},
+        {"capabilities": ["research"], "task_id": other["task"]["id"]},
     )
     assert status == 200
     assert denied["task"] is None
