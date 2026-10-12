@@ -15,9 +15,14 @@ def test_worker_claims_reports_and_twin_receives_feedback(tmp_path):
 
     registry.feedback(task["id"], "digital-twin", "Please include a test report", "correction")
     result = registry.report(task["id"], "worker-a", "completed", output="Prototype + tests", lease_token=claimed["lease_token"])
-    assert result["status"] == "completed"
+    assert result["status"] == "awaiting_validation"
     assert result["output"] == "Prototype + tests"
     assert result["feedback"][0]["actor"] == "digital-twin"
+    assert registry.snapshot()["counts"]["awaiting_validation"] == 1
+    verified = registry.record_verification(task["id"], {
+        "accepted": True, "checks": [{"name": "test_report_present", "passed": True}],
+    })
+    assert verified["status"] == "completed"
     assert registry.snapshot()["counts"]["completed"] == 1
 
 
@@ -140,7 +145,9 @@ def test_fencing_token_rejects_stale_attempt_from_same_worker(tmp_path):
     accepted = registry.report(task["id"], "same-worker", "completed", output="current result",
                                lease_token=second["lease_token"])
     assert accepted["output"] == "current result"
-    assert accepted["status"] == "completed"
+    assert accepted["status"] == "awaiting_validation"
+    verified = registry.record_verification(task["id"], {"accepted": True, "checks": []})
+    assert verified["status"] == "completed"
     assert "_lease_token" not in registry.snapshot()["tasks"][0]
 
 def test_active_lease_heartbeat_renews_lease_and_rejects_stale_token(tmp_path):
@@ -189,6 +196,7 @@ def test_verification_record_is_persisted_without_claiming_truth(tmp_path):
     }
     saved = registry.record_verification(task["id"], verification)
     assert saved["verification"]["accepted"] is True
+    assert saved["status"] == "completed"
     assert saved["verified_truth"] is False
     assert saved["history"][-1]["event"] == "verification_recorded"
     restored = WorkforceRegistry(path=str(tmp_path / "verification.json"))
