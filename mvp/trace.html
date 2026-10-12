@@ -59,18 +59,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   $("runtimeInfo").textContent=runtime?
    "执行模式："+(names[mode]||mode)+"；搜索已配置："+(runtime.search_configured?"是":"否")+"；模型已配置："+(runtime.llm_configured?"是":"否")+"。配置状态不等于每个任务都真实调用了模型或搜索，需结合任务输出来源标记判断。":
    "暂时无法读取执行环境配置。不要据此推断任务是真实执行还是模拟执行。";
- }
- function renderWorkers(){
-  const workers=Array.isArray(snapshot.workers)?snapshot.workers:[];
-  $("workerCount").textContent=workers.length+" 名员工";
-  if(!workers.length){$("workers").innerHTML='<div class="empty">尚无员工心跳记录。没有心跳记录不代表员工正在运行。</div>';return;}
-  $("workers").innerHTML=workers.map(w=>{
-   const id=w.worker_id||"unknown",status=w.status||"unknown",online=w.last_heartbeat_at?((Date.now()-Date.parse(w.last_heartbeat_at))<=30000):false;
-   const current=rows().find(t=>(t.id||t.task_id)===w.current_task_id);
-   return '<div class="sub"><div class="line"><strong>'+esc(id)+'</strong><span class="pill '+(online?"good":"bad")+'">'+(online?"心跳新鲜":"心跳过期 / 缺失")+'</span></div><div class="muted">状态：'+esc(label(status))+' · 最近心跳：'+esc(w.last_heartbeat_at||"无记录")+'</div><div style="margin-top:7px">当前任务：'+esc(current?(current.title||current.id):(w.current_task_id||"无"))+'</div><div class="muted">进度：'+esc(w.progress||"无进度反馈")+'</div>'+(w.last_error?'<div class="error">最近错误：'+esc(w.last_error)+'</div>':'')+'<div class="muted">能力：'+esc((w.capabilities||[]).join(", ")||"未声明")+'</div></div>';
-  }).join("");
- }
- function outputEnvelope(value){
+ }function outputEnvelope(value){
   if(typeof value!=="string")return {content:value,provenance:"unknown"};
   try{const parsed=JSON.parse(value);if(parsed&&typeof parsed==="object"&&("content" in parsed||"simulated" in parsed))return {content:parsed.content??parsed,provenance:parsed.simulated===true?"simulated":parsed.simulated===false?"executor_reported_live":"unknown"};}catch(e){}
   return {content:value,provenance:"unknown"};
@@ -83,26 +72,18 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   const vals=[tasks.length,running,pending,failed,eventRows().length];
   $("metrics").innerHTML=vals.map((v,i)=>'<div class="metric"><strong>'+esc(v)+'</strong><span>'+["任务总数","执行中","待处理","已阻塞 / 失败","事件记录"][i]+'</span></div>').join("");
   $("eventCount").textContent=eventRows().length+" 条事件";
- }
- function renderWorkers(){
-  const workers=Array.isArray(snapshot&&snapshot.workers)?snapshot.workers:[];
-  $("workerCount").textContent=workers.length+" 名员工";
-  if(!workers.length){$("workers").innerHTML='<div class="empty">当前没有已登记员工。员工在首次心跳后会出现在这里。</div>';return;}
-  $("workers").innerHTML=workers.map(w=>{
-   const wid=w.worker_id||w.id||"unknown",status=w.status||"unknown";
-   return '<div class="sub"><div class="line"><strong>'+esc(wid)+'</strong><span class="pill '+tone(status)+'">'+esc(label(status))+'</span></div><div class="muted" style="margin:7px 0">最近心跳：'+esc(w.last_heartbeat||w.heartbeat_at||w.updated_at||"无记录")+'</div><div class="muted">能力：'+esc(pretty(w.capabilities||[]))+'</div><div class="muted">当前任务：'+esc(pretty(w.active_task_ids||w.task_ids||[]))+'</div></div>';
-  }).join("");
- }
- function renderWorkers(){
-  const workers=Array.isArray(snapshot&&snapshot.workers)?snapshot.workers:[];
-  if(!workers.length){$("workers").className="empty";$("workers").textContent="暂时没有员工心跳记录。员工首次心跳后会显示在这里。";return;}
-  $("workers").className="detailgrid";
-  $("workers").innerHTML=workers.slice().sort((a,b)=>String(a.worker_id||"").localeCompare(String(b.worker_id||""))).map(w=>{
-   const status=w.status||"unknown";
-   return '<div class="sub"><div class="line"><strong>'+esc(w.worker_id||"未命名员工")+'</strong><span class="pill '+tone(status)+'">'+esc(label(status))+'</span></div><div class="muted">最近心跳：'+esc(w.last_heartbeat_at||"尚无记录")+'</div><div class="muted">当前任务：'+esc(w.current_task_id||"无")+'</div><div class="muted">能力：'+esc((w.capabilities||[]).join(", ")||"未登记")+'</div><div class="sub" style="margin-top:8px"><h3>进度 / 最近错误</h3><pre class="content">'+esc(pretty({progress:w.progress,last_error:w.last_error}))+'</pre></div></div>';
-  }).join("");
- }
- function renderTasks(){
+ }function renderWorkers(){
+   const workers=Array.isArray(snapshot&&snapshot.workers)?snapshot.workers:[];
+   $("workerCount").textContent=workers.length+" 名员工";
+   if(!workers.length){$("workers").className="detailgrid";$("workers").innerHTML='<div class="empty">当前没有员工心跳记录。员工首次心跳后会显示在这里；无心跳不代表员工正在运行。</div>';return;}
+   $("workers").className="detailgrid";
+   $("workers").innerHTML=workers.slice().sort((a,b)=>String(a.worker_id||"").localeCompare(String(b.worker_id||""))).map(w=>{
+    const status=w.status||"unknown",last=w.last_heartbeat_at||"",age=last?Date.now()-Date.parse(last):null,online=age!==null&&Number.isFinite(age)&&age<=30000;
+    const task=rows().find(t=>(t.id||t.task_id)===w.current_task_id);
+    return '<div class="sub"><div class="line"><strong>'+esc(w.worker_id||"未命名员工")+'</strong><span class="pill '+(online?"good":last?"bad":"warn")+'">'+(online?"心跳新鲜":last?"心跳过期":"尚无心跳")+'</span></div><div class="muted">状态：'+esc(label(status))+' · 最近心跳：'+esc(last||"尚无记录")+'</div><div style="margin-top:7px">当前任务：'+esc(task?(task.title||task.id):(w.current_task_id||"无"))+'</div><div class="muted">能力：'+esc((w.capabilities||[]).join(", ")||"未登记")+'</div><div class="sub" style="margin-top:8px"><h3>进度 / 最近错误</h3><pre class="content">'+esc(pretty({progress:w.progress,last_error:w.last_error}))+'</pre></div></div>';
+   }).join("");
+  }
+function renderTasks(){
   const filter=$("filter").value;
   const tasks=rows().filter(t=>filter==="all"||(filter==="active"&&["queued","assigned","running","working","approval_required"].includes(t.status))||(filter==="blocked"&&["blocked","failed"].includes(t.status))||(filter==="completed"&&t.status==="completed"));
   if(!tasks.length){$("tasks").innerHTML='<div class="empty">这个筛选条件下没有任务。</div>';return;}
@@ -131,7 +112,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   $("events").className="events";
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
- function render(){renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
+ function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
  $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
