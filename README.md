@@ -12,6 +12,7 @@ The first domain pack is AI-native game feasibility and game-operations analysis
 
 - JARVIS game-operation copilot demo: `demo/JARVIS_AI_Game_Operation_Copilot_V4.html`.
 - Task lifecycle and worker feedback contract: [Digital Workforce Protocol](docs/DIGITAL_WORKFORCE_PROTOCOL.md).
+- Future improvement direction: [Recursive Self-Improvement Protocol](docs/RECURSIVE_SELF_IMPROVEMENT.md) — staged, evidence-driven, bounded, and rollback-capable; design only, not yet implemented.
 - Node.js HTTP runtime: `src/server.js`, with task APIs, worker feedback, approval gates, retries, and health endpoint.
 - Bearer-token authentication and role-based access control are now implemented. Configure separate `JARVIS_ADMIN_TOKEN` and `JARVIS_WORKER_TOKEN` secrets. The worker identity is configured with `JARVIS_WORKER_ID`.
 - `GET /health` is public for deployment probes. All task routes require `Authorization: Bearer <token>`.
@@ -56,6 +57,7 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 5. Move durable state to a production database before concurrent/multi-instance use.
 6. Verify deployment with configured secrets and an end-to-end smoke test.
 7. Add multi-worker dependency graphs and reusable domain packs.
+8. After the execution and verification loop is reliable, implement observe-only self-improvement reports, then offline regression evaluation and reversible adoption.
 
 ## MVP success criteria
 
