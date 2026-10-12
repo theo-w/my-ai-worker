@@ -37,3 +37,4 @@ python -m mvp.server
 - [流程可观测性与验收](docs/OBSERVABILITY.md)
 - [目标驱动架构](docs/GOAL_DRIVEN_ARCHITECTURE.md)
 - [安全与认证](docs/SECURITY_AND_AUTH.md)
+- [手动验收清单](docs/MANUAL_ACCEPTANCE.md)：按步骤查看任务创建、员工领取/反馈、结果验证和阻塞处理。
