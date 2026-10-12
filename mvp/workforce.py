@@ -101,7 +101,7 @@ class WorkforceRegistry:
             self.save()
             return dict(task)
 
-    def claim(self, worker_id: str, capabilities: list[str] | None = None) -> dict | None:
+    def claim(self, worker_id: str, capabilities: list[str] | None = None, task_id: str | None = None) -> dict | None:
         worker_id = worker_id.strip()
         if not worker_id or len(worker_id) > 120:
             raise ValueError("worker_id must be between 1 and 120 characters")
@@ -110,6 +110,7 @@ class WorkforceRegistry:
             self.maintain(save=False)
             eligible = [t for t in self.tasks.values()
                         if t["status"] == "queued"
+                        and (task_id is None or t["id"] == task_id)
                         and (not t.get("assigned_to") or t["assigned_to"] == worker_id)
                         and (not caps or t["capability"] in caps or "general" in caps)]
             if not eligible:
