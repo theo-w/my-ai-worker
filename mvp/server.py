@@ -265,6 +265,31 @@ def _worker_capabilities(worker_id: str) -> list[str]:
     return sorted(set(x.strip() for x in capabilities))
 
 
+def _live_provider_configuration_present() -> bool:
+    """Return true if any external search/model credential or endpoint is configured."""
+    return any(os.getenv(key, "").strip() for key in (
+        "JARVIS_SEARCH_ENDPOINT", "JARVIS_SEARCH_API_KEY",
+        "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL",
+    ))
+
+
+def authenticate_dashboard(headers) -> dict:
+    """Protect state and execution APIs; public demo is an explicit local-only mode."""
+    public_demo = os.getenv("JARVIS_PUBLIC_DEMO", "").strip().lower() in {"1", "true", "yes"}
+    if public_demo:
+        credentials_configured = any(os.getenv(key, "").strip() for key in (
+            "JARVIS_ADMIN_TOKEN", "JARVIS_WORKER_TOKEN", "JARVIS_WORKER_ID",
+            "JARVIS_WORKER_TOKENS", "JARVIS_WORKER_CAPABILITIES",
+        ))
+        if credentials_configured or _live_provider_configuration_present():
+            raise WorkforceAuthError(
+                503,
+                "Public demo mode cannot be used with workforce credentials or live providers.",
+            )
+        return {"role": "demo", "worker_id": None}
+    return authenticate_workforce(headers, "admin")
+
+
 def authenticate_workforce(headers, required_role: str) -> dict:
     admin_token = os.getenv("JARVIS_ADMIN_TOKEN", "")
     worker_tokens = _worker_tokens()
@@ -345,6 +370,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, **WORKFORCE.snapshot()})
             return
         if self.path == "/api/state":
+            try:
+                authenticate_dashboard(self.headers)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
             with LOCK:
                 self._json(dict(STATE))
             return
@@ -516,6 +546,16 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 self._json({"ok": False, "error": "Unable to persist workforce state."}, 500)
             return
+        protected_dashboard_routes = {
+            "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
+            "/api/experience-design", "/api/game-action", "/api/model-handoff",
+        }
+        if self.path in protected_dashboard_routes:
+            try:
+                authenticate_dashboard(self.headers)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
         if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
             return
