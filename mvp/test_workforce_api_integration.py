@@ -427,4 +427,33 @@ def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_htt
     status, protected = request_json(base, "/api/workforce")
     assert status == 401
     assert protected["ok"] is False
+def test_admin_verification_endpoint_records_check_without_claiming_truth(workforce_http):
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Verify visible output", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+    status, claim = request_json(
+        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
+    )
+    assert status == 200
+    status, reported = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "completed",
+        "lease_token": claim["task"]["lease_token"], "output": "candidate result",
+    })
+    assert status == 200
+    status, forbidden = request_json(base, "/api/workforce/verify", RESEARCHER, {
+        "task_id": task_id, "verification": {"accepted": True},
+    })
+    assert status == 403
+    status, verified = request_json(base, "/api/workforce/verify", ADMIN, {
+        "task_id": task_id,
+        "verification": {"accepted": True, "status": "accepted", "checks": []},
+    })
+    assert status == 200
+    assert verified["task"]["verification"]["accepted"] is True
+    assert verified["task"]["verified_truth"] is False
+    assert any(e["type"] == "verification_recorded" and e["task_id"] == task_id
+               for e in registry.snapshot()["events"])
 
