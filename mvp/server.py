@@ -430,8 +430,8 @@ class Handler(BaseHTTPRequestHandler):
                     "LLM not configured; autonomous tasks use simulated execution.",
             })
             return
-        if self.path in ("/", "/index.html", "/playtest", "/trace"):
-            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace", "/logic"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "logic.html" if self.path == "/logic" else "dashboard.html"
             data = (ROOT / page).read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
