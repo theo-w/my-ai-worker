@@ -704,6 +704,19 @@ class DigitalTwinCoordinator:
                             "Independent review was required but no reviewer callback is configured."
                         )
                     task["verification"] = verification
+                    # Persist the same verification record to the workforce audit
+                    # timeline so the read-only trace page reflects actual checks.
+                    try:
+                        self._request("POST", "/api/workforce/verify", {
+                            "task_id": task["task_id"],
+                            "verification": verification,
+                        })
+                    except Exception as exc:
+                        events.append({
+                            "type": "verification_persistence_failed",
+                            "task_id": task["task_id"],
+                            "reason": type(exc).__name__ + ": " + str(exc)[:300],
+                        })
         counts = {s: sum(t["status"] == s for t in scoped)
                   for s in ("queued", "assigned", "completed", "blocked", "failed",
                             "cancelled", "superseded", "approval_required")}
