@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS · 流程追踪与验收</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1020;--panel:#111b2e;--line:#263854;--text:#eef4ff;--muted:#91a2bf;--accent:#76ddff;--good:#65e4a1;--warn:#ffd16d;--bad:#ff8585}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#1a2b4a 0,#0a1020 44%);color:var(--text);font:14px/1.55 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--accent)}h1{font-size:25px;margin:4px 0}h2{font-size:15px;margin:0 0 12px}.muted,.hint{color:var(--muted);font-size:12px}a{color:var(--accent)}button,input,select{font:inherit;color:var(--text);background:#17243a;border:1px solid #354b6c;border-radius:8px;padding:9px 11px}button{cursor:pointer}button.primary{background:#16465c;border-color:#2e8bab}button:disabled{opacity:.45;cursor:wait}.auth{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap}.auth input{flex:1;min-width:220px}.grid{display:grid;grid-template-columns: minmax(290px,.8fr) minmax(0,1.6fr);gap:14px;margin-top:15px}.panel{background:rgba(17,27,46,.95);border:1px solid var(--line);border-radius:13px;padding:15px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(5,minmax(90px,1fr));gap:9px;margin-top:15px}.metric{background:#131f34;border:1px solid var(--line);border-radius:10px;padding:12px}.metric strong{display:block;font-size:23px}.metric span{font-size:11px;color:var(--muted)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.task{width:100%;text-align:left;margin:5px 0;padding:11px;background:#131f34;border:1px solid #273954;border-radius:9px}.task.active{border-color:var(--accent);background:#162d43}.task .line{display:flex;justify-content:space-between;gap:8px}.pill{font-size:11px;border-radius:99px;padding:2px 8px;background:#26334a;color:#dce7f8;white-space:nowrap}.pill.good{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}.detailgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.sub{border:1px solid #273954;border-radius:9px;padding:11px;min-width:0}.sub h3{font-size:12px;color:var(--muted);margin:0 0 7px}.content{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;margin:0;font:12px/1.6 ui-monospace,SFMono-Regular,monospace}.timeline{position:relative;margin:0;padding:0;list-style:none}.timeline li{border-left:2px solid #35516d;margin-left:5px;padding:0 0 15px 15px;position:relative}.timeline li:before{content:"";position:absolute;left:-6px;top:5px;width:9px;height:9px;background:var(--accent);border-radius:50%}.timeline .when{font-size:11px;color:var(--muted)}.timeline .what{font-weight:650}.events{max-height:480px;overflow:auto}.empty{color:var(--muted);padding:20px;text-align:center}.notice{margin-top:10px;color:var(--muted);font-size:12px}.error{color:var(--bad)}.ok{color:var(--good)}.wide{margin-top:14px}@media(max-width:850px){main{padding:13px}.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.detailgrid{grid-template-columns:1fr}.top h1{font-size:22px}}
+</style>
+</head>
+<body><main>
+<header class="top"><div><div class="eyebrow">JARVIS / OBSERVABILITY</div><h1>数字分身 · 流程追踪与验收</h1><div class="muted">查看任务分配、员工反馈、输入输出、重试决策与事件时间线。此页面只读，不会自动修改任务。</div></div><div><a href="/">← 返回工作台</a></div></header>
+<section class="panel">
+ <h2>连接运行中的工作区</h2>
+ <div class="auth"><input id="token" type="password" autocomplete="off" placeholder="管理员 Token（仅保存在当前页面内存）"><button class="primary" id="connect">连接并查看</button><button id="refresh" disabled>立即刷新</button><label style="display:flex;align-items:center;gap:6px"><input id="auto" type="checkbox" checked style="min-width:auto"> 每 5 秒刷新</label></div>
+ <div id="status" class="notice">尚未连接。请使用运行中 JARVIS 服务配置的管理员 Token。</div>
+</section>
+<section class="metrics" id="metrics">
+ <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
+</section>
+<div class="grid">
+ <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务与员工状态</h2><select id="filter"><option value="all">全部任务</option><option value="active">进行中 / 排队</option><option value="blocked">阻塞 / 失败</option><option value="completed">已完成</option></select></div><div id="tasks" class="empty">连接后显示实时任务。</div></section>
+ <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务过程详情</h2><span id="selectedStatus" class="pill">未选择</span></div><div id="detail" class="empty">选择左侧任务，查看输入、输出、阻塞原因和完整任务历史。</div></section>
+</div>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">全局事件时间线</h2><span id="eventCount" class="muted">0 条事件</span></div><div id="events" class="events empty">连接后显示事件。</div></section>
+<div class="notice">安全说明：管理员 Token 不写入 localStorage 或 URL；数据通过带 Authorization 的只读接口获取。请只在可信环境使用管理员凭证。模型输出、员工反馈和已验证结论应分别判断，不要仅凭状态为 completed 就认定事实正确。</div>
+</main>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ let token="",snapshot=null,selectedId=null,timer=null,busy=false;
+ const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
+ const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
+ const tone=s=>["completed"].includes(s)?"good":["blocked","queued","assigned","approval_required","running","working"].includes(s)?"warn":["failed"].includes(s)?"bad":"";
+ function setStatus(msg,cls=""){ $("status").className="notice "+cls; $("status").textContent=msg; }
+ function rows(){return Array.isArray(snapshot&&snapshot.tasks)?snapshot.tasks:[];}
+ function eventRows(){return Array.isArray(snapshot&&snapshot.events)?snapshot.events:[];}
+ async function load(){
+  if(!token||busy)return;busy=true;$("refresh").disabled=true;
+  try{
+   const r=await fetch("/api/workforce",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
+   snapshot=data;render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
+  }catch(e){setStatus("读取失败："+e.message+"。请检查 Token、服务状态和权限。","error");}
+  finally{busy=false;$("refresh").disabled=false;}
+ }
+ function renderMetrics(){
+  const tasks=rows(), workers=Array.isArray(snapshot.workers)?snapshot.workers:[];
+  const running=tasks.filter(t=>["assigned","running","working"].includes(t.status)).length;
+  const pending=tasks.filter(t=>["queued","approval_required"].includes(t.status)).length;
+  const failed=tasks.filter(t=>["blocked","failed"].includes(t.status)).length;
+  const vals=[tasks.length,running,pending,failed,eventRows().length];
+  $("metrics").innerHTML=vals.map((v,i)=>'<div class="metric"><strong>'+esc(v)+'</strong><span>'+["任务总数","执行中","待处理","已阻塞 / 失败","事件记录"][i]+'</span></div>').join("");
+  $("eventCount").textContent=eventRows().length+" 条事件";
+ }
+ function renderTasks(){
+  const filter=$("filter").value;
+  const tasks=rows().filter(t=>filter==="all"||(filter==="active"&&["queued","assigned","running","working","approval_required"].includes(t.status))||(filter==="blocked"&&["blocked","failed"].includes(t.status))||(filter==="completed"&&t.status==="completed"));
+  if(!tasks.length){$("tasks").innerHTML='<div class="empty">这个筛选条件下没有任务。</div>';return;}
+  $("tasks").innerHTML=tasks.map(t=>{
+   const id=t.id||t.task_id||"",title=t.title||t.description||id,worker=t.assigned_to||t.worker_id||"尚未分配";
+   return '<button class="task '+(id===selectedId?"active":"")+'" data-id="'+esc(id)+'"><div class="line"><strong>'+esc(title)+'</strong><span class="pill '+tone(t.status)+'">'+esc(label(t.status))+'</span></div><div class="muted">员工：'+esc(worker)+' · 尝试次数：'+esc(t.attempts??"—")+' / '+esc(t.max_attempts??"—")+'</div><div class="muted">任务 ID：'+esc(id)+'</div></button>';
+  }).join("");
+  $("tasks").querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>{selectedId=b.dataset.id;renderTasks();renderDetail();}));
+ }
+ function historyOf(t){
+  const h=Array.isArray(t.history)?t.history:[];
+  const f=Array.isArray(t.feedback)?t.feedback:[];
+  return h.concat(f.map(x=>({...x,event:x.event||"employee_feedback"}))).sort((a,b)=>String(a.at||a.timestamp||"").localeCompare(String(b.at||b.timestamp||"")));
+ }
+ function renderDetail(){
+  const t=rows().find(x=>(x.id||x.task_id)===selectedId);
+  if(!t){$("selectedStatus").textContent="未选择";$("detail").innerHTML='<div class="empty">选择左侧任务，查看详细过程。</div>';return;}
+  $("selectedStatus").className="pill "+tone(t.status);$("selectedStatus").textContent=label(t.status);
+  const hist=historyOf(t);
+  const timeline=hist.length?'<ul class="timeline">'+hist.slice().reverse().map(h=>'<li><div class="when">'+esc(h.at||h.timestamp||"时间未知")+'</div><div class="what">'+esc(label(h.event||h.type||"event"))+'</div><div>'+esc(h.reason||h.blocker||h.message||h.status||"")+'</div><pre class="content">'+esc(pretty(h))+'</pre></li>').join("")+'</ul>':'<div class="empty">该任务暂无历史事件。</div>';
+  $("detail").innerHTML='<div class="detailgrid"><div class="sub"><h3>任务输入 / 目标</h3><pre class="content">'+esc(pretty({title:t.title,description:t.description,capability:t.capability,input:t.input,criteria:t.criteria}))+'</pre></div><div class="sub"><h3>执行信息</h3><pre class="content">'+esc(pretty({status:t.status,assigned_to:t.assigned_to,attempts:t.attempts,max_attempts:t.max_attempts,lease_until:t.lease_until,updated_at:t.updated_at}))+'</pre></div><div class="sub"><h3>员工输出</h3><pre class="content">'+esc(pretty(t.output??t.result))+'</pre></div><div class="sub"><h3>阻塞 / 反馈 / 验证</h3><pre class="content">'+esc(pretty({blocker:t.blocker,feedback:t.feedback,verification:t.verification,verified_truth:t.verified_truth}))+'</pre></div></div><div style="margin-top:15px"><h2>任务历史</h2>'+timeline+'</div>';
+ }
+ function renderEvents(){
+  const ev=eventRows().slice().reverse();
+  if(!ev.length){$("events").innerHTML='<div class="empty">尚无全局事件记录。</div>';return;}
+  $("events").className="events";
+  $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
+ }
+ function render(){renderMetrics();renderTasks();renderDetail();renderEvents();}
+ function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
+ $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
+ $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
+ $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
+ timer=setInterval(load,5000);
+ window.addEventListener("beforeunload",()=>{token="";if(timer)clearInterval(timer);});
+})();
+</script></body></html>
