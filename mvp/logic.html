@@ -43,11 +43,11 @@
 <div class="node"><b>执行器</b>模拟模式运行演示 worker；配置 LLM/搜索后由 Hybrid executor 按能力路由。这个路径不会调用 <code>plan_project()</code> 生成 LLM 任务计划。</div><div class="down">↓</div>
 <div class="node"><b>汇总与演示决策</b>更新工作台状态、输出和证据列表。模拟模式可产生明确标记的 demo 决策；实时模型文字不会自动成为证据。</div>
 </div></div>
-<div class="path"><h3>路径 B · 数字分身 ↔ 员工任务信箱</h3><div class="muted">入口：<code>/api/workforce/*</code>、<code>/api/workers/heartbeat</code></div><div class="sequence">
-<div class="node"><b>管理员创建任务</b>确定性权限校验、能力与状态规则。</div><div class="down">↓</div>
+<div class="path"><h3>路径 B · 数字分身 ↔ 员工任务信箱</h3><div class="muted">入口：<code>POST /api/twin/goal</code>、<code>POST /api/twin/review</code>、<code>/api/workforce/*</code>、<code>/api/workers/heartbeat</code></div><div class="sequence">
+<div class="node"><b>分身接收目标并创建任务</b><code>POST /api/twin/goal</code> 默认单员工优先；只有显式选择 decompose 才拆分任务。</div><div class="down">↓</div>
 <div class="node"><b>员工领取 / 心跳</b>检查 worker 身份、任务分配、租约和活跃状态；心跳不能代替任务结果。</div><div class="down">↓</div>
 <div class="node"><b>员工提交进度与结果</b>状态机只允许特定活跃状态接收事件；验收中的任务不能再被迟到事件覆盖。</div><div class="down">↓</div>
-<div class="node"><b>独立验收 / 重试 / 反馈</b>管理员验收、证据字段、尝试上限和状态转换由代码执行。</div><div class="down">↓</div>
+<div class="node"><b>分身读取员工反馈</b><code>POST /api/twin/review</code> 按任务状态给出继续观察、等待独立验收或需要重规划的决策；不自动重试、不自动验收。</div><div class="down">↓</div><div class="node"><b>独立验收 / 重试</b>管理员验收、证据字段、尝试上限和状态转换由代码执行。</div><div class="down">↓</div>
 <div class="node"><b>观察式改进报告</b><code>GET /api/improvement/report</code>只读；需管理员 Token，不会自动执行建议。</div>
 </div></div></div>
 <div class="callout" style="margin-top:12px"><b>重要现状：</b>这两条路径目前是同一仓库里的两套接口/执行流，还没有完全统一成一个端到端运行时。界面能显示的内容取决于对应路径是否写入同一套状态与事件数据。</div></section>
