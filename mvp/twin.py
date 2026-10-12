@@ -441,6 +441,7 @@ class DigitalTwinCoordinator:
                 "success_criteria": task.get("success_criteria", {}),
                 "evidence_required": task.get("evidence_required", False),
                 "verification": verification,
+                "verification_recorded": isinstance(task.get("verification"), dict),
             })
         active = counts["queued"] + counts["assigned"]
         if active:
@@ -705,6 +706,7 @@ class DigitalTwinCoordinator:
                     "Independent review was required but no reviewer callback is configured."
                 )
             task["verification"] = verification
+            task["verification_recorded"] = False
             try:
                 persisted = self._request("POST", "/api/workforce/verify", {
                     "task_id": task["task_id"],
@@ -713,6 +715,7 @@ class DigitalTwinCoordinator:
                 saved_task = persisted.get("task", {})
                 task["status"] = saved_task.get("status", task["status"])
                 task["blocker"] = saved_task.get("blocker", task.get("blocker", ""))
+                task["verification_recorded"] = isinstance(saved_task.get("verification"), dict)
             except Exception as exc:
                 events.append({
                     "type": "verification_persistence_failed",
@@ -732,11 +735,11 @@ class DigitalTwinCoordinator:
         elif counts["awaiting_validation"] or counts["blocked"] or counts["failed"] or counts["completed"] != len(ids):
             status = "needs_attention"
         elif any(not t.get("verification", {}).get("accepted", False)
-                 for t in scoped if t.get("verification") is not None):
+                 for t in scoped if t.get("verification_recorded")):
             status = "needs_attention"
             events.append({"type": "verification_rejected",
                            "task_ids": [t["task_id"] for t in scoped
-                                        if t.get("verification") is not None
+                                        if t.get("verification_recorded")
                                         and not t.get("verification", {}).get("accepted", False)],
                            "reason": "Completed worker output did not pass the required evidence gate."})
         else:
@@ -752,7 +755,7 @@ class DigitalTwinCoordinator:
                 for t in scoped
             ),
             "rejected_outputs": sum(
-                t.get("verification") is not None and not t.get("verification", {}).get("accepted", False)
+                t.get("verification_recorded") and not t.get("verification", {}).get("accepted", False)
                 for t in scoped
             ),
             "cancelled_tasks": counts["cancelled"],
