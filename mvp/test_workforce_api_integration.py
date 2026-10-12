@@ -385,3 +385,31 @@ def test_http_retry_exhaustion_marks_task_failed_and_visible_to_monitor(workforc
     assert any(alert["type"] == "failed" and alert["task_id"] == task_id
                for alert in report["alerts"])
 
+def test_admin_retry_endpoint_requires_triage_reason_and_worker_cannot_call(workforce_http):
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Retry only after review", "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+    status, claim = request_json(
+        base, "/api/workforce/claim", RESEARCHER, {"capabilities": ["research"]},
+    )
+    assert status == 200
+    status, report = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id, "status": "blocked",
+        "lease_token": claim["task"]["lease_token"],
+        "blocker": "Source endpoint temporarily unavailable",
+    })
+    assert status == 200
+    status, forbidden = request_json(base, "/api/workforce/retry", RESEARCHER, {
+        "task_id": task_id, "reason": "Worker cannot authorize its own retry",
+    })
+    assert status == 403
+    status, retried = request_json(base, "/api/workforce/retry", ADMIN, {
+        "task_id": task_id, "reason": "Twin checked the source outage; retry once",
+    })
+    assert status == 200
+    assert retried["task"]["status"] == "queued"
+    assert retried["task"]["history"][-1]["event"] == "retry_approved"
+
