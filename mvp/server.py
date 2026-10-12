@@ -350,8 +350,8 @@ class Handler(BaseHTTPRequestHandler):
         return body
     def do_HEAD(self):
         # Render and other HTTP monitors commonly probe the root with HEAD.
-        if self.path in ("/", "/index.html", "/playtest", "/trace"):
-            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace", "/logic"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "logic.html" if self.path == "/logic" else "dashboard.html"
             try:
                 size = (ROOT / page).stat().st_size
             except OSError:
