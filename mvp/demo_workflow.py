@@ -110,7 +110,7 @@ def main() -> int:
         "blocker": "",
         "lease_token": lease_token,
     })
-    print("3. Worker submitted completed status with an explicit SIMULATED label.")
+    print("3. Worker submitted a result with an explicit SIMULATED label; task now awaits validation.")
 
     verification = {
         "accepted": True,
