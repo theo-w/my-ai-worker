@@ -159,3 +159,22 @@ def test_active_lease_heartbeat_renews_lease_and_rejects_stale_token(tmp_path):
     with pytest.raises(ValueError, match="lease token"):
         registry.renew_lease(task["id"], "worker-a", "stale-token")
 
+def test_explicit_retry_requeues_blocked_task_with_audit_and_limit(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "explicit-retry.json"), max_attempts=2)
+    task = registry.create_task("Needs dependency", capability="analysis")
+    first = registry.claim("worker-a", ["analysis"])
+    registry.report(task["id"], "worker-a", "blocked", blocker="Missing dependency",
+                    lease_token=first["lease_token"])
+
+    retried = registry.retry_task(task["id"], "Dependency restored; retry once")
+    assert retried["status"] == "queued"
+    assert retried["blocker"] == ""
+    assert retried["history"][-1]["event"] == "retry_approved"
+    assert retried["history"][-1]["reason"] == "Dependency restored; retry once"
+
+    second = registry.claim("worker-a", ["analysis"])
+    registry.report(task["id"], "worker-a", "blocked", blocker="Still unavailable",
+                    lease_token=second["lease_token"])
+    with pytest.raises(ValueError, match="retry limit"):
+        registry.retry_task(task["id"], "Do not exceed the bounded retry policy")
+
