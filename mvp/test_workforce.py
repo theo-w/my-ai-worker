@@ -37,7 +37,7 @@ def test_approval_gate_prevents_claim_until_approved(tmp_path):
     assert registry.claim("worker-a")["id"] == task["id"]
 
 
-def test_persistent_queue_survives_restart_and_retries_blocker(tmp_path):
+def test_persistent_queue_survives_restart_and_keeps_blocked_for_triage(tmp_path):
     path = str(tmp_path / "workforce.json")
     first = WorkforceRegistry(path=path, max_attempts=2)
     task = first.create_task("Run tests", capability="testing")
@@ -45,8 +45,8 @@ def test_persistent_queue_survives_restart_and_retries_blocker(tmp_path):
     first.report(task["id"], "worker-a", "blocked", blocker="Missing dependency", lease_token=claimed["lease_token"])
 
     restarted = WorkforceRegistry(path=path, max_attempts=2)
-    assert restarted.snapshot()["tasks"][0]["status"] == "queued"
-    assert restarted.claim("worker-b", ["testing"])["attempts"] == 2
+    assert restarted.snapshot()["tasks"][0]["status"] == "blocked"
+    assert restarted.claim("worker-b", ["testing"]) is None
 
 
 def test_expired_lease_rejects_late_report_and_requeues_task(tmp_path):
