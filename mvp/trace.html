@@ -22,6 +22,8 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 <section class="metrics" id="metrics">
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>待验证 / 已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字分身：目标规划</h2><span class="pill">管理员操作</span></div><div class="detailgrid"><div class="sub"><label for="twinGoal"><strong>目标</strong></label><textarea id="twinGoal" rows="3" maxlength="4000" placeholder="例如：评估一款 AI 原生游戏的海外市场需求与技术可行性"></textarea><div class="muted">默认单员工优先；需要明确分工收益时再拆分。创建任务不代表已执行或验收。</div></div><div class="sub"><label for="twinStrategy"><strong>任务组织方式</strong></label><select id="twinStrategy"><option value="single_agent">单员工优先</option><option value="decompose">拆分任务</option></select><div style="margin-top:10px"><button class="primary" id="createTwinGoal">规划目标并创建任务</button></div><div id="twinGoalResult" class="muted" style="margin-top:10px">尚未提交目标。</div></div></div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工在线与心跳</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
 
 <div class="grid">
