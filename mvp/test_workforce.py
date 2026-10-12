@@ -223,3 +223,24 @@ def test_rejected_validation_blocks_task_and_cannot_be_repeated(tmp_path):
     assert rejected["blocker"] == "No supporting source was supplied"
     with pytest.raises(ValueError, match="awaiting_validation"):
         registry.record_verification(task["id"], {"accepted": True})
+
+def test_evidence_required_task_cannot_be_accepted_without_valid_source_records(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "evidence-gate.json"))
+    task = registry.create_task(
+        "Research with evidence", capability="research", evidence_required=True,
+    )
+    claimed = registry.claim("worker-a", ["research"])
+    registry.report(
+        task["id"], "worker-a", "completed", output="Candidate claim",
+        lease_token=claimed["lease_token"],
+    )
+    rejected = registry.record_verification(task["id"], {
+        "accepted": True,
+        "evidence_count": 0,
+        "checks": [{"name": "source_structure", "passed": True}],
+    })
+    assert rejected["status"] == "blocked"
+    assert rejected["verification"]["accepted"] is False
+    assert any(check["name"] == "required_evidence_for_task"
+               and not check["passed"] for check in rejected["verification"]["checks"])
+    assert rejected["verified_truth"] is False
