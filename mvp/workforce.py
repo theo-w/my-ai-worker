@@ -246,6 +246,33 @@ class WorkforceRegistry:
         return {"requeued": requeued, "failed": failed}
 
 
+    def record_verification(self, task_id: str, verification: dict) -> dict:
+        """Persist a structural verification record without claiming factual truth."""
+        if not isinstance(verification, dict) or len(json.dumps(verification)) > 8000:
+            raise ValueError("verification must be an object up to 8000 serialized characters")
+        if "accepted" not in verification or not isinstance(verification.get("accepted"), bool):
+            raise ValueError("verification.accepted must be a boolean")
+        safe = dict(verification)
+        # Structural acceptance is not proof that the output is factually true.
+        safe["verified_truth"] = False
+        with self.lock:
+            task = self._get(task_id)
+            if task["status"] not in {"completed", "blocked", "failed"}:
+                raise ValueError("only terminal tasks can be verified")
+            task["verification"] = safe
+            task["verified_truth"] = False
+            task["updated_at"] = _stamp()
+            task["history"].append({
+                "event": "verification_recorded",
+                "accepted": safe["accepted"],
+                "verified_truth": False,
+                "at": _stamp(),
+            })
+            self._event("verification_recorded", task_id=task_id,
+                        accepted=safe["accepted"], verified_truth=False)
+            self.save()
+            return {key: value for key, value in task.items() if key != "_lease_token"}
+
     def retry_task(self, task_id: str, reason: str) -> dict:
         """Explicitly requeue blocked/failed work after twin triage, within retry limits."""
         if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
