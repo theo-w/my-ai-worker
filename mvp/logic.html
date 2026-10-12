@@ -51,6 +51,34 @@
 <div class="node"><b>观察式改进报告</b><code>GET /api/improvement/report</code>只读；需管理员 Token，不会自动执行建议。</div>
 </div></div></div>
 <div class="callout" style="margin-top:12px"><b>重要现状：</b>这两条路径目前是同一仓库里的两套接口/执行流，还没有完全统一成一个端到端运行时。界面能显示的内容取决于对应路径是否写入同一套状态与事件数据。</div></section>
+<section class="panel"><h2>数字分身 ↔ 数字员工：谁负责什么？</h2>
+<div class="two">
+<div class="path"><h3 class="llm">数字分身 · 目标负责人 / 协调者</h3><ul>
+<li>保存用户目标、约束、完成标准与授权范围。</li>
+<li>先判断一个员工能否完成；只有并行拆分确有收益时才组织多个员工。</li>
+<li>根据能力和权限分配任务，不强制固定岗位编制。</li>
+<li>持续接收员工进度、问题、阻塞、结果和证据。</li>
+<li>反馈后做出可追踪决策：澄清、重规划、合并、取消、有限重试或询问用户。</li>
+<li>不把员工自报完成视为验收通过。</li>
+</ul></div>
+<div class="path"><h3 class="rule">数字员工 · 有边界的执行代理</h3><ul>
+<li>只领取服务端允许的能力范围内的任务。</li>
+<li>报告进度、输出、证据、假设、不确定性和阻塞原因。</li>
+<li>遇到缺少信息或权限时请求澄清，不自行扩大范围。</li>
+<li>结果先进入待验收状态，由授权验收流程决定是否接受。</li>
+<li>不能验收自己的结果、冒充其他员工或修改自身权限。</li>
+</ul></div>
+</div>
+<div class="sequence" style="margin-top:12px">
+<div class="node"><b>1. 分身理解目标</b>记录约束、完成标准、风险和自主权限；规则先检查权限与审批要求。</div><div class="down">↓</div>
+<div class="node"><b>2. 单员工优先</b>判断单代理是否足够；若需要拆分，说明并行协作的质量、速度或风险收益。</div><div class="down">↓</div>
+<div class="node"><b>3. 分配任务 → 员工执行</b>任务应包含输入、预期输出、验收标准、证据要求和工具权限；员工持续反馈。</div><div class="down">↓</div>
+<div class="node"><b>4. 分身处理反馈</b>根据任务记录决定澄清、调整、合并、取消、有限重试或请求用户决策，并记录原因。</div><div class="down">↓</div>
+<div class="node"><b>5. 独立验收 → 更新目标进展</b>验收通过才更新已接受结果；失败则反馈并进入受限恢复流程。</div>
+</div>
+<div class="callout" style="margin-top:12px"><b>当前实现边界：</b>仓库已有 Twin policy / bounded project loop、持久化 worker mailbox、心跳租约、反馈和验收状态。但工作台执行流、自主项目循环和持久化员工邮箱尚未统一成一个运行时；分身基于反馈作出的所有决策也还没有统一成一套完整的决策记录 API。</div>
+<div class="muted" style="margin-top:8px"><a href="https://github.com/theo-w/my-ai-worker/blob/feat/observe-only-self-improvement/docs/TWIN_WORKER_INTERACTION.md" target="_blank" rel="noopener noreferrer">查看数字分身与员工交互契约、状态边界和端到端验收清单 →</a></div>
+</section>
 <section class="panel"><h2>LLM 在什么时机真正生效？</h2><div class="tablewrap"><table><thead><tr><th>阶段</th><th>触发条件</th><th>LLM 做什么</th><th>不会替代什么</th></tr></thead><tbody>
 <tr><td>规划 <code>/api/autonomous</code></td><td>请求未提供 tasks，且启动时成功配置 <code>JARVIS_LLM_BASE_URL</code>、<code>JARVIS_LLM_API_KEY</code>、<code>JARVIS_LLM_MODEL</code>。</td><td>生成有界 JSON 任务列表；代码再校验 ID、标题、能力类型和任务数量。</td><td>不负责权限认证或审批；无效/异常响应退回确定性计划。</td></tr>
 <tr><td>普通员工执行</td><td>非研究任务被路由到 LLM executor，且模型配置有效。</td><td>根据目标和任务指令生成工作输出。</td><td>不自动浏览网页、不证明事实、不把模型文字变成外部证据。</td></tr>
