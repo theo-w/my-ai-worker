@@ -64,6 +64,8 @@ Every worker update should contain:
 - `POST /tasks` — create a task
 - `GET /tasks` and `GET /tasks/:id` — inspect queue and task state
 - `POST /tasks/:id/accept` — worker acknowledges assignment
+- `POST /tasks/:id/heartbeat` — worker refreshes its last-seen timestamp while assigned work is active
+- `GET /monitoring/workers` — admin-only view of active task ownership and stale-heartbeat flags
 - `POST /tasks/:id/events` — worker posts progress/result/blocker/failure events
 - `POST /tasks/:id/approve` — record human approval or rejection
 - `POST /tasks/:id/retry` — explicitly requeue an eligible task
@@ -72,6 +74,8 @@ Every worker update should contain:
 These endpoints are a target contract, not a claim that they are already implemented.
 
 ## Reliability and safety requirements
+
+- Heartbeats are operational liveness signals, not proof of task progress or correctness. The monitoring endpoint marks a heartbeat stale after the configured timeout; automated reassignment is not implemented by this change.
 
 - Persist tasks and events; do not rely on browser memory or process memory as the source of truth.
 - Use idempotency keys for task creation and worker event submission.
