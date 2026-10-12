@@ -51,7 +51,7 @@ curl -fsS -X POST "$BASE/api/workforce/report" \
   -d "{\"task_id\":\"$TASK_ID\",\"status\":\"completed\",\"lease_token\":\"$LEASE\",\"output\":\"[ACCEPTANCE SAMPLE] 待验证假设；尚未检索外部来源。\",\"blocker\":\"\"}" | jq .
 ```
 
-回到页面查看任务详情与历史。该输出是验收样例，不是市场研究结论；它不包含可验证来源，也不应被视为事实。
+回到页面查看任务详情与历史。员工提交后，任务应进入 `awaiting_validation`，而不是直接标记完成。该输出是验收样例，不是市场研究结论；它不包含可验证来源，也不应被视为事实。
 
 ## 4. 记录结构检查结果
 
@@ -64,7 +64,7 @@ curl -fsS -X POST "$BASE/api/workforce/verify" \
   -d "{\"task_id\":\"$TASK_ID\",\"verification\":{\"accepted\":false,\"status\":\"rejected\",\"checks\":[{\"name\":\"source_evidence_present\",\"passed\":false,\"note\":\"验收样例没有外部来源\"}]}}" | jq .
 ```
 
-页面应显示验证状态为 rejected，且 `verified_truth` 为 `false`。这体现了“员工完成提交”和“结果通过验证”是两个不同阶段。
+验证前任务应保持 `awaiting_validation`；记录结构检查后，页面应显示验证结果，且 `verified_truth` 为 `false`。如果检查不通过，任务转为 `blocked`；通过结构检查后任务才转为 `completed`，但这不代表事实已被独立证实。这体现了“员工提交结果”和“结果通过验证”是两个不同阶段。
 
 ## 5. 验收阻塞与重试边界
 
