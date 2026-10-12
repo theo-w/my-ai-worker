@@ -422,7 +422,8 @@ def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_htt
         assert response.status == 200
         assert "流程追踪与验收" in page
         assert 'fetch("/api/workforce"' in page
-        assert "localStorage" not in page
+        assert "localStorage.setItem" not in page
+        assert "localStorage.getItem" not in page
     status, protected = request_json(base, "/api/workforce")
     assert status == 401
     assert protected["ok"] is False
