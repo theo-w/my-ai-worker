@@ -278,7 +278,7 @@ function createServer(options = {}) {
       if (req.method === 'GET' && pathname === '/monitoring/workers') {
         if (actor.role !== 'admin') throw httpError(403, 'Admin role required');
         const timeoutMs = Math.max(5000, Number(process.env.JARVIS_HEARTBEAT_TIMEOUT_MS) || 60000);
-        const tasks = (await store.listTasks()).filter((task) => task.worker_id && !TERMINAL_STATES.has(task.status));
+        const tasks = (await store.listTasks()).filter((task) => task.worker_id && ['accepted', 'running'].includes(task.status));
         const now = Date.now();
         const workers = tasks.map((task) => {
           const last = task.last_heartbeat_at ? Date.parse(task.last_heartbeat_at) : NaN;
