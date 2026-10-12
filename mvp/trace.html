@@ -18,7 +18,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </section>
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">运行环境与真实性标记</h2><span id="runtimeMode" class="pill">尚未读取</span></div><div id="runtimeInfo" class="muted">连接后读取当前执行器配置。模拟执行、真实模型调用和外部搜索会明确区分。</div></section>
 <section class="metrics" id="metrics">
- <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
+ <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>待验证 / 已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工在线与心跳</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
 
@@ -37,7 +37,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null;
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
- const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
+ const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",awaiting_validation:"等待验证",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
  const tone=s=>["completed"].includes(s)?"good":["blocked","queued","assigned","approval_required","running","working"].includes(s)?"warn":["failed"].includes(s)?"bad":"";
  function setStatus(msg,cls=""){ $("status").className="notice "+cls; $("status").textContent=msg; }
  function rows(){return Array.isArray(snapshot&&snapshot.tasks)?snapshot.tasks:[];}
@@ -68,7 +68,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  function renderMetrics(){
   const tasks=rows(), workers=Array.isArray(snapshot.workers)?snapshot.workers:[];
   const running=tasks.filter(t=>["assigned","running","working"].includes(t.status)).length;
-  const pending=tasks.filter(t=>["queued","approval_required"].includes(t.status)).length;
+  const pending=tasks.filter(t=>["queued","approval_required","awaiting_validation"].includes(t.status)).length;
   const failed=tasks.filter(t=>["blocked","failed"].includes(t.status)).length;
   const vals=[tasks.length,running,pending,failed,eventRows().length];
   $("metrics").innerHTML=vals.map((v,i)=>'<div class="metric"><strong>'+esc(v)+'</strong><span>'+["任务总数","执行中","待处理","已阻塞 / 失败","事件记录"][i]+'</span></div>').join("");
@@ -86,7 +86,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   }
 function renderTasks(){
   const filter=$("filter").value;
-  const tasks=rows().filter(t=>filter==="all"||(filter==="active"&&["queued","assigned","running","working","approval_required"].includes(t.status))||(filter==="blocked"&&["blocked","failed"].includes(t.status))||(filter==="completed"&&t.status==="completed"));
+  const tasks=rows().filter(t=>filter==="all"||(filter==="active"&&["queued","assigned","running","working","approval_required","awaiting_validation"].includes(t.status))||(filter==="blocked"&&["blocked","failed"].includes(t.status))||(filter==="completed"&&t.status==="completed"));
   if(!tasks.length){$("tasks").innerHTML='<div class="empty">这个筛选条件下没有任务。</div>';return;}
   $("tasks").innerHTML=tasks.map(t=>{
    const id=t.id||t.task_id||"",title=t.title||t.description||id,worker=t.assigned_to||t.worker_id||"尚未分配";
