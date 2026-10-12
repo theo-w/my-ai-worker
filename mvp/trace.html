@@ -19,6 +19,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 <section class="metrics" id="metrics">
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字员工心跳与运行状态</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
 <div class="grid">
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务与员工状态</h2><select id="filter"><option value="all">全部任务</option><option value="active">进行中 / 排队</option><option value="blocked">阻塞 / 失败</option><option value="completed">已完成</option></select></div><div id="tasks" class="empty">连接后显示实时任务。</div></section>
  <section class="panel"><div class="toolbar"><h2 style="margin:0;flex:1">任务过程详情</h2><span id="selectedStatus" class="pill">未选择</span></div><div id="detail" class="empty">选择左侧任务，查看输入、输出、阻塞原因和完整任务历史。</div></section>
@@ -56,6 +57,15 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   $("metrics").innerHTML=vals.map((v,i)=>'<div class="metric"><strong>'+esc(v)+'</strong><span>'+["任务总数","执行中","待处理","已阻塞 / 失败","事件记录"][i]+'</span></div>').join("");
   $("eventCount").textContent=eventRows().length+" 条事件";
  }
+ function renderWorkers(){
+  const workers=Array.isArray(snapshot&&snapshot.workers)?snapshot.workers:[];
+  $("workerCount").textContent=workers.length+" 名员工";
+  if(!workers.length){$("workers").innerHTML='<div class="empty">当前没有已登记员工。员工在首次心跳后会出现在这里。</div>';return;}
+  $("workers").innerHTML=workers.map(w=>{
+   const wid=w.worker_id||w.id||"unknown",status=w.status||"unknown";
+   return '<div class="sub"><div class="line"><strong>'+esc(wid)+'</strong><span class="pill '+tone(status)+'">'+esc(label(status))+'</span></div><div class="muted" style="margin:7px 0">最近心跳：'+esc(w.last_heartbeat||w.heartbeat_at||w.updated_at||"无记录")+'</div><div class="muted">能力：'+esc(pretty(w.capabilities||[]))+'</div><div class="muted">当前任务：'+esc(pretty(w.active_task_ids||w.task_ids||[]))+'</div></div>';
+  }).join("");
+ }
  function renderTasks(){
   const filter=$("filter").value;
   const tasks=rows().filter(t=>filter==="all"||(filter==="active"&&["queued","assigned","running","working","approval_required"].includes(t.status))||(filter==="blocked"&&["blocked","failed"].includes(t.status))||(filter==="completed"&&t.status==="completed"));
@@ -85,7 +95,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
   $("events").className="events";
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
- function render(){renderMetrics();renderTasks();renderDetail();renderEvents();}
+ function render(){renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
  $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
