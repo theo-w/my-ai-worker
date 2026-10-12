@@ -15,6 +15,20 @@
 <div class="step"><strong>7. 分身反馈 / 重规划</strong><div class="muted">处理失败、重试、合并或取消低价值工作</div><span class="tag rule">次数与状态限制</span><span class="tag llm">特定路径可选 LLM 重规划</span></div>
 <div class="step"><strong>8. 观察式自我改进</strong><div class="muted">识别重复阻塞与重试，提出可证伪实验</div><span class="tag rule">只读分析</span><span class="tag blocked">不自动改代码或上线</span></div>
 </div></section>
+<section class="panel"><h2>数字分身 ↔ 数字员工：双向协作闭环</h2>
+<p class="muted">分身不是简单的任务分发器；员工也不是只返回一段文本的工具。分身管理目标、计划与取舍，员工负责有边界地执行并报告真实状态。以下是目标行为；当前不同执行路径尚未全部统一，不能把设计图当成已完成的端到端能力。</p>
+<div class="flow">
+<div class="step"><strong>1. 分身接收目标</strong><div class="muted">保存目标、约束、成功标准和风险等级。</div><span class="tag rule">输入校验 / 策略规则</span></div>
+<div class="step"><strong>2. 分身决定如何组织</strong><div class="muted">先判断单代理是否足够；只有存在明确分工收益时才拆成多个任务。</div><span class="tag llm">LLM 可提出计划</span><span class="tag rule">规则校验计划</span></div>
+<div class="step"><strong>3. 员工接收并确认</strong><div class="muted">按能力、身份、权限与任务租约领取工作。</div><span class="tag rule">权限 / 能力 / 租约检查</span></div>
+<div class="step"><strong>4. 员工执行并持续反馈</strong><div class="muted">提交进度、结果、证据来源或阻塞原因；心跳只代表存活，不代表工作成功。</div><span class="tag conditional">LLM / 搜索 / 工具按配置调用</span></div>
+<div class="step"><strong>5. 分身处理反馈</strong><div class="muted">决定继续、补充输入、重试、改派、合并、取消或重规划。</div><span class="tag rule">状态与次数边界</span><span class="tag llm">可选 LLM 重规划</span></div>
+<div class="step"><strong>6. 独立验收</strong><div class="muted">员工不能自己批准自己的结果；失败时记录原因并返回分身决策环节。</div><span class="tag rule">验收门槛 / 权限边界</span></div>
+<div class="step"><strong>7. 记忆与改进</strong><div class="muted">记录决策、反馈、成本和结果；先生成改进假设，评估与批准后才考虑采用。</div><span class="tag rule">当前为观察模式</span></div>
+</div>
+<div class="arrow">↺ 未通过、阻塞或目标变化时，返回第 2 或第 5 步；完成后汇报用户。</div>
+<div class="callout"><strong>当前实现边界：</strong>任务信箱已支持创建、领取、心跳、进度/结果反馈、等待验收、管理员验证和重试边界；工作台快速运行、项目自主循环和持久化员工信箱目前仍是并存路径。要实现真正持续管理，下一步必须把“分身决策 → 信箱任务 → 员工反馈 → 分身再决策”接成一条受测的运行时闭环。不要把员工心跳当成完成状态，也不要把 LLM 输出当成独立证据。</div>
+</section>
 <section class="panel"><h2>当前有三条并存的执行路径（不要混为一条）</h2><div class="two">
 <div class="path"><h3>路径 A · 项目规划与执行</h3><div class="muted">入口：<code>POST /api/autonomous</code></div><div class="sequence">
 <div class="node"><b>请求校验</b>目标、任务格式、动作边界先由代码检查。</div><div class="down">↓</div>
