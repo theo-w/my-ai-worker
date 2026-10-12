@@ -421,7 +421,7 @@ def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_htt
         page = response.read().decode("utf-8")
         assert response.status == 200
         assert "流程追踪与验收" in page
-        assert "员工在线与心跳" in page
+        assert "员工心跳与运行状态" in page
         assert "最近心跳" in page
         assert 'fetch("/api/workforce"' in page
         assert "localStorage.setItem" not in page
