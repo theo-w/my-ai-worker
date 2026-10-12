@@ -18,6 +18,7 @@ ANALYST = "analyst-secret-for-integration-tests-0003"
 
 @pytest.fixture
 def workforce_http(monkeypatch, tmp_path):
+    monkeypatch.delenv("JARVIS_PUBLIC_DEMO", raising=False)
     monkeypatch.setenv("JARVIS_ADMIN_TOKEN", ADMIN)
     monkeypatch.setenv(
         "JARVIS_WORKER_TOKENS",
