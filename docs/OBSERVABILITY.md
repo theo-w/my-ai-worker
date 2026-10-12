@@ -127,3 +127,28 @@ individual cycle errors. It does not invent an AI recovery policy: pass
 `recovery_policy(report)` only when an explicit policy implementation is available.
 Use a process manager for deployment, and configure secure secret injection,
 logs, restart policy, and an external health check before running it unattended.
+
+## Interactive workflow trace and acceptance view
+
+When the JARVIS HTTP server is running, open `/trace` in the same browser session
+(e.g. `http://127.0.0.1:8765/trace`). The main dashboard also links to this page.
+Enter the configured administrator token in the page to read `/api/workforce`.
+The token is held only in page memory, is not written to localStorage or the URL,
+and is cleared when the page is closed.
+
+The view refreshes every five seconds by default and supports manual refresh and
+task-state filters. Select a task to inspect its goal/input, assignment, output,
+blocker/feedback fields, attempt count, task history, and the recent global event
+timeline. The endpoint remains admin-authenticated; the trace page itself does not
+embed credentials and does not mutate task state.
+
+Use this view to verify real execution at milestones:
+- a worker claims a task and receives a lease;
+- the worker reports progress or a blocker;
+- the twin recommends a replan or explicitly approves a retry;
+- the task finishes and any evidence/verification result is reviewed.
+
+A task status of `completed` is not by itself proof that its claims are true.
+Review source evidence and verification state separately. The trace view shows
+what the runtime has recorded; it does not claim that an unrecorded model action
+occurred.
