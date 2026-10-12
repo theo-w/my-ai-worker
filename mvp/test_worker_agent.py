@@ -74,7 +74,7 @@ def test_twin_plan_is_claimed_executed_and_reported_by_standalone_agent(system):
 
     snapshot = twin.inspect()
     task = next(item for item in snapshot["tasks"] if item["task_id"] == result["task_id"])
-    assert task["status"] == "completed"
+    assert task["status"] == "awaiting_validation"
     assert task["provenance"] == "executor_reported_live"
     stored = next(item for item in registry.snapshot()["tasks"] if item["id"] == result["task_id"])
     envelope = json.loads(stored["output"])
