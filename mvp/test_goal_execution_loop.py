@@ -102,7 +102,9 @@ def test_twin_does_not_accept_simulated_research_as_goal_success(monkeypatch, tm
         result = twin.execute_goal("research goal", [worker], max_cycles=3, tasks=[
             {"title": "Research evidence", "capability": "research", "priority": 5},
         ])
-        assert result["counts"]["completed"] == 1
+        assert result["counts"]["completed"] == 0
+        assert result["counts"]["blocked"] == 1
+        assert result["metrics"]["rejected_outputs"] == 1
         assert result["status"] == "needs_attention"
         task = result["tasks"][0]
         assert task["verification"]["accepted"] is False
