@@ -737,7 +737,7 @@ def supervise_workforce():
 
 
 if __name__ == "__main__":
-    host = os.getenv("HOST", "0.0.0.0")
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8765"))
     threading.Thread(target=supervise_workforce, name="jarvis-workforce-supervisor", daemon=True).start()
     print(f"JARVIS Dashboard listening on {host}:{port}", flush=True)
