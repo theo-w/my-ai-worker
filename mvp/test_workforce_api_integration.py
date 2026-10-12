@@ -948,3 +948,84 @@ def test_twin_reviews_blocked_employee_feedback_without_auto_retry(workforce_htt
     assert review_event["next_actions"] == review["next_actions"]
     assert review_event["llm_used"] is False
     assert task_id in review_event["task_ids"]
+
+
+def test_twin_advance_retries_only_recognized_transient_blockers(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Search provider temporarily unavailable (HTTP 503)",
+    })
+    assert status == 200
+    assert blocked["task"]["status"] == "blocked"
+
+    status, advanced = request_json(base, "/api/twin/advance", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert advanced["decision"] == "transient_retry_queued"
+    assert advanced["action_task_id"] == task_id
+    assert advanced["llm_used"] is False
+    assert advanced["next_actions"][0]["status"] == "queued"
+    assert "not auto-accepted" in advanced["safety_note"]
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    task_after = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+    assert task_after["status"] == "queued"
+    assert any(event["type"] == "twin_advanced"
+               and event["project_id"] == project_id
+               and event["decision"] == "transient_retry_queued"
+               for event in snapshot["events"])
+
+
+def test_twin_advance_does_not_retry_unknown_blockers(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Evaluate an AI-native game concept",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Research evidence conflicts and requires human diagnosis",
+    })
+    assert status == 200
+
+    status, advanced = request_json(base, "/api/twin/advance", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert advanced["decision"] == "human_review_required"
+    assert advanced["action_task_id"] is None
+    assert advanced["next_actions"][0]["task_id"] == task_id
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    task_after = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+    assert task_after["status"] == "blocked"
