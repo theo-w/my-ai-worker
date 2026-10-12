@@ -48,7 +48,7 @@ def build_improvement_report(snapshot: dict, min_samples: int = 2,
         if isinstance(attempts, int) and not isinstance(attempts, bool) and attempts >= 2:
             retry_task_ids.append(task_id)
         verification = task.get("verification")
-        if (task.get("status") == "blocked"
+        if (task.get("status") in {"blocked", "failed"}
                 or (isinstance(verification, dict) and verification.get("accepted") is False)):
             rejected_task_ids.append(task_id)
         if task.get("status") == "awaiting_validation":
