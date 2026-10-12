@@ -48,6 +48,21 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  function setStatus(msg,cls=""){ $("status").className="notice "+cls; $("status").textContent=msg; }
  function rows(){return Array.isArray(snapshot&&snapshot.tasks)?snapshot.tasks:[];}
  function eventRows(){return Array.isArray(snapshot&&snapshot.events)?snapshot.events:[];}
+ async function createTwinGoal(){
+  const goal=$("twinGoal").value.trim();
+  if(!token){setStatus("请先连接管理员 Token。","error");return;}
+  if(!goal){$("twinGoalResult").textContent="请先输入目标。";return;}
+  const button=$("createTwinGoal");button.disabled=true;$("twinGoalResult").textContent="正在规划…";
+  try{
+   const response=await fetch("/api/twin/goal",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({goal:goal,strategy:$("twinStrategy").value})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+   $("twinGoalResult").textContent="项目 "+(data.project_id||"")+"；规划模式："+(data.plan_mode||"unknown")+"；创建任务："+((data.tasks||[]).length)+" 个。";
+   setStatus("数字分身已创建员工任务；请查看任务状态和后续反馈。","ok");
+   await load();
+  }catch(e){$("twinGoalResult").textContent="规划失败："+e.message;setStatus("数字分身未能创建任务："+e.message,"error");}
+  finally{button.disabled=false;}
+ }
  async function load(){
   if(!token||busy)return;busy=true;$("refresh").disabled=true;
   try{
@@ -134,7 +149,7 @@ function renderTasks(){
  }
  function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();renderImprovement();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
- $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
+ $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("createTwinGoal").addEventListener("click",createTwinGoal);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
  $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
  timer=setInterval(load,5000);
