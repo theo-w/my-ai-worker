@@ -92,7 +92,7 @@ flowchart TD
 
 ### Current implementation caveat
 
-The repository has a persistent workforce lifecycle and a separate dashboard/executor path. Do not assume the Digital Twin automatically orchestrates every persistent employee task end-to-end yet. The collaboration flow above is the target operating model; each integration edge must be demonstrated by tests and trace events before being called complete.
+The repository has a persistent workforce lifecycle and a separate dashboard/executor path. The new admin-only `POST /api/twin/goal` endpoint now connects a goal to that mailbox: it defaults to one queued employee task (`strategy=single_agent`) and only decomposes into temporary tasks when the caller explicitly requests `strategy=decompose`. Decomposed tasks share a project ID in their acceptance metadata, and a `twin_goal_planned` event records the plan mode and created task IDs. This is the first integration edge, not yet a fully autonomous continuous manager: employee feedback still requires an explicit orchestration decision, and the end-to-end replan/merge/cancel loop must be proven separately by tests and trace events.
 
 ## 3. When deterministic rules run vs. when an LLM runs
 
@@ -165,7 +165,7 @@ Not yet proven as one end-to-end production workflow:
 - `mvp/research.py` — live search adapter, evidence gate and optional synthesis.
 - `mvp/claim_evidence.py` — citation-structure audit.
 - `mvp/verification.py` — output acceptance checks and optional independent reviewer.
-- `mvp/workforce.py` / `mvp/server.js` — persistent task lifecycle, events, heartbeat and validation.
+- `mvp/workforce.py` / `mvp/server.py` — persistent task lifecycle, events, heartbeat and validation; `POST /api/twin/goal` connects goals to the employee mailbox.
 - `mvp/improvement.py` — observe-only recursive improvement proposals.
 
 
