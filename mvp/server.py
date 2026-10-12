@@ -433,8 +433,12 @@ class Handler(BaseHTTPRequestHandler):
                         str(body.get("progress", "")), str(body.get("last_error", "")),
                     )
                     worker["capabilities"] = _worker_capabilities(worker_id)
-                    WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
-                    WORKFORCE.save()
+                    # The registry lock must cover the final capability update and
+                    # persistence. Parallel heartbeat handlers otherwise race on
+                    # the shared .tmp file used by WorkforceRegistry.save().
+                    with WORKFORCE.lock:
+                        WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
+                        WORKFORCE.save()
                     self._json({"ok": True, "worker": worker})
                 elif self.path == "/api/workforce/tasks":
                     task = WORKFORCE.create_task(
