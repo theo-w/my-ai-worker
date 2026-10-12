@@ -433,6 +433,7 @@ class DigitalTwinCoordinator:
                 "status": status,
                 "assigned_to": task.get("assigned_to"),
                 "attempts": task.get("attempts"),
+                "max_attempts": task.get("max_attempts"),
                 "provenance": provenance,
                 "has_output": bool(output),
                 "output": output,
