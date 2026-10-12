@@ -939,5 +939,12 @@ def test_twin_reviews_blocked_employee_feedback_without_auto_retry(workforce_htt
 
     status, snapshot = request_json(base, "/api/workforce", ADMIN)
     assert status == 200
-    assert any(event["type"] == "twin_reviewed" and event["project_id"] == project_id
-               for event in snapshot["events"])
+    review_events = [event for event in snapshot["events"]
+                     if event["type"] == "twin_reviewed" and event["project_id"] == project_id]
+    assert review_events
+    review_event = review_events[-1]
+    assert review_event["decision"] == review["decision"]
+    assert review_event["reason"] == review["reason"]
+    assert review_event["next_actions"] == review["next_actions"]
+    assert review_event["llm_used"] is False
+    assert task_id in review_event["task_ids"]
