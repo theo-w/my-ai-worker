@@ -28,13 +28,15 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </div>
 
 
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">递归自我改进 · 观察模式</h2><button id="refreshImprovement">刷新改进建议</button><span id="improvementMode" class="pill">尚未读取</span></div><div id="improvementReport" class="detailgrid"><div class="empty">连接后展示重复阻塞、重试和验收失败的观察信号。这里只提出建议，不会自动改动任务或代码。</div></div><div class="notice">建议来自已记录的任务元数据，只是诊断线索，不代表已确认根因。任何方案都需要回归测试、独立评估和人工批准。</div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">全局事件时间线</h2><span id="eventCount" class="muted">0 条事件</span></div><div id="events" class="events empty">连接后显示事件。</div></section>
 <div class="notice">安全说明：管理员 Token 不写入 localStorage 或 URL；数据通过带 Authorization 的只读接口获取。请只在可信环境使用管理员凭证。模型输出、员工反馈和已验证结论应分别判断，不要仅凭状态为 completed 就认定事实正确。</div>
 </main>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null;
+ let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null,improvement=null;
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
  const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",awaiting_validation:"等待验证",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
@@ -48,7 +50,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
    const r=await fetch("/api/workforce",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
-   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
+   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}try{const ir=await fetch("/api/improvement/report",{headers:{Authorization:"Bearer "+token},cache:"no-store"});const idata=await ir.json().catch(()=>({}));if(!ir.ok)throw new Error(idata.error||("HTTP "+ir.status));improvement=idata.report;}catch(e){improvement={error:e.message};}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
   }catch(e){setStatus("读取失败："+e.message+"。请检查 Token、服务状态和权限。","error");}
   finally{busy=false;$("refresh").disabled=false;}
  }
@@ -113,9 +115,22 @@ function renderTasks(){
   $("events").className="events";
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
- function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
+ function renderImprovement(){
+  const root=$("improvementReport"),mode=$("improvementMode");
+  if(!improvement){mode.textContent="尚未读取";root.innerHTML='<div class="empty">尚无改进报告。</div>';return;}
+  if(improvement.error){mode.textContent="读取失败";root.innerHTML='<div class="sub error">'+esc(improvement.error)+'</div>';return;}
+  mode.textContent="观察模式 · 不自动执行";
+  const m=improvement.metrics||{};
+  const metrics='<div class="sub"><h3>观察指标</h3><pre class="content">'+esc(pretty(m))+'</pre></div>';
+  const observations=Array.isArray(improvement.observations)?improvement.observations:[];
+  const proposals=Array.isArray(improvement.proposals)?improvement.proposals:[];
+  const obs='<div class="sub"><h3>观察信号（'+observations.length+'）</h3>'+(observations.length?observations.map(x=>'<div style="margin:7px 0"><strong>'+esc(x.signal)+'</strong><div class="muted">样本：'+esc(x.sample_count)+' · 任务：'+esc((x.task_ids||[]).join(", "))+'</div><div>'+esc(x.detail||"")+'</div><div class="muted">'+esc(x.interpretation||"")+'</div></div>').join(""):'<div class="muted">当前样本不足，暂不提出问题假设。</div>')+'</div>';
+  const props='<div class="sub"><h3>待评估建议（'+proposals.length+'）</h3>'+(proposals.length?proposals.map(p=>'<div style="margin:8px 0"><strong>'+esc(p.title)+'</strong><div>'+esc(p.hypothesis)+'</div><div class="muted">实验：'+esc(p.experiment)+'</div><div class="muted">成功指标：'+esc(p.success_metric)+'</div><div class="pill warn">需要独立评估与人工批准</div></div>').join(""):'<div class="muted">暂无达到样本门槛的建议。</div>')+'</div>';
+  root.className="detailgrid";root.innerHTML=metrics+obs+props+'<div class="sub"><h3>安全边界</h3><pre class="content">'+esc(pretty({actions_taken:improvement.actions_taken,adoption_requires:improvement.adoption_requires,truth_claim:improvement.truth_claim}))+'</pre></div>';
+ }
+ function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();renderImprovement();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
- $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
+ $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
  $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
  timer=setInterval(load,5000);
