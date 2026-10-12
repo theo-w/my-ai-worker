@@ -240,6 +240,9 @@ def test_evidence_required_task_cannot_be_accepted_without_valid_source_records(
     })
     assert rejected["status"] == "blocked"
     assert rejected["verification"]["accepted"] is False
-    assert any(check["name"] == "required_evidence_for_task"
+    assert rejected["verification"]["evidence_count"] == 0
+    assert any(check["name"] == "source_structure"
+               and not check["passed"] for check in rejected["verification"]["checks"])
+    assert any(check["name"] == "server_evidence_gate"
                and not check["passed"] for check in rejected["verification"]["checks"])
     assert rejected["verified_truth"] is False
