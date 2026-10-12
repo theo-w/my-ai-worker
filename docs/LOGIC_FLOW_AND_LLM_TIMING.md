@@ -112,3 +112,69 @@ Not yet proven as one end-to-end production workflow:
 - `mvp/verification.py` — output acceptance checks and optional independent reviewer.
 - `mvp/workforce.py` / `mvp/server.js` — persistent task lifecycle, events, heartbeat and validation.
 - `mvp/improvement.py` — observe-only recursive improvement proposals.
+
+
+## 7. Digital Twin and Digital Employee: responsibilities and current integration boundary
+
+### Digital Twin (goal owner / supervisor)
+The Twin is responsible for:
+1. Preserve the user's goal, constraints, priorities, and acceptance criteria.
+2. Decide whether one capable worker is sufficient; use multiple workers only when parallelism or independent review has a clear benefit.
+3. Create and assign work, receive worker progress/blockers, merge or cancel low-value work, and re-plan within bounded limits.
+4. Keep decisions auditable: why this task was created, why a worker was selected, what evidence changed the plan, and who approved a gated action.
+5. Treat worker completion as a submission, not acceptance; rely on independent validation before declaring success.
+
+### Digital Employee (capability-bound executor)
+A worker is not a fixed human job title. Each worker has a runtime identity, an explicit capability allowlist, and scoped tools. It must:
+1. Claim only eligible tasks matching its authorized capabilities.
+2. Acknowledge work and renew its lease/heartbeat while working.
+3. Report progress, completion output, or a blocker with the lease token for that attempt.
+4. Include source/evidence records when the task requires research evidence.
+5. Accept feedback and retry only when the Twin/supervisor explicitly re-queues the task within the attempt limit.
+
+### Shared closed-loop view
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant T as Digital Twin
+  participant R as Rules / Policy
+  participant W as Digital Employee
+  participant V as Independent Verifier
+  U->>T: Goal + constraints
+  T->>R: Check permissions, risk and acceptance criteria
+  R-->>T: Allowed plan or approval required
+  T->>W: Assign capability-scoped task
+  W-->>T: Accept + heartbeat/progress
+  W-->>T: Output + evidence OR blocker
+  T->>V: Submit result for independent checks
+  V-->>T: Accept / reject + reasons
+  alt rejected or blocked
+    T->>R: Check retry budget and replan limits
+    R-->>T: Bounded retry allowed / stop
+    T->>W: Feedback + revised task, if allowed
+  else accepted
+    T-->>U: Report verified scope, evidence and remaining uncertainty
+  end
+```
+
+### Important current implementation boundary
+
+The repository currently contains **two related but not yet fully unified execution paths**:
+
+- `POST /api/autonomous` runs a bounded project loop through the configured `WORKER_EXECUTOR`. It can call LLM planning/replanning when a client is configured, and its current default can be simulated.
+- `/api/workforce/*` and `WorkforceRegistry` implement a persistent task mailbox, worker capability filtering, lease tokens, heartbeat, worker reports, feedback, retries, cancellation, merging, and verification records.
+- `/trace` reads the persistent workforce API. It does not yet prove that every task created by `/api/autonomous` is automatically mirrored into the persistent workforce registry or that every result traverses one shared independent-verification pipeline.
+
+Therefore, do not treat the separate pieces as a proven end-to-end Digital Twin + Employee runtime yet. The next integration milestone should unify goal/planning events with persistent worker tasks, link every task to its originating goal and plan version, and make the trace view show Twin decisions and employee actions on one correlated timeline. Add an end-to-end test that verifies: goal → plan → assigned worker → progress/heartbeat → blocker or output → Twin feedback/replan → independent acceptance → final report.
+
+### What the user should be able to inspect
+
+For each run, the trace view should expose:
+- **Twin decisions:** goal interpretation, single-agent vs multi-agent choice, task creation/merge/cancel/replan reasons, approval gates, and next-step decision.
+- **Employee execution:** worker identity, authorized capabilities, input, tool/LLM mode, progress, heartbeat, output, blocker and lease/attempt number.
+- **Rules:** which validation or policy rule ran, its result, and whether it blocked or allowed the next transition.
+- **LLM calls:** exact stage (planning, execution, synthesis, or re-planning), model/configuration label, sanitized prompt/input reference, output reference, duration, error/fallback, and provenance. Never log API keys or secrets.
+- **Acceptance:** verifier identity/type, criteria checked, evidence references, rejected claims, decision and unresolved uncertainty.
+
+An LLM call should be represented as an event only when the code actually invokes the configured client. A configured model, a planned model step, or a simulated output must never be presented as a completed live LLM call.
