@@ -442,7 +442,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/twin/goal", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -483,6 +483,70 @@ class Handler(BaseHTTPRequestHandler):
                         WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
                         WORKFORCE.save()
                     self._json({"ok": True, "worker": worker})
+                elif self.path == "/api/twin/goal":
+                    goal = body.get("goal")
+                    if not isinstance(goal, str) or not goal.strip() or len(goal.strip()) > 4000:
+                        raise ValueError("goal must be between 1 and 4000 characters")
+                    goal = goal.strip()
+                    strategy = body.get("strategy", "single_agent")
+                    if strategy not in ("single_agent", "decompose"):
+                        raise ValueError("strategy must be single_agent or decompose")
+                    project_id = __import__("uuid").uuid4().hex[:12]
+                    if strategy == "single_agent":
+                        capability = body.get("capability")
+                        if capability is None:
+                            lower_goal = goal.lower()
+                            capability = (
+                                "research" if any(word in lower_goal for word in ("research", "market", "调研", "市场"))
+                                else "analysis" if any(word in lower_goal for word in ("assess", "evaluate", "feasibility", "分析", "评估", "可行性"))
+                                else "general"
+                            )
+                        if not isinstance(capability, str) or not capability.strip() or len(capability) > 100:
+                            raise ValueError("capability must be a non-empty string up to 100 characters")
+                        planned = {
+                            "mode": "single_agent_first",
+                            "warnings": ["默认单员工优先；如需拆分任务，请显式选择 strategy=decompose。"],
+                            "tasks": [{
+                                "id": "goal",
+                                "title": goal[:200],
+                                "capability": capability.strip(),
+                                "description": goal,
+                                "success_criteria": {"goal": goal, "acceptance": "管理员/独立验收，不以员工自述代替验收"},
+                            }],
+                        }
+                    else:
+                        llm_client = getattr(WORKER_EXECUTOR, "client", None)
+                        planned = plan_project(goal, llm_client)
+                        planned["mode"] = "llm_decomposed" if planned.get("mode") == "llm" else planned.get("mode", "deterministic_decomposed")
+                    created_tasks = []
+                    for item in planned["tasks"]:
+                        task = WORKFORCE.create_task(
+                            title=str(item.get("title", goal))[:200],
+                            description=(f"项目目标：{goal}\n子任务：{item.get('title', goal)}")[:5000],
+                            capability=str(item.get("capability", "general")),
+                            priority=3,
+                            success_criteria={
+                                "project_id": project_id,
+                                "goal": goal,
+                                "task": str(item.get("title", goal)),
+                                "acceptance": "结果须独立验收；LLM 输出不自动视为事实",
+                            },
+                            evidence_required=str(item.get("capability", "")).lower() in ("research", "market_research"),
+                        )
+                        created_tasks.append(task)
+                    WORKFORCE._event("twin_goal_planned", project_id=project_id, strategy=strategy,
+                                     plan_mode=planned.get("mode"), task_ids=[t["id"] for t in created_tasks])
+                    WORKFORCE.save()
+                    self._json({
+                        "ok": True,
+                        "project_id": project_id,
+                        "goal": goal,
+                        "strategy": strategy,
+                        "plan_mode": planned.get("mode"),
+                        "warnings": planned.get("warnings", []),
+                        "tasks": created_tasks,
+                        "next_step": "员工领取任务并持续反馈；分身根据反馈决定继续、重试或重规划；管理员/独立验证者负责验收。",
+                    }, 201)
                 elif self.path == "/api/workforce/tasks":
                     task = WORKFORCE.create_task(
                         title=str(body.get("title", "")),
