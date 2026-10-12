@@ -457,3 +457,82 @@ def test_admin_verification_endpoint_records_check_without_claiming_truth(workfo
     assert any(e["type"] == "verification_recorded" and e["task_id"] == task_id
                for e in registry.snapshot()["events"])
 
+def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce_http):
+    """Exercise the observable acceptance path through authenticated HTTP APIs."""
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Validate a game-demand research result",
+        "description": "Collect a result, handle a temporary source outage, then verify its recorded evidence.",
+        "capability": "research",
+        "priority": 5,
+        "success_criteria": {"min_output_chars": 20},
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+
+    status, first_claim = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"],
+    })
+    assert status == 200
+    first_token = first_claim["task"]["lease_token"]
+
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": first_token,
+        "blocker": "Research endpoint temporarily unavailable",
+        "output": "Initial research attempt could not reach the source.",
+    })
+    assert status == 200
+    assert blocked["task"]["status"] == "blocked"
+
+    status, retry = request_json(base, "/api/workforce/retry", ADMIN, {
+        "task_id": task_id,
+        "reason": "Twin reviewed the temporary outage and authorized one bounded retry.",
+    })
+    assert status == 200
+    assert retry["task"]["status"] == "queued"
+
+    status, second_claim = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"],
+    })
+    assert status == 200
+    second_token = second_claim["task"]["lease_token"]
+    assert second_token and second_token != first_token
+
+    status, completed = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "completed",
+        "lease_token": second_token,
+        "output": "Candidate finding: three sources reviewed; factual confirmation pending.",
+    })
+    assert status == 200
+    assert completed["task"]["status"] == "completed"
+
+    status, verification = request_json(base, "/api/workforce/verify", ADMIN, {
+        "task_id": task_id,
+        "verification": {
+            "accepted": True,
+            "status": "structural_checks_passed",
+            "checks": [{"name": "output_present", "passed": True}],
+            "reviewer": "acceptance-test",
+        },
+    })
+    assert status == 200
+    assert verification["task"]["verification"]["accepted"] is True
+    assert verification["task"]["verified_truth"] is False
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    task = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+    assert task["status"] == "completed"
+    assert task["blocker"] == "Research endpoint temporarily unavailable"
+    assert task["verification"]["accepted"] is True
+    assert task["verified_truth"] is False
+    event_types = [event["type"] for event in snapshot["events"] if event.get("task_id") == task_id]
+    assert "task_created" in event_types
+    assert "worker_reported" in event_types
+    assert "retry_approved" in event_types
+    assert "verification_recorded" in event_types
+    assert len(task["history"]) >= 4
+
