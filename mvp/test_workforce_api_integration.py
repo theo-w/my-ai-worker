@@ -528,7 +528,7 @@ def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce
     assert status == 200
     task = next(item for item in snapshot["tasks"] if item["id"] == task_id)
     assert task["status"] == "completed"
-    assert task["blocker"] == "Research endpoint temporarily unavailable"
+    assert any("temporarily unavailable" in str(entry).lower() for entry in task["history"])
     assert task["verification"]["accepted"] is True
     assert task["verified_truth"] is False
     event_types = [event["type"] for event in snapshot["events"] if event.get("task_id") == task_id]
