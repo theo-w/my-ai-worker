@@ -11,8 +11,12 @@ import pytest
 from mvp.server import Handler
 
 
-@pytest.fixture(scope="module")
-def api_base_url():
+@pytest.fixture
+def api_base_url(monkeypatch):
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", "admin-secret-for-model-handoff-tests-0001")
+    monkeypatch.delenv("JARVIS_PUBLIC_DEMO", raising=False)
+    for key in ("JARVIS_WORKER_TOKEN", "JARVIS_WORKER_ID", "JARVIS_WORKER_TOKENS", "JARVIS_WORKER_CAPABILITIES"):
+        monkeypatch.delenv(key, raising=False)
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -28,7 +32,7 @@ def post_json(base_url: str, path: str, payload: dict) -> tuple[int, dict]:
     request = Request(
         base_url + path,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "Authorization": "Bearer admin-secret-for-model-handoff-tests-0001"},
         method="POST",
     )
     with urlopen(request, timeout=3) as response:
