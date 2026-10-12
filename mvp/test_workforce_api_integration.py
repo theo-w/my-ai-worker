@@ -806,3 +806,67 @@ def test_twin_can_explicitly_decompose_goal_into_temporary_tasks(workforce_http,
     assert snapshot_status == 200
     assert any(event["type"] == "twin_goal_planned" and event["project_id"] == response["project_id"]
                for event in snapshot["events"])
+
+
+
+def test_digital_twin_coordinator_drives_employee_feedback_and_acceptance(workforce_http):
+    from mvp.twin import DigitalTwinCoordinator
+
+    base, registry = workforce_http
+
+    class TestEmployee:
+        capabilities = ["analysis"]
+
+        def run_once(self):
+            status, claim = request_json(
+                base, "/api/workforce/claim", ANALYST,
+                {"capabilities": self.capabilities},
+            )
+            assert status == 200
+            task = claim["task"]
+            if task is None:
+                return {"status": "idle"}
+            token = task["lease_token"]
+            status, progress = request_json(base, "/api/workforce/report", ANALYST, {
+                "task_id": task["id"], "status": "in_progress",
+                "lease_token": token, "output": "Started bounded analysis",
+            })
+            assert status == 200
+            status, result = request_json(base, "/api/workforce/report", ANALYST, {
+                "task_id": task["id"], "status": "completed",
+                "lease_token": token,
+                "output": json.dumps({"result": "Acceptance-test result", "simulated": True}),
+            })
+            assert status == 200
+            return {"status": result["task"]["status"], "task_id": task["id"]}
+
+    twin = DigitalTwinCoordinator(base, ADMIN)
+    result = twin.execute_goal(
+        "Validate the Twin-to-employee workflow",
+        [TestEmployee()],
+        max_cycles=3,
+        tasks=[{
+            "title": "Run a bounded workflow check",
+            "capability": "analysis",
+            "priority": 5,
+            "description": "Test the task feedback and acceptance path.",
+            "success_criteria": {},
+        }],
+        execution_profile={
+            "complexity": 1,
+            "parallelizable": False,
+            "quality_requirement": 1,
+            "risk_level": 1,
+            "expected_parallel_quality_gain": 0.0,
+            "expected_parallel_time_savings": 0.0,
+            "team_cost_multiplier": 1.5,
+        },
+    )
+
+    assert result["execution_decision"]["mode"] == "single_agent"
+    assert result["counts"]["completed"] == 1
+    assert result["status"] == "completed"
+    assert result["metrics"]["accepted_outputs"] == 1
+    assert any(event.get("type") == "worker_reported" for event in registry.events)
+    assert any(event.get("type") == "goal_finished" and event.get("status") == "completed"
+               for event in result["events"])
