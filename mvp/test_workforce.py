@@ -226,9 +226,8 @@ def test_rejected_validation_blocks_task_and_cannot_be_repeated(tmp_path):
 
 def test_evidence_required_task_cannot_be_accepted_without_valid_source_records(tmp_path):
     registry = WorkforceRegistry(path=str(tmp_path / "evidence-gate.json"))
-    task = registry.create_task(
-        "Research with evidence", capability="research", evidence_required=True,
-    )
+    task = registry.create_task("Research with evidence", capability="research")
+    assert task["evidence_required"] is True
     claimed = registry.claim("worker-a", ["research"])
     registry.report(
         task["id"], "worker-a", "completed", output="Candidate claim",
@@ -236,7 +235,7 @@ def test_evidence_required_task_cannot_be_accepted_without_valid_source_records(
     )
     rejected = registry.record_verification(task["id"], {
         "accepted": True,
-        "evidence_count": 0,
+        "evidence_count": 99,
         "checks": [{"name": "source_structure", "passed": True}],
     })
     assert rejected["status"] == "blocked"
