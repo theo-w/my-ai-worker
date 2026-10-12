@@ -526,7 +526,7 @@ def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce
         "output": "Candidate finding: three sources reviewed; factual confirmation pending.",
     })
     assert status == 200
-    assert completed["task"]["status"] == "completed"
+    assert completed["task"]["status"] == "awaiting_validation"
 
     status, verification = request_json(base, "/api/workforce/verify", ADMIN, {
         "task_id": task_id,
