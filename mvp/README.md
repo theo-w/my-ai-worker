@@ -27,11 +27,14 @@ Replace simulated workers with real web research + LLM synthesis while keeping t
 
 ## Operations Dashboard
 
-For an HR/company-ready product walkthrough:
+For a local simulated walkthrough (no model/search credentials), explicitly enable public-demo mode:
 
 ```bash
+export JARVIS_PUBLIC_DEMO=true
 python3 mvp/server.py
 ```
+
+For an authenticated setup, configure `JARVIS_ADMIN_TOKEN` instead; enter it in the dashboard header. Do not enable public-demo mode when any live provider or workforce credential is configured.
 
 Open `http://127.0.0.1:8765`.
 
