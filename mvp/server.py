@@ -321,8 +321,8 @@ class Handler(BaseHTTPRequestHandler):
         return body
     def do_HEAD(self):
         # Render and other HTTP monitors commonly probe the root with HEAD.
-        if self.path in ("/", "/index.html", "/playtest"):
-            page = "loophole.html" if self.path == "/playtest" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
             try:
                 size = (ROOT / page).stat().st_size
             except OSError:
@@ -387,8 +387,8 @@ class Handler(BaseHTTPRequestHandler):
                     "LLM not configured; autonomous tasks use simulated execution.",
             })
             return
-        if self.path in ("/", "/index.html", "/playtest"):
-            page = "loophole.html" if self.path == "/playtest" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
             data = (ROOT / page).read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
