@@ -370,27 +370,18 @@ def test_twin_can_explicitly_retry_after_revision_policy_reviews_blocker(monkeyp
         twin = DigitalTwinCoordinator(base, admin)
         executor = FailOnceExecutor()
         worker = DigitalEmployeeAgent(base, token, ["analysis"], executor, "recover goal")
-        policy_calls = []
-
-        def revision_policy(goal, tasks, cycle):
-            policy_calls.append((cycle, [(task["status"], task.get("blocker", "")) for task in tasks]))
-            if cycle == 1 and tasks and tasks[0]["status"] == "blocked":
-                return {"retry": [{
-                    "task_id": tasks[0]["task_id"],
-                    "reason": "Confirmed temporary outage; retry within configured limit",
-                }]}
-            return {}
+        from mvp.revision_policy import ConservativeTransientRetryPolicy
 
         result = twin.execute_goal(
             "recover goal", [worker], max_cycles=3,
             tasks=[{"title": "Analyze source", "capability": "analysis"}],
-            revision_policy=revision_policy,
+            revision_policy=ConservativeTransientRetryPolicy(),
         )
         assert result["status"] == "completed"
         assert result["counts"]["completed"] == 1
         assert executor.calls == 2
         assert any(event["type"] == "task_retry_approved" for event in result["events"])
-        assert len(policy_calls) >= 2
+        assert any(event["type"] == "replan_recommended" for event in result["events"])
     finally:
         httpd.shutdown()
         httpd.server_close()
