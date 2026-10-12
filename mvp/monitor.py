@@ -85,6 +85,8 @@ def build_monitor_report(snapshot: dict, now: datetime | None = None,
             "lease_until": task.get("lease_until"),
             "feedback": task.get("feedback", []),
             "history": task.get("history", []),
+            "verification": task.get("verification"),
+            "verified_truth": task.get("verified_truth", False),
         })
     active_count = sum(counts.get(key, 0) for key in ACTIVE)
     blocked_count = counts.get("blocked", 0) + counts.get("failed", 0)
