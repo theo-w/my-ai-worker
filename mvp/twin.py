@@ -525,6 +525,7 @@ class DigitalTwinCoordinator:
         all_goal_ids = set(ids)
         worker_runs = []
         cycles = 0
+        triaged_task_ids = set()
         for cycle in range(1, max_cycles + 1):
             cycles = cycle
             before = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
@@ -568,6 +569,29 @@ class DigitalTwinCoordinator:
                     worker_runs.append({"cycle": cycle, **result})
             events.append({"type": "cycle_finished", "cycle": cycle,
                            "execution_mode": decision.mode, "worker_results": cycle_results})
+            # Deterministic failure triage is safe by default: surface the next
+            # decision without pretending that a semantic replan was performed.
+            triage_snapshot = self.inspect()
+            for task in triage_snapshot["tasks"]:
+                task_id = task["task_id"]
+                if task_id not in ids or task_id in triaged_task_ids:
+                    continue
+                if task["status"] not in ("blocked", "failed"):
+                    continue
+                triaged_task_ids.add(task_id)
+                blocker = str(task.get("blocker") or "").strip()
+                events.append({
+                    "type": "replan_recommended",
+                    "cycle": cycle,
+                    "task_id": task_id,
+                    "task_status": task["status"],
+                    "reason": blocker or "Task did not complete successfully.",
+                    "suggested_next_step": (
+                        "review_blocker_then_reassign_or_revise"
+                        if blocker else "inspect_worker_feedback_and_choose_retry_or_replan"
+                    ),
+                    "automatic_retry": False,
+                })
             if revision_policy is not None:
                 try:
                     revision_snapshot = self.inspect()
