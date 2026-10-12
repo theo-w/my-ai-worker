@@ -585,8 +585,21 @@ class Handler(BaseHTTPRequestHandler):
                             evidence_required=str(item.get("capability", "")).lower() in ("research", "market_research"),
                         )
                         created_tasks.append(task)
+                    llm_used = planned.get("mode") == "llm_decomposed"
+                    WORKFORCE.record_twin_decision(
+                        goal=goal,
+                        decision="single_agent_first" if strategy == "single_agent" else "decompose",
+                        reason=(
+                            "默认单员工优先；只有明确选择拆分时才建立临时任务组合。"
+                            if strategy == "single_agent"
+                            else "已请求任务拆分；计划经过确定性结构校验，执行仍受能力和验收规则约束。"
+                        ),
+                        llm_used=llm_used,
+                        task_id=created_tasks[0]["id"] if len(created_tasks) == 1 else None,
+                    )
                     WORKFORCE._event("twin_goal_planned", project_id=project_id, strategy=strategy,
-                                     plan_mode=planned.get("mode"), task_ids=[t["id"] for t in created_tasks])
+                                     plan_mode=planned.get("mode"), task_ids=[t["id"] for t in created_tasks],
+                                     llm_used=llm_used)
                     WORKFORCE.save()
                     self._json({
                         "ok": True,
