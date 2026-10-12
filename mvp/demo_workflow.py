@@ -121,7 +121,11 @@ def main() -> int:
             {"name": "next_step_present", "passed": "下一步：" in output},
         ],
         "evidence": [],
-        "notes": "Demo only: structural checks passed; no factual claim has been independently verified.",
+        "evidence_count": 0,
+        "checks": [
+            { "name": "source_structure", "passed": False },
+        ],
+        "notes": "Demo only: structural checks passed, but no source evidence was supplied.",
         "verified_truth": False,
     }
     verification["accepted"] = all(item["passed"] for item in verification["checks"])
@@ -129,7 +133,7 @@ def main() -> int:
         "task_id": task_id,
         "verification": verification,
     })
-    print("4. Admin recorded structural verification; verified_truth remains false.")
+    print("4. Admin recorded validation; missing source evidence keeps the task blocked and verified_truth false.")
     snapshot = request_json(base, "/api/workforce", admin)
     final = next((item for item in snapshot.get("tasks", []) if item.get("id") == task_id), None)
     if final is None:
