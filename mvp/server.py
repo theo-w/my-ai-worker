@@ -442,7 +442,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/twin/goal", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -483,6 +483,57 @@ class Handler(BaseHTTPRequestHandler):
                         WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
                         WORKFORCE.save()
                     self._json({"ok": True, "worker": worker})
+                elif self.path == "/api/twin/review":
+                    project_id = body.get("project_id")
+                    if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
+                        raise ValueError("project_id must be a non-empty string up to 80 characters")
+                    with WORKFORCE.lock:
+                        project_tasks = [
+                            dict(task) for task in WORKFORCE.tasks.values()
+                            if isinstance(task.get("success_criteria"), dict)
+                            and task["success_criteria"].get("project_id") == project_id
+                        ]
+                    if not project_tasks:
+                        self._json({"ok": False, "error": "No tasks found for project_id."}, 404)
+                        return
+                    statuses = [task.get("status", "unknown") for task in project_tasks]
+                    failed = [task for task in project_tasks if task.get("status") in ("blocked", "failed")]
+                    awaiting = [task for task in project_tasks if task.get("status") == "awaiting_validation"]
+                    active = [task for task in project_tasks if task.get("status") in ("queued", "assigned", "approval_required")]
+                    if failed:
+                        decision = "replan_required"
+                        reason = "员工反馈阻塞或失败；分身需要检查反馈并决定补充输入、改派或重规划。此接口不会自动重试。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"],
+                                         "blocker": task.get("blocker", ""),
+                                         "attempts": task.get("attempts", 0)} for task in failed]
+                    elif awaiting:
+                        decision = "awaiting_independent_validation"
+                        reason = "员工已提交候选结果，仍需独立验收；不能仅凭员工完成报告关闭目标。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"]} for task in awaiting]
+                    elif active:
+                        decision = "continue_monitoring"
+                        reason = "仍有任务未完成，继续观察员工状态与反馈。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"]} for task in active]
+                    elif all(status == "completed" for status in statuses):
+                        decision = "goal_completed"
+                        reason = "所有关联任务均已完成其验收流程；事实真伪仍以 verified_truth 和证据验证状态为准。"
+                        next_actions = []
+                    else:
+                        decision = "needs_twin_review"
+                        reason = "任务状态组合不符合自动关闭条件，需要分身进一步检查。"
+                        next_actions = [{"task_id": task["id"], "status": task.get("status")} for task in project_tasks]
+                    with WORKFORCE.lock:
+                        WORKFORCE._event("twin_reviewed", project_id=project_id, decision=decision,
+                                         task_ids=[task["id"] for task in project_tasks])
+                        WORKFORCE.save()
+                    self._json({
+                        "ok": True, "project_id": project_id, "decision": decision,
+                        "reason": reason, "task_count": len(project_tasks),
+                        "status_counts": {status: statuses.count(status) for status in sorted(set(statuses))},
+                        "next_actions": next_actions,
+                        "llm_used": False,
+                        "safety_note": "本次分身复核由确定性规则完成；没有调用 LLM，也不会自动重试、改派或验收。",
+                    })
                 elif self.path == "/api/twin/goal":
                     goal = body.get("goal")
                     if not isinstance(goal, str) or not goal.strip() or len(goal.strip()) > 4000:
