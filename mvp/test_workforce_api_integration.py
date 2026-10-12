@@ -737,6 +737,10 @@ def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
         assert "流程追踪与验收" in trace_page
         assert "最近心跳" in trace_page
         assert 'id="improvementReport"' in trace_page
+        assert 'id="createTwinGoal"' in trace_page
+        assert 'id="reviewTwinProject"' in trace_page
+        assert 'fetch("/api/twin/review"' in trace_page
+        assert "此按钮不会自动重试、取消或修改员工任务" in trace_page
         assert "分身与员工验收清单" in page
         assert "TWIN_EMPLOYEE_ACCEPTANCE.md" in page
 
