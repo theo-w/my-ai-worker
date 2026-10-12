@@ -177,4 +177,21 @@ def test_explicit_retry_requeues_blocked_task_with_audit_and_limit(tmp_path):
                     lease_token=second["lease_token"])
     with pytest.raises(ValueError, match="retry limit"):
         registry.retry_task(task["id"], "Do not exceed the bounded retry policy")
+def test_verification_record_is_persisted_without_claiming_truth(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "verification.json"))
+    task = registry.create_task("Verify output", capability="analysis")
+    claimed = registry.claim("worker-a", ["analysis"])
+    registry.report(task["id"], "worker-a", "completed", output="A candidate result",
+                    lease_token=claimed["lease_token"])
+    verification = {
+        "accepted": True, "status": "accepted",
+        "checks": [{"name": "required_phrase", "passed": True}],
+    }
+    saved = registry.record_verification(task["id"], verification)
+    assert saved["verification"]["accepted"] is True
+    assert saved["verified_truth"] is False
+    assert saved["history"][-1]["event"] == "verification_recorded"
+    restored = WorkforceRegistry(path=str(tmp_path / "verification.json"))
+    assert restored.snapshot()["tasks"][0]["verification"]["accepted"] is True
+    assert restored.snapshot()["tasks"][0]["verified_truth"] is False
 
