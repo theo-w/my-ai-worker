@@ -246,6 +246,32 @@ class WorkforceRegistry:
         return {"requeued": requeued, "failed": failed}
 
 
+    def retry_task(self, task_id: str, reason: str) -> dict:
+        """Explicitly requeue blocked/failed work after twin triage, within retry limits."""
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
+            raise ValueError("reason must be between 1 and 1000 characters")
+        with self.lock:
+            task = self._get(task_id)
+            if task["status"] not in {"blocked", "failed"}:
+                raise ValueError("only blocked or failed tasks can be retried")
+            if task["attempts"] >= task["max_attempts"]:
+                raise ValueError("task retry limit reached")
+            prior_status = task["status"]
+            task["status"] = "queued"
+            task["assigned_to"] = None
+            task["lease_until"] = None
+            task["_lease_token"] = None
+            task["blocker"] = ""
+            task["updated_at"] = _stamp()
+            task["history"].append({
+                "event": "retry_approved", "reason": reason.strip(),
+                "previous_status": prior_status, "at": _stamp(),
+            })
+            self._event("task_retry_approved", task_id=task_id, reason=reason.strip(),
+                        previous_status=prior_status, attempts=task["attempts"])
+            self.save()
+            return {key: value for key, value in task.items() if key != "_lease_token"}
+
     def cancel_task(self, task_id: str, reason: str) -> dict:
         """Cancel queued/assigned work; preserve an audit trail and reject late reports."""
         if not isinstance(reason, str) or not reason.strip() or len(reason) > 1000:
