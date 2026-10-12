@@ -101,7 +101,7 @@ def test_agent_reports_missing_executor_dependency_as_blocked(system):
     assert "not configured" in result["error"]
     stored = next(item for item in registry.snapshot()["tasks"]
                   if item["id"] == plan["created_tasks"][0]["id"])
-    assert stored["status"] == "queued"  # blocked work is eligible for bounded retry
+    assert stored["status"] == "blocked"  # retry requires explicit twin triage
     assert stored["blocker"]
 
 
