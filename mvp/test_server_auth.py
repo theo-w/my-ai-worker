@@ -71,3 +71,13 @@ def test_public_demo_requires_explicit_opt_in_and_disallows_live_credentials(mon
     with pytest.raises(WorkforceAuthError) as unsafe:
         authenticate_dashboard(Headers())
     assert unsafe.value.status == 503
+
+
+def test_admin_token_must_be_long_enough(monkeypatch):
+    monkeypatch.setenv("JARVIS_ADMIN_TOKEN", "short")
+    monkeypatch.delenv("JARVIS_WORKER_TOKENS", raising=False)
+    monkeypatch.delenv("JARVIS_WORKER_TOKEN", raising=False)
+    monkeypatch.delenv("JARVIS_WORKER_ID", raising=False)
+    with pytest.raises(WorkforceAuthError) as error:
+        authenticate_workforce(Headers(), "admin")
+    assert error.value.status == 503
