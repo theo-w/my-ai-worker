@@ -145,9 +145,10 @@ function createRuntimeStore(filePath) {
     heartbeat: (id, input, actor) => mutate((data) => {
       const task = data.tasks[id];
       if (!task) throw httpError(404, 'Task not found');
-      if (TERMINAL_STATES.has(task.status)) throw httpError(409, 'Task is already terminal');
+      if (!['accepted', 'running'].includes(task.status)) throw httpError(409, 'Heartbeat is only allowed while a task is accepted or running');
+      if (actor.role !== 'worker') throw httpError(403, 'Only the assigned worker can send a heartbeat');
       if (!task.worker_id) throw httpError(409, 'Task must be accepted before sending a heartbeat');
-      if (actor.role === 'worker' && task.worker_id !== actor.id) throw httpError(403, 'Worker does not own this task');
+      if (task.worker_id !== actor.id) throw httpError(403, 'Worker does not own this task');
       if (input.worker_id && input.worker_id !== task.worker_id) throw httpError(403, 'Worker does not own this task');
       const now = new Date().toISOString();
       task.last_heartbeat_at = now;
@@ -159,7 +160,7 @@ function createRuntimeStore(filePath) {
     addEvent: (id, input, actor) => mutate((data) => {
       const task = data.tasks[id];
       if (!task) throw httpError(404, 'Task not found');
-      if (TERMINAL_STATES.has(task.status)) throw httpError(409, 'Task is already terminal');
+      if (!['accepted', 'running'].includes(task.status)) throw httpError(409, 'Worker events are only allowed while a task is accepted or running');
       const eventType = validateText(input.event_type, 'event_type', 40);
       if (!EVENT_TYPES.has(eventType)) throw httpError(400, 'event_type must be progress, result, blocked, or failed');
       if (!task.worker_id) throw httpError(409, 'Task must be accepted by a worker before reporting events');
