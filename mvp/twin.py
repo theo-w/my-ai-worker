@@ -87,8 +87,13 @@ class AutonomousProjectLoop:
     def run(self, goal: str, tasks: list[dict], executor,
             options: list[dict] | None = None,
             requested_actions: list[str] | None = None,
-            replanner=None) -> dict:
-        """Run bounded task iterations; an optional replanner can replace failed tasks."""
+            replanner=None, verifier=None) -> dict:
+        """Run bounded task iterations and optionally verify outputs independently.
+
+        A verifier must return {"accepted": True, "evidence_refs": [...]} for a
+        result to count as verified. Without a verifier, execution completion is
+        never promoted to factual verification.
+        """
         options = self.rank_options(options or [])
         gated = sorted(set(requested_actions or []) & self.approval_required_for)
         events = [{"type": "goal_accepted", "goal": goal},
@@ -112,12 +117,56 @@ class AutonomousProjectLoop:
                 break
             for task in pending:
                 task["status"] = "running"
+                task["verified"] = False
+                task["verification_status"] = "not_configured"
+                task["evidence_refs"] = []
                 try:
                     output = executor(task)
                     task["output"] = str(output or "")
-                    task["status"] = "completed" if task["output"].strip() else "blocked"
+                    if not task["output"].strip():
+                        task["status"] = "blocked"
+                        task["failure_category"] = task.get("failure_category") or "empty_output"
+                    elif verifier is None:
+                        # Execution completion is not the same as verified success.
+                        task["status"] = "completed"
+                        events.append({
+                            "type": "validation_skipped", "task_id": task.get("id"),
+                            "reason": "independent_verifier_not_configured",
+                        })
+                    else:
+                        try:
+                            decision = verifier(task, task["output"])
+                            decision = decision if isinstance(decision, dict) else {}
+                            refs = decision.get("evidence_refs", [])
+                            refs = [ref for ref in refs if isinstance(ref, str) and ref.strip()] if isinstance(refs, list) else []
+                            accepted = decision.get("accepted") is True and bool(refs)
+                            task["evidence_refs"] = refs
+                            task["verification_reason"] = str(decision.get("reason", ""))[:1000]
+                            task["verification_status"] = "verified" if accepted else "rejected"
+                            task["verified"] = accepted
+                            if accepted:
+                                task["status"] = "completed"
+                            else:
+                                task["status"] = "blocked"
+                                task["failure_category"] = "verification_rejected"
+                            events.append({
+                                "type": "validation_decision", "task_id": task.get("id"),
+                                "accepted": accepted, "evidence_refs": refs,
+                                "reason": task["verification_reason"],
+                            })
+                        except Exception as exc:
+                            task["status"] = "blocked"
+                            task["verified"] = False
+                            task["verification_status"] = "error"
+                            task["failure_category"] = "verifier_error"
+                            events.append({
+                                "type": "validation_error", "task_id": task.get("id"),
+                                "error": type(exc).__name__,
+                            })
                 except Exception as exc:
                     task["status"] = "blocked"
+                    task["verified"] = False
+                    task["failure_category"] = task.get("failure_category") or "execution_error"
                     task["output"] = "Execution failed: " + type(exc).__name__
                 events.append({"type": "task_finished", "task_id": task.get("id"), "status": task["status"]})
 
@@ -177,7 +226,6 @@ class AutonomousProjectLoop:
             "improvement_summary": improvement_summary,
             "questions_for_human": questions, "events": events,
         }
-
 
 
 @dataclass
@@ -357,8 +405,7 @@ class DigitalTwinCoordinator:
         return {
             "goal": goal.strip(),
             "status": "planned",
-            "created_tasks": created,
-            "task_count": len(created),
+            "created_tasks": created,            "task_count": len(created),
             "note": "任务已进入真实队列；创建成功不代表员工已执行或结果已验证。",
         }
 
@@ -537,7 +584,6 @@ class DigitalTwinCoordinator:
                 "tasks": [], "worker_runs": [], "events": events,
                 "execution_decision": decision.to_dict(),
             }
-
         started_at = monotonic()
         plan = self.start_goal(goal, tasks=plan_items)
         ids = {task["id"] for task in plan["created_tasks"]}
@@ -717,8 +763,7 @@ class DigitalTwinCoordinator:
                 verification["status"] = "rejected"
                 verification["independent_review"] = "not_configured"
                 verification["checks"].append({
-                    "name": "independent_review_configured", "passed": False,
-                })
+                    "name": "independent_review_configured", "passed": False,                })
                 verification["verification_note"] = (
                     "Independent review was required but no reviewer callback is configured."
                 )
@@ -837,4 +882,3 @@ class DigitalTwinCoordinator:
             "task_id": task_id, "actor": "digital-twin",
             "message": message.strip()[:4000], "kind": kind,
         })
-
