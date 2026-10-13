@@ -537,7 +537,8 @@ class DigitalTwinCoordinator:
             from execution_strategy import TaskProfile, choose_execution_mode
         if not isinstance(max_cycles, int) or not 1 <= max_cycles <= 20:
             raise ValueError("max_cycles must be an integer between 1 and 20")
-        if not isinstance(goal, str) or not goal.strip():            raise ValueError("goal must be a non-empty string")
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal must be a non-empty string")
         if not employees or any(not callable(getattr(worker, "run_once", None))
                                 for worker in employees):
             raise ValueError("employees must contain agents exposing run_once()")
@@ -762,7 +763,8 @@ class DigitalTwinCoordinator:
                 verification["status"] = "rejected"
                 verification["independent_review"] = "not_configured"
                 verification["checks"].append({
-                    "name": "independent_review_configured", "passed": False,                })
+                    "name": "independent_review_configured", "passed": False,
+                })
                 verification["verification_note"] = (
                     "Independent review was required but no reviewer callback is configured."
                 )
@@ -817,7 +819,9 @@ class DigitalTwinCoordinator:
             "worker_runs": len(worker_runs),
             "task_count": len(scoped),
             "accepted_outputs": sum(
-                t["status"] == "completed" and t.get("verification", {}).get("accepted", False)
+                t["status"] == "completed"
+                and t.get("verification_recorded") is True
+                and t.get("verification", {}).get("accepted", False)
                 for t in scoped
             ),
             "rejected_outputs": sum(
