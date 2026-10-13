@@ -47,6 +47,8 @@ python -m mvp.demo_workflow
 
 ## 文档
 
+- [数字分身与数字员工信息流图](docs/DIGITAL_TWIN_EMPLOYEE_FLOW.md)：目标、任务、反馈、独立验证、监控与递归改进的逻辑链路。
+
 - [流程可观测性与验收](docs/OBSERVABILITY.md)
 - [目标驱动架构](docs/GOAL_DRIVEN_ARCHITECTURE.md)
 - [安全与认证](docs/SECURITY_AND_AUTH.md)
