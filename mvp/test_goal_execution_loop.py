@@ -418,6 +418,9 @@ def test_twin_persists_verification_into_traceable_workforce_history(monkeypatch
         assert task["verification"]["accepted"] is False
         assert task["verification"]["status"] == "rejected"
         assert task["verified_truth"] is False
+        assert result["tasks"][0]["verification_recorded"] is True
+        assert result["metrics"]["accepted_outputs"] == 0
+        assert result["metrics"]["rejected_outputs"] == 1
         assert any(
             event["type"] == "verification_recorded" and event["task_id"] == task_id
             for event in snapshot["events"]
