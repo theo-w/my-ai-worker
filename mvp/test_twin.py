@@ -107,7 +107,14 @@ def test_project_loop_exposes_verified_outcome_summary_for_recursive_review():
     def executor(task):
         return "result with evidence reference" if task["id"] == "verified" else ""
 
-    report = loop.run("Assess an AI-native game", tasks, executor)
+    report = loop.run(
+        "Assess an AI-native game", tasks, executor,
+        verifier=lambda task, output: {
+            "accepted": task["id"] == "verified",
+            "evidence_refs": ["https://example.test/evidence"] if task["id"] == "verified" else [],
+            "reason": "test verifier decision",
+        },
+    )
 
     assert report["improvement_summary"]["sample_count"] == 2
     assert report["improvement_summary"]["verified_successes"] == 1
@@ -116,5 +123,63 @@ def test_project_loop_exposes_verified_outcome_summary_for_recursive_review():
     }
     assert any(
         event["type"] == "improvement_review_snapshot"
+        for event in report["events"]
+    )
+
+
+
+def test_project_loop_does_not_treat_execution_as_verification_without_verifier():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "unverified", "title": "Candidate result", "verified": True}]
+
+    report = loop.run("Collect a result", tasks, lambda task: "looks successful")
+
+    assert report["tasks"][0]["status"] == "completed"
+    assert report["tasks"][0]["verified"] is False
+    assert report["tasks"][0]["verification_status"] == "not_configured"
+    assert report["improvement_summary"]["verified_successes"] == 0
+    assert any(event["type"] == "validation_skipped" for event in report["events"])
+
+
+def test_project_loop_requires_evidence_refs_for_verifier_acceptance():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "no-evidence", "title": "Unsupported claim"}]
+
+    report = loop.run(
+        "Verify a result", tasks, lambda task: "claim",
+        verifier=lambda task, output: {
+            "accepted": True,
+            "evidence_refs": [],
+            "reason": "No auditable evidence attached",
+        },
+    )
+
+    assert report["tasks"][0]["status"] == "blocked"
+    assert report["tasks"][0]["verified"] is False
+    assert report["tasks"][0]["failure_category"] == "verification_rejected"
+    assert report["improvement_summary"]["verified_successes"] == 0
+
+
+def test_project_loop_records_independent_verification_and_evidence():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "verified", "title": "Evidence-backed result"}]
+
+    report = loop.run(
+        "Verify a result", tasks, lambda task: "result",
+        verifier=lambda task, output: {
+            "accepted": True,
+            "evidence_refs": ["https://example.test/source", "artifact://report-1"],
+            "reason": "Sources checked",
+        },
+    )
+
+    assert report["tasks"][0]["status"] == "completed"
+    assert report["tasks"][0]["verified"] is True
+    assert report["tasks"][0]["evidence_refs"] == [
+        "https://example.test/source", "artifact://report-1",
+    ]
+    assert report["improvement_summary"]["verified_successes"] == 1
+    assert any(
+        event["type"] == "validation_decision" and event["accepted"] is True
         for event in report["events"]
     )
