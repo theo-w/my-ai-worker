@@ -105,6 +105,8 @@ def test_twin_does_not_accept_simulated_research_as_goal_success(monkeypatch, tm
         assert result["counts"]["completed"] == 0
         assert result["counts"]["blocked"] == 1
         assert result["metrics"]["rejected_outputs"] == 1
+        assert result["metrics"]["accepted_outputs"] == 0
+        assert result["tasks"][0]["verification_recorded"] is True
         assert result["status"] == "needs_attention"
         task = result["tasks"][0]
         assert task["verification"]["accepted"] is False
