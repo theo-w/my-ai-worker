@@ -246,3 +246,57 @@ def test_evidence_required_task_cannot_be_accepted_without_valid_source_records(
     assert any(check["name"] == "server_evidence_gate"
                and not check["passed"] for check in rejected["verification"]["checks"])
     assert rejected["verified_truth"] is False
+
+
+def test_research_evidence_gate_rejects_simulated_sources_even_when_structurally_valid(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "simulated-evidence.json"))
+    task = registry.create_task("Research with simulated evidence", capability="research")
+    claimed = registry.claim("worker-a", ["research"])
+    simulated_output = __import__("json").dumps({
+        "simulated": True,
+        "content": __import__("json").dumps({
+            "sources": [{
+                "title": "Plausible-looking source",
+                "url": "https://example.com/report",
+                "snippet": "This is a structurally valid excerpt, but the output is simulated.",
+            }],
+        }),
+    })
+    registry.report(task["id"], "worker-a", "completed", output=simulated_output,
+                    lease_token=claimed["lease_token"])
+
+    rejected = registry.record_verification(task["id"], {
+        "accepted": True,
+        "evidence_count": 1,
+        "checks": [{"name": "source_structure", "passed": True}],
+    })
+    assert rejected["status"] == "blocked"
+    assert rejected["verification"]["accepted"] is False
+    assert any(check["name"] == "non_simulated_evidence" and not check["passed"]
+               for check in rejected["verification"]["checks"])
+    assert rejected["verified_truth"] is False
+
+
+def test_research_evidence_gate_rejects_non_https_source_records(tmp_path):
+    registry = WorkforceRegistry(path=str(tmp_path / "invalid-source.json"))
+    task = registry.create_task("Research with invalid source", capability="research")
+    claimed = registry.claim("worker-a", ["research"])
+    output = __import__("json").dumps({
+        "sources": [{
+            "title": "Insecure source",
+            "url": "http://example.com/report",
+            "snippet": "This record has an insecure URL and must not pass.",
+        }],
+    })
+    registry.report(task["id"], "worker-a", "completed", output=output,
+                    lease_token=claimed["lease_token"])
+
+    rejected = registry.record_verification(task["id"], {
+        "accepted": True,
+        "evidence_count": 1,
+        "checks": [{"name": "source_structure", "passed": True}],
+    })
+    assert rejected["status"] == "blocked"
+    assert rejected["verification"]["accepted"] is False
+    assert rejected["verification"]["evidence_count"] == 0
+    assert rejected["verified_truth"] is False
