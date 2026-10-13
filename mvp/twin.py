@@ -177,7 +177,8 @@ class AutonomousProjectLoop:
                     replacements = replanner(goal, failed, iteration) or []
                 except Exception as exc:
                     replacements = []
-                    events.append({"type": "replan_failed", "error": type(exc).__name__})                if replacements:
+                    events.append({"type": "replan_failed", "error": type(exc).__name__})
+                if replacements:
                     for task in failed:
                         task["status"] = "superseded"
                         task["replan_attempted"] = True
