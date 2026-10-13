@@ -177,8 +177,7 @@ class AutonomousProjectLoop:
                     replacements = replanner(goal, failed, iteration) or []
                 except Exception as exc:
                     replacements = []
-                    events.append({"type": "replan_failed", "error": type(exc).__name__})
-                if replacements:
+                    events.append({"type": "replan_failed", "error": type(exc).__name__})                if replacements:
                     for task in failed:
                         task["status"] = "superseded"
                         task["replan_attempted"] = True
@@ -206,7 +205,7 @@ class AutonomousProjectLoop:
         improvement_summary = summarize_outcomes([
             {
                 "status": task.get("status"),
-                "verified": task.get("verified") is True,
+                "verified": task.get("verified") is True and task.get("verification_status") == "verified" and bool(task.get("evidence_refs")),
                 "provenance": task.get("provenance", "unknown"),
                 "failure_category": task.get("failure_category"),
             }
@@ -357,8 +356,7 @@ class DigitalTwinCoordinator:
         """Create a small, reusable first-pass plan from a natural-language goal."""
         if not isinstance(goal, str) or not goal.strip():
             raise ValueError("goal must be a non-empty string")
-        normalized = goal.casefold()
-        if any(word in normalized for word in ("game", "游戏", "rpg", "npc", "玩家", "ai-native")):
+        normalized = goal.casefold()        if any(word in normalized for word in ("game", "游戏", "rpg", "npc", "玩家", "ai-native")):
             return [
                 {"title": "研究目标用户与市场需求", "capability": "research", "priority": 5,
                  "description": "寻找可追溯的市场、玩家需求与竞品资料；标注来源和不确定性。"},
@@ -537,8 +535,7 @@ class DigitalTwinCoordinator:
             from execution_strategy import TaskProfile, choose_execution_mode
         if not isinstance(max_cycles, int) or not 1 <= max_cycles <= 20:
             raise ValueError("max_cycles must be an integer between 1 and 20")
-        if not isinstance(goal, str) or not goal.strip():
-            raise ValueError("goal must be a non-empty string")
+        if not isinstance(goal, str) or not goal.strip():            raise ValueError("goal must be a non-empty string")
         if not employees or any(not callable(getattr(worker, "run_once", None))
                                 for worker in employees):
             raise ValueError("employees must contain agents exposing run_once()")
@@ -717,8 +714,7 @@ class DigitalTwinCoordinator:
                             events.append({"type": "revision_rejected", "action": "cancel",
                                            "task_id": task_id, "reason": str(exc)[:300]})
                 except Exception as exc:
-                    events.append({"type": "revision_policy_failed",
-                                   "cycle": cycle, "error": type(exc).__name__})
+                    events.append({"type": "revision_policy_failed",                                   "cycle": cycle, "error": type(exc).__name__})
             after = {t["task_id"]: t["status"] for t in self.inspect()["tasks"]
                      if t["task_id"] in ids}
             if after and all(s in ("completed", "awaiting_validation", "blocked", "failed") for s in after.values()):
