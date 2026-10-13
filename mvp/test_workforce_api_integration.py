@@ -62,6 +62,8 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     assert status == 201
     task_id = created["task"]["id"]
     assert created["task"]["status"] == "queued"
+    # Research tasks must retain the evidence gate even when callers omit the flag.
+    assert created["task"]["evidence_required"] is True
 
     status, claim = request_json(
         base, "/api/workforce/claim", RESEARCHER,
