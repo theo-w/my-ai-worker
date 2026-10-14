@@ -64,3 +64,29 @@ def test_missing_hypothesis_and_invalid_score_fail_closed():
     assert result["accepted"] is False
     assert "missing_hypothesis" in result["reasons"]
     assert "score_must_be_between_0_and_1" in result["reasons"]
+
+
+
+def test_invalid_recursive_improvement_configuration_fails_closed():
+    baseline = {"score": 0.5}
+    candidate = {"score": 0.8, "sample_count": 10, "regressions": 0}
+    proposal = {"hypothesis": "Improve evidence quality"}
+
+    invalid_iteration = evaluate_improvement(
+        proposal, baseline, candidate, iteration="1", max_iterations=3,
+    )
+    assert invalid_iteration["accepted"] is False
+    assert "iteration_budget_exceeded" in invalid_iteration["reasons"]
+
+    invalid_samples = evaluate_improvement(
+        proposal, baseline, candidate, min_samples=True,
+    )
+    assert invalid_samples["accepted"] is False
+    assert "invalid_minimum_sample_count" in invalid_samples["reasons"]
+
+    invalid_gain = evaluate_improvement(
+        proposal, baseline, candidate, min_gain=float("nan"),
+    )
+    assert invalid_gain["accepted"] is False
+    assert "invalid_minimum_gain" in invalid_gain["reasons"]
+    assert invalid_gain["auto_applied"] is False
