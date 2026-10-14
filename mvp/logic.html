@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>整体逻辑流程与规则 / LLM 生效时机</title>
+<style>
+:root{color-scheme:dark;--bg:#09101e;--panel:#111d31;--line:#2a3d59;--text:#edf4ff;--muted:#9aabc5;--cyan:#7ddfff;--green:#78e2ad;--amber:#ffd27c;--red:#ff9b9b}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0,#1b2d4b 0,#09101e 48%);color:var(--text);font:14px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1200px;margin:auto;padding:22px}a{color:var(--cyan)}h1{font-size:26px;margin:4px 0}h2{font-size:18px;margin:0 0 12px}h3{font-size:14px;margin:0 0 7px}.muted{color:var(--muted);font-size:12px}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}.eyebrow{color:var(--cyan);letter-spacing:.12em;font-size:11px}.panel{background:rgba(17,29,49,.94);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.step,.node{border:1px solid var(--line);background:#142239;border-radius:10px;padding:12px}.step strong{display:block;margin-bottom:5px}.tag{display:inline-block;border-radius:99px;padding:2px 8px;font-size:11px;margin:4px 4px 0 0;background:#263751}.rule{color:var(--green)}.llm{color:var(--cyan)}.conditional{color:var(--amber)}.blocked{color:var(--red)}.arrow,.down{text-align:center;color:var(--cyan);font-size:20px;margin:3px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.path{border:1px solid var(--line);border-radius:11px;padding:14px;background:#0e192b}.sequence{display:grid;gap:7px}.node b{display:block}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:700px}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid var(--line)}th{color:var(--cyan)}code{overflow-wrap:anywhere;color:#d3e9ff}.callout{border-left:3px solid var(--amber);padding:10px 12px;background:#201e1a;border-radius:5px}ul,ol{padding-left:20px}li{margin:5px 0}@media(max-width:800px){main{padding:13px}.flow,.two{grid-template-columns:1fr 1fr}h1{font-size:22px}}@media(max-width:520px){.flow,.two{grid-template-columns:1fr}}
+</style></head><body><main>
+<header class="top"><div><div class="eyebrow">JARVIS / SYSTEM MAP</div><h1>整体逻辑流程与规则 / LLM 生效时机</h1><div class="muted">规则与模型如何协作</div><div class="muted">绿色 = 确定性规则；蓝色 = LLM 可能介入；黄色 = 依赖配置或条件；红色 = 缺少能力时应阻断。</div></div><div><a href="/">工作台</a> · <a href="/trace">流程追踪</a> · <a href="https://github.com/theo-w/my-ai-worker/blob/feat/observe-only-self-improvement/docs/TWIN_EMPLOYEE_ACCEPTANCE.md" target="_blank" rel="noopener noreferrer">分身与员工验收清单</a></div></header>
+<section class="panel"><h2>整体逻辑流程与规则 / LLM 生效时机</h2><p class="muted">数字分身负责目标、规划、反馈处理和重规划；数字员工负责按能力执行任务、报告进度与结果。规则在输入、权限、状态、证据和验收边界生效；LLM 只在明确配置的规划、执行、研究总结或重规划节点调用。</p></section>
+<section class="panel"><h2>一张图先看整体</h2><div class="flow">
+<div class="step"><strong>1. 用户目标 / 请求</strong><div class="muted">自然语言目标、任务输入、研究查询</div><span class="tag rule">请求校验</span><span class="tag rule">身份权限</span></div>
+<div class="step"><strong>2. 规划与策略</strong><div class="muted">选择预设任务或生成计划；检查审批边界</div><span class="tag rule">确定性校验</span><span class="tag llm">可选 LLM 规划</span></div>
+<div class="step"><strong>3. 能力路由</strong><div class="muted">按 capability 选择执行器与工具</div><span class="tag rule">权限 / 状态规则</span><span class="tag conditional">搜索 / 模型配置</span></div>
+<div class="step"><strong>4. 执行与留痕</strong><div class="muted">输出、来源、尝试次数、事件、心跳</div><span class="tag llm">可选 LLM 执行</span><span class="tag rule">状态机 / 记录</span></div>
+</div><div class="arrow">↓</div><div class="flow">
+<div class="step"><strong>5. 证据质量门槛</strong><div class="muted">来源去重、字段检查、质量过滤</div><span class="tag rule">确定性规则</span><span class="tag blocked">无合格证据则阻断研究任务</span></div>
+<div class="step"><strong>6. 独立验收</strong><div class="muted">任务完成与事实正确分开</div><span class="tag rule">验收规则</span><span class="tag conditional">证据支持度仍需加强</span></div>
+<div class="step"><strong>7. 分身反馈 / 重规划</strong><div class="muted">处理失败、重试、合并或取消低价值工作</div><span class="tag rule">次数与状态限制</span><span class="tag llm">特定路径可选 LLM 重规划</span></div>
+<div class="step"><strong>8. 观察式自我改进</strong><div class="muted">识别重复阻塞与重试，提出可证伪实验</div><span class="tag rule">只读分析</span><span class="tag blocked">不自动改代码或上线</span></div>
+</div></section>
+<section class="panel"><h2>数字分身 ↔ 数字员工：双向协作闭环</h2>
+<p class="muted">分身不是简单的任务分发器；员工也不是只返回一段文本的工具。分身管理目标、计划与取舍，员工负责有边界地执行并报告真实状态。以下是目标行为；当前不同执行路径尚未全部统一，不能把设计图当成已完成的端到端能力。</p>
+<div class="flow">
+<div class="step"><strong>1. 分身接收目标</strong><div class="muted">保存目标、约束、成功标准和风险等级。</div><span class="tag rule">输入校验 / 策略规则</span></div>
+<div class="step"><strong>2. 分身决定如何组织</strong><div class="muted">先判断单代理是否足够；只有存在明确分工收益时才拆成多个任务。</div><span class="tag llm">LLM 可提出计划</span><span class="tag rule">规则校验计划</span></div>
+<div class="step"><strong>3. 员工接收并确认</strong><div class="muted">按能力、身份、权限与任务租约领取工作。</div><span class="tag rule">权限 / 能力 / 租约检查</span></div>
+<div class="step"><strong>4. 员工执行并持续反馈</strong><div class="muted">提交进度、结果、证据来源或阻塞原因；心跳只代表存活，不代表工作成功。</div><span class="tag conditional">LLM / 搜索 / 工具按配置调用</span></div>
+<div class="step"><strong>5. 分身处理反馈</strong><div class="muted">决定继续、补充输入、重试、改派、合并、取消或重规划。</div><span class="tag rule">状态与次数边界</span><span class="tag llm">可选 LLM 重规划</span></div>
+<div class="step"><strong>6. 独立验收</strong><div class="muted">员工不能自己批准自己的结果；失败时记录原因并返回分身决策环节。</div><span class="tag rule">验收门槛 / 权限边界</span></div>
+<div class="step"><strong>7. 记忆与改进</strong><div class="muted">记录决策、反馈、成本和结果；先生成改进假设，评估与批准后才考虑采用。</div><span class="tag rule">当前为观察模式</span></div>
+</div>
+<div class="arrow">↺ 未通过、阻塞或目标变化时，返回第 2 或第 5 步；完成后汇报用户。</div>
+<div class="callout"><strong>当前实现边界：</strong>任务信箱已支持创建、领取、心跳、进度/结果反馈、等待验收、管理员验证和重试边界；工作台快速运行、项目自主循环和持久化员工信箱目前仍是并存路径。要实现真正持续管理，下一步必须把“分身决策 → 信箱任务 → 员工反馈 → 分身再决策”接成一条受测的运行时闭环。不要把员工心跳当成完成状态，也不要把 LLM 输出当成独立证据。</div>
+</section>
+<section class="panel"><h2>当前有三条并存的执行路径（不要混为一条）</h2><div class="two">
+<div class="path"><h3>路径 A · 项目规划与执行</h3><div class="muted">入口：<code>POST /api/autonomous</code></div><div class="sequence">
+<div class="node"><b>请求校验</b>目标、任务格式、动作边界先由代码检查。</div><div class="down">↓</div>
+<div class="node"><b>规划</b>若请求已提供 tasks，则跳过自动规划；否则尝试 LLM 规划，未配置或响应无效时退回确定性计划。</div><div class="down">↓</div>
+<div class="node"><b>审批门槛</b>发布、预算承诺、对外发布、破坏性操作、法律承诺等受保护动作会先要求审批。</div><div class="down">↓</div>
+<div class="node"><b>执行器路由</b>研究任务要求真实搜索 provider；其他任务可走 LLM executor；没有任何实时集成时走明确标记的模拟执行。</div><div class="down">↓</div>
+<div class="node"><b>结果与准确性标记</b>返回任务、来源信任级别与未验证输出数；接口明确不授权基于这些输出直接作事实决策。</div>
+</div></div>
+<div class="path" style="grid-column:1/-1"><h3>路径 C · 工作台快速运行（演示/旧流程）</h3><div class="muted">入口：<code>POST /api/run</code>；本次修复已补齐该路由。</div><div class="sequence">
+<div class="node"><b>确定性组队</b><code>DigitalTwin.form_team()</code> 依据目标关键词选择候选员工，受最大并行人数策略限制；当前这个执行函数实际按顺序逐个运行。</div><div class="down">↓</div>
+<div class="node"><b>执行器</b>模拟模式运行演示 worker；配置 LLM/搜索后由 Hybrid executor 按能力路由。这个路径不会调用 <code>plan_project()</code> 生成 LLM 任务计划。</div><div class="down">↓</div>
+<div class="node"><b>汇总与演示决策</b>更新工作台状态、输出和证据列表。模拟模式可产生明确标记的 demo 决策；实时模型文字不会自动成为证据。</div>
+</div></div>
+<div class="path"><h3>路径 B · 数字分身 ↔ 员工任务信箱</h3><div class="muted">入口：<code>POST /api/twin/goal</code>、<code>POST /api/twin/review</code>、<code>/api/workforce/*</code>、<code>/api/workers/heartbeat</code></div><div class="sequence">
+<div class="node"><b>分身接收目标并创建任务</b><code>POST /api/twin/goal</code> 默认单员工优先；只有显式选择 decompose 才拆分任务。</div><div class="down">↓</div>
+<div class="node"><b>员工领取 / 心跳</b>检查 worker 身份、任务分配、租约和活跃状态；心跳不能代替任务结果。</div><div class="down">↓</div>
+<div class="node"><b>员工提交进度与结果</b>状态机只允许特定活跃状态接收事件；验收中的任务不能再被迟到事件覆盖。</div><div class="down">↓</div>
+<div class="node"><b>分身读取员工反馈</b><code>POST /api/twin/review</code> 按任务状态给出继续观察、等待独立验收或需要重规划的决策；不自动重试、不自动验收。</div><div class="down">↓</div><div class="node"><b>独立验收 / 重试</b>管理员验收、证据字段、尝试上限和状态转换由代码执行。</div><div class="down">↓</div>
+<div class="node"><b>观察式改进报告</b><code>GET /api/improvement/report</code>只读；需管理员 Token，不会自动执行建议。</div>
+</div></div></div>
+<div class="callout" style="margin-top:12px"><b>重要现状：</b>这两条路径目前是同一仓库里的两套接口/执行流，还没有完全统一成一个端到端运行时。界面能显示的内容取决于对应路径是否写入同一套状态与事件数据。</div></section>
+<section class="panel"><h2>数字分身 ↔ 数字员工：谁负责什么？</h2>
+<div class="two">
+<div class="path"><h3 class="llm">数字分身 · 目标负责人 / 协调者</h3><ul>
+<li>保存用户目标、约束、完成标准与授权范围。</li>
+<li>先判断一个员工能否完成；只有并行拆分确有收益时才组织多个员工。</li>
+<li>根据能力和权限分配任务，不强制固定岗位编制。</li>
+<li>持续接收员工进度、问题、阻塞、结果和证据。</li>
+<li>反馈后做出可追踪决策：澄清、重规划、合并、取消、有限重试或询问用户。</li>
+<li>不把员工自报完成视为验收通过。</li>
+</ul></div>
+<div class="path"><h3 class="rule">数字员工 · 有边界的执行代理</h3><ul>
+<li>只领取服务端允许的能力范围内的任务。</li>
+<li>报告进度、输出、证据、假设、不确定性和阻塞原因。</li>
+<li>遇到缺少信息或权限时请求澄清，不自行扩大范围。</li>
+<li>结果先进入待验收状态，由授权验收流程决定是否接受。</li>
+<li>不能验收自己的结果、冒充其他员工或修改自身权限。</li>
+</ul></div>
+</div>
+<div class="sequence" style="margin-top:12px">
+<div class="node"><b>1. 分身理解目标</b>记录约束、完成标准、风险和自主权限；规则先检查权限与审批要求。</div><div class="down">↓</div>
+<div class="node"><b>2. 单员工优先</b>判断单代理是否足够；若需要拆分，说明并行协作的质量、速度或风险收益。</div><div class="down">↓</div>
+<div class="node"><b>3. 分配任务 → 员工执行</b>任务应包含输入、预期输出、验收标准、证据要求和工具权限；员工持续反馈。</div><div class="down">↓</div>
+<div class="node"><b>4. 分身处理反馈</b>根据任务记录决定澄清、调整、合并、取消、有限重试或请求用户决策，并记录原因。</div><div class="down">↓</div>
+<div class="node"><b>5. 独立验收 → 更新目标进展</b>验收通过才更新已接受结果；失败则反馈并进入受限恢复流程。</div>
+</div>
+<div class="callout" style="margin-top:12px"><b>当前实现边界：</b>仓库已有 Twin policy / bounded project loop、持久化 worker mailbox、心跳租约、反馈和验收状态。但工作台执行流、自主项目循环和持久化员工邮箱尚未统一成一个运行时；分身基于反馈作出的所有决策也还没有统一成一套完整的决策记录 API。</div>
+<div class="muted" style="margin-top:8px"><a href="https://github.com/theo-w/my-ai-worker/blob/feat/observe-only-self-improvement/docs/TWIN_WORKER_INTERACTION.md" target="_blank" rel="noopener noreferrer">查看数字分身与员工交互契约、状态边界和端到端验收清单 →</a></div>
+</section>
+<section class="panel"><h2>LLM 在什么时机真正生效？</h2><div class="tablewrap"><table><thead><tr><th>阶段</th><th>触发条件</th><th>LLM 做什么</th><th>不会替代什么</th></tr></thead><tbody>
+<tr><td>规划 <code>/api/autonomous</code></td><td>请求未提供 tasks，且启动时成功配置 <code>JARVIS_LLM_BASE_URL</code>、<code>JARVIS_LLM_API_KEY</code>、<code>JARVIS_LLM_MODEL</code>。</td><td>生成有界 JSON 任务列表；代码再校验 ID、标题、能力类型和任务数量。</td><td>不负责权限认证或审批；无效/异常响应退回确定性计划。</td></tr>
+<tr><td>普通员工执行</td><td>非研究任务被路由到 LLM executor，且模型配置有效。</td><td>根据目标和任务指令生成工作输出。</td><td>不自动浏览网页、不证明事实、不把模型文字变成外部证据。</td></tr>
+<tr><td>研究搜索</td><td>研究任务执行时配置了 <code>JARVIS_SEARCH_ENDPOINT</code>。</td><td>搜索由外部 provider 执行，不是 LLM 自己搜索。</td><td>未配置搜索时研究任务应失败关闭；不能拿 LLM 编写的答案冒充搜索结果。</td></tr>
+<tr><td>研究综合</td><td>搜索结果通过质量门槛、至少有一条合格证据，并配置完整 LLM 环境变量。</td><td>LLM 只综合已提供的合格来源材料，并被要求引用来源 ID。</td><td>没有合格证据则跳过 LLM 综合，保留确定性综合状态。</td></tr>
+<tr><td>失败重规划</td><td><code>/api/autonomous</code> 有可用 planner client，且任务失败需要重规划。</td><td>可参与生成替代任务建议。</td><td>仍受计划校验、迭代上限与审批规则约束。</td></tr>
+<tr><td>任务状态、权限、心跳、租约、重试次数、验收门槛</td><td>每次相关 API 请求或状态转换。</td><td><b>不需要调用 LLM。</b></td><td>这些是确定性代码规则，不交给模型自由决定。</td></tr>
+</tbody></table></div></section>
+<section class="panel"><h2>规则的优先级与事实边界</h2><div class="two"><div><h3 style="color:var(--green)">确定性规则（每次执行都生效）</h3><ul>
+<li>身份与角色权限、任务状态转换、worker 能力与租约检查。</li><li>审批要求、最大重试次数、任务迭代上限、允许的 capability 集合。</li><li>研究来源的基本格式检查、URL 去重、质量门槛。</li><li>模拟 / LLM / 搜索的来源标记；缺少必需工具时失败关闭。</li><li>观察式改进只报告信号与实验建议，不自行采纳。</li></ul></div><div><h3 style="color:var(--amber)">模型输出的边界</h3><ul>
+<li>LLM 是可选的规划器或任务执行器，不是权限系统。</li><li>LLM 输出即使状态为 completed，也不代表独立验收或事实为真。</li><li>搜索摘要也不自动等于已验证事实；质量门槛目前主要是机械筛选。</li><li>递归自我改进当前是观察与建议阶段，不会自主改代码、改变规则或部署。</li></ul></div></div></section>
+<section class="panel"><h2>下一步需要验证 / 补齐</h2><ol>
+<li>把路径 A 与路径 B 的任务、事件、验收状态统一到一个可追踪的运行时，避免两个界面展示不同数据源。</li><li>给每次 LLM 调用写入可审计 trace：阶段、模型名、输入摘要、输出摘要、耗时、失败原因和费用（不记录密钥）。</li><li>增强证据验证：检查来源可访问性、发布时间、来源独立性，以及结论是否真的被来源支持。</li><li>在安全隔离的测试环境中跑通完整闭环，再决定是否开放真实工具或更高自主权。</li></ol><div class="muted">本页按当前仓库代码整理；部署实例可能使用不同环境变量。请以运行时的 /api/executor/status 与 /api/llm/status 为准，并结合任务级来源标记确认实际执行模式。</div></section>
+<footer class="muted" style="margin:16px 0">JARVIS · Logic Map · 不包含任何密钥或用户任务内容。</footer></main></body></html>

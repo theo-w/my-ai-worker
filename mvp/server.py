@@ -23,6 +23,7 @@ try:
     from .game_action import interpret_and_validate_action
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
+    from .improvement import build_improvement_report
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -35,6 +36,7 @@ except ImportError:  # Direct script execution from mvp/
     from game_action import interpret_and_validate_action
     from model_handoff import interpret_handoff_and_validate_action
     from workforce import WorkforceRegistry
+    from improvement import build_improvement_report
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -348,8 +350,8 @@ class Handler(BaseHTTPRequestHandler):
         return body
     def do_HEAD(self):
         # Render and other HTTP monitors commonly probe the root with HEAD.
-        if self.path in ("/", "/index.html", "/playtest", "/trace"):
-            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace", "/logic"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "logic.html" if self.path == "/logic" else "dashboard.html"
             try:
                 size = (ROOT / page).stat().st_size
             except OSError:
@@ -363,6 +365,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_GET(self):
+        if self.path == "/api/improvement/report":
+            try:
+                authenticate_workforce(self.headers, "admin")
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            report = build_improvement_report(WORKFORCE.snapshot())
+            self._json({"ok": True, "report": report})
+            return
         if self.path == "/api/workforce":
             try:
                 authenticate_workforce(self.headers, "admin")
@@ -419,8 +430,8 @@ class Handler(BaseHTTPRequestHandler):
                     "LLM not configured; autonomous tasks use simulated execution.",
             })
             return
-        if self.path in ("/", "/index.html", "/playtest", "/trace"):
-            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
+        if self.path in ("/", "/index.html", "/playtest", "/trace", "/logic"):
+            page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "logic.html" if self.path == "/logic" else "dashboard.html"
             data = (ROOT / page).read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -431,7 +442,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
-        if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -472,6 +483,245 @@ class Handler(BaseHTTPRequestHandler):
                         WORKFORCE.workers[worker_id]["capabilities"] = worker["capabilities"]
                         WORKFORCE.save()
                     self._json({"ok": True, "worker": worker})
+                elif self.path == "/api/twin/advance":
+                    project_id = body.get("project_id")
+                    if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
+                        raise ValueError("project_id must be a non-empty string up to 80 characters")
+                    with WORKFORCE.lock:
+                        project_tasks = [
+                            dict(task) for task in WORKFORCE.tasks.values()
+                            if isinstance(task.get("success_criteria"), dict)
+                            and task["success_criteria"].get("project_id") == project_id
+                        ]
+                    if not project_tasks:
+                        self._json({"ok": False, "error": "No tasks found for project_id."}, 404)
+                        return
+                    # One bounded deterministic action per call. Only known transient
+                    # infrastructure failures are retried; unknown blockers stay blocked.
+                    transient_markers = (
+                        "temporarily unavailable", "timeout", "timed out",
+                        "connection reset", "rate limit", "too many requests",
+                        "http 502", "http 503", "http 504", "status 502",
+                        "status 503", "status 504",
+                    )
+                    retry_candidate = next((
+                        task for task in project_tasks
+                        if task.get("status") in ("blocked", "failed")
+                        and task.get("attempts", 0) < task.get("max_attempts", 0)
+                        and any(marker in str(task.get("blocker", "")).lower()
+                                for marker in transient_markers)
+                    ), None)
+                    if retry_candidate:
+                        task_id = retry_candidate["id"]
+                        action_reason = (
+                            "Digital Twin bounded advance: retrying a recognized transient "
+                            "infrastructure blocker within the task's configured attempt limit. "
+                            "Original blocker: " + str(retry_candidate.get("blocker", ""))[:500]
+                        )
+                        retried = WORKFORCE.retry_task(task_id, action_reason)
+                        decision = "transient_retry_queued"
+                        next_actions = [{"task_id": task_id, "status": retried["status"],
+                                         "attempts": retried["attempts"]}]
+                    else:
+                        task_id = None
+                        retried = None
+                        needs_human = [
+                            {"task_id": task["id"], "status": task.get("status"),
+                             "blocker": task.get("blocker", ""),
+                             "attempts": task.get("attempts", 0)}
+                            for task in project_tasks
+                            if task.get("status") in ("blocked", "failed")
+                        ]
+                        awaiting = [task for task in project_tasks
+                                    if task.get("status") == "awaiting_validation"]
+                        active = [task for task in project_tasks
+                                  if task.get("status") in ("queued", "assigned", "approval_required")]
+                        if needs_human:
+                            decision = "human_review_required"
+                            next_actions = needs_human
+                        elif awaiting:
+                            decision = "awaiting_independent_validation"
+                            next_actions = [{"task_id": task["id"], "status": task["status"]}
+                                            for task in awaiting]
+                        elif active:
+                            decision = "continue_monitoring"
+                            next_actions = [{"task_id": task["id"], "status": task["status"]}
+                                            for task in active]
+                        elif all(task.get("status") == "completed" for task in project_tasks):
+                            decision = "goal_completed"
+                            next_actions = []
+                        else:
+                            decision = "needs_twin_review"
+                            next_actions = [{"task_id": task["id"], "status": task.get("status")}
+                                            for task in project_tasks]
+                    reason = (
+                        "A single bounded retry was queued for a recognized transient blocker."
+                        if decision == "transient_retry_queued" else
+                        "No safe automatic action was identified. Unknown blockers require diagnosis; "
+                        "candidate results still require independent validation."
+                    )
+                    with WORKFORCE.lock:
+                        WORKFORCE._event(
+                            "twin_advanced",
+                            project_id=project_id,
+                            decision=decision,
+                            reason=reason,
+                            task_ids=[task["id"] for task in project_tasks],
+                            next_actions=next_actions,
+                            action_task_id=task_id,
+                            llm_used=False,
+                        )
+                        WORKFORCE.save()
+                    self._json({
+                        "ok": True, "project_id": project_id, "decision": decision,
+                        "reason": reason, "task_count": len(project_tasks),
+                        "next_actions": next_actions, "action_task_id": task_id,
+                        "llm_used": False,
+                        "safety_note": (
+                            "One deterministic action maximum per call; only recognized transient "
+                            "blockers are retried within configured limits. No result is auto-accepted, "
+                            "and unknown blockers are not retried."
+                        ),
+                    })
+                elif self.path == "/api/twin/review":
+                    project_id = body.get("project_id")
+                    if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
+                        raise ValueError("project_id must be a non-empty string up to 80 characters")
+                    with WORKFORCE.lock:
+                        project_tasks = [
+                            dict(task) for task in WORKFORCE.tasks.values()
+                            if isinstance(task.get("success_criteria"), dict)
+                            and task["success_criteria"].get("project_id") == project_id
+                        ]
+                    if not project_tasks:
+                        self._json({"ok": False, "error": "No tasks found for project_id."}, 404)
+                        return
+                    statuses = [task.get("status", "unknown") for task in project_tasks]
+                    failed = [task for task in project_tasks if task.get("status") in ("blocked", "failed")]
+                    awaiting = [task for task in project_tasks if task.get("status") == "awaiting_validation"]
+                    active = [task for task in project_tasks if task.get("status") in ("queued", "assigned", "approval_required")]
+                    if failed:
+                        decision = "replan_required"
+                        reason = "员工反馈阻塞或失败；分身需要检查反馈并决定补充输入、改派或重规划。此接口不会自动重试。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"],
+                                         "blocker": task.get("blocker", ""),
+                                         "attempts": task.get("attempts", 0)} for task in failed]
+                    elif awaiting:
+                        decision = "awaiting_independent_validation"
+                        reason = "员工已提交候选结果，仍需独立验收；不能仅凭员工完成报告关闭目标。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"]} for task in awaiting]
+                    elif active:
+                        decision = "continue_monitoring"
+                        reason = "仍有任务未完成，继续观察员工状态与反馈。"
+                        next_actions = [{"task_id": task["id"], "status": task["status"]} for task in active]
+                    elif all(status == "completed" for status in statuses):
+                        decision = "goal_completed"
+                        reason = "所有关联任务均已完成其验收流程；事实真伪仍以 verified_truth 和证据验证状态为准。"
+                        next_actions = []
+                    else:
+                        decision = "needs_twin_review"
+                        reason = "任务状态组合不符合自动关闭条件，需要分身进一步检查。"
+                        next_actions = [{"task_id": task["id"], "status": task.get("status")} for task in project_tasks]
+                    status_counts = {status: statuses.count(status) for status in sorted(set(statuses))}
+                    # Persist the same explanation and actionable task references returned
+                    # to the caller, so the Twin's reasoning is inspectable after the response.
+                    with WORKFORCE.lock:
+                        WORKFORCE._event(
+                            "twin_reviewed",
+                            project_id=project_id,
+                            decision=decision,
+                            reason=reason,
+                            task_ids=[task["id"] for task in project_tasks],
+                            status_counts=status_counts,
+                            next_actions=next_actions,
+                            llm_used=False,
+                        )
+                        WORKFORCE.save()
+                    self._json({
+                        "ok": True, "project_id": project_id, "decision": decision,
+                        "reason": reason, "task_count": len(project_tasks),
+                        "status_counts": status_counts,
+                        "next_actions": next_actions,
+                        "llm_used": False,
+                        "safety_note": "本次分身复核由确定性规则完成；没有调用 LLM，也不会自动重试、改派或验收。",
+                    })
+                elif self.path == "/api/twin/goal":
+                    goal = body.get("goal")
+                    if not isinstance(goal, str) or not goal.strip() or len(goal.strip()) > 4000:
+                        raise ValueError("goal must be between 1 and 4000 characters")
+                    goal = goal.strip()
+                    strategy = body.get("strategy", "single_agent")
+                    if strategy not in ("single_agent", "decompose"):
+                        raise ValueError("strategy must be single_agent or decompose")
+                    project_id = __import__("uuid").uuid4().hex[:12]
+                    if strategy == "single_agent":
+                        capability = body.get("capability")
+                        if capability is None:
+                            lower_goal = goal.lower()
+                            capability = (
+                                "research" if any(word in lower_goal for word in ("research", "market", "调研", "市场"))
+                                else "analysis" if any(word in lower_goal for word in ("assess", "evaluate", "feasibility", "分析", "评估", "可行性"))
+                                else "general"
+                            )
+                        if not isinstance(capability, str) or not capability.strip() or len(capability) > 100:
+                            raise ValueError("capability must be a non-empty string up to 100 characters")
+                        planned = {
+                            "mode": "single_agent_first",
+                            "warnings": ["默认单员工优先；如需拆分任务，请显式选择 strategy=decompose。"],
+                            "tasks": [{
+                                "id": "goal",
+                                "title": goal[:200],
+                                "capability": capability.strip(),
+                                "description": goal,
+                                "success_criteria": {"goal": goal, "acceptance": "管理员/独立验收，不以员工自述代替验收"},
+                            }],
+                        }
+                    else:
+                        llm_client = getattr(WORKER_EXECUTOR, "client", None)
+                        planned = plan_project(goal, llm_client)
+                        planned["mode"] = "llm_decomposed" if planned.get("mode") == "llm" else planned.get("mode", "deterministic_decomposed")
+                    created_tasks = []
+                    for item in planned["tasks"]:
+                        task = WORKFORCE.create_task(
+                            title=str(item.get("title", goal))[:200],
+                            description=(f"项目目标：{goal}\n子任务：{item.get('title', goal)}")[:5000],
+                            capability=str(item.get("capability", "general")),
+                            priority=3,
+                            success_criteria={
+                                "project_id": project_id,
+                                "goal": goal,
+                                "task": str(item.get("title", goal)),
+                                "acceptance": "结果须独立验收；LLM 输出不自动视为事实",
+                            },
+                            evidence_required=str(item.get("capability", "")).lower() in ("research", "market_research"),
+                        )
+                        created_tasks.append(task)
+                    llm_used = planned.get("mode") == "llm_decomposed"
+                    WORKFORCE.record_twin_decision(
+                        goal=goal,
+                        decision="single_agent_first" if strategy == "single_agent" else "decompose",
+                        reason=(
+                            "默认单员工优先；只有明确选择拆分时才建立临时任务组合。"
+                            if strategy == "single_agent"
+                            else "已请求任务拆分；计划经过确定性结构校验，执行仍受能力和验收规则约束。"
+                        ),
+                        llm_used=llm_used,
+                        task_id=created_tasks[0]["id"] if len(created_tasks) == 1 else None,
+                    )
+                    WORKFORCE._event("twin_goal_planned", project_id=project_id, strategy=strategy,
+                                     plan_mode=planned.get("mode"), task_ids=[t["id"] for t in created_tasks],
+                                     llm_used=llm_used)
+                    WORKFORCE.save()
+                    self._json({
+                        "ok": True,
+                        "project_id": project_id,
+                        "goal": goal,
+                        "strategy": strategy,
+                        "plan_mode": planned.get("mode"),
+                        "warnings": planned.get("warnings", []),
+                        "tasks": created_tasks,
+                        "next_step": "员工领取任务并持续反馈；分身根据反馈决定继续、重试或重规划；管理员/独立验证者负责验收。",
+                    }, 201)
                 elif self.path == "/api/workforce/tasks":
                     task = WORKFORCE.create_task(
                         title=str(body.get("title", "")),
@@ -560,6 +810,26 @@ class Handler(BaseHTTPRequestHandler):
                 return
         if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
+            return
+        if self.path == "/api/run":
+            body = self._read_json(max_bytes=131072)
+            if body is None:
+                return
+            goal = body.get("goal")
+            if not isinstance(goal, str) or not goal.strip():
+                self._json({"ok": False, "error": "A non-empty goal is required."}, 400)
+                return
+            goal = goal.strip()
+            if len(goal) > 2000:
+                self._json({"ok": False, "error": "Goal must be at most 2000 characters."}, 400)
+                return
+            with LOCK:
+                if STATE.get("phase") in {"planning", "team", "evaluation"}:
+                    self._json({"ok": False, "error": "A dashboard run is already active."}, 409)
+                    return
+                STATE["phase"] = "planning"
+            threading.Thread(target=execute, args=(goal,), daemon=True).start()
+            self._json({"ok": True, "accepted": True, "phase": "planning"}, 202)
             return
         if self.path == "/api/model-handoff":
             body = self._read_json(max_bytes=131072)

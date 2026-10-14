@@ -94,6 +94,13 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     assert completed["task"]["status"] == "awaiting_validation"
     assert completed["task"]["assigned_to"] is None
 
+    project_id = created["task"]["success_criteria"].get("project_id")
+    if project_id:
+        status, twin_review = request_json(base, "/api/twin/review", ADMIN, {"project_id": project_id})
+        assert status == 200
+        assert twin_review["decision"] == "awaiting_independent_validation"
+        assert twin_review["llm_used"] is False
+
     status, premature = request_json(base, "/api/workforce/verify", RESEARCHER, {
         "task_id": task_id, "verification": {"accepted": True},
     })
@@ -443,6 +450,12 @@ def test_trace_dashboard_is_served_without_exposing_workforce_data(workforce_htt
         assert 'id="workers"' in page
         assert "最近心跳" in page
         assert 'fetch("/api/workforce"' in page
+        assert 'id="improvementReport"' in page
+        assert 'fetch("/api/improvement/report"' in page
+        assert 'id="twinGoal"' in page
+        assert 'id="twinStrategy"' in page
+        assert 'fetch("/api/twin/goal"' in page
+        assert "单员工优先" in page
         assert "localStorage.setItem" not in page
         assert "localStorage.getItem" not in page
     status, protected = request_json(base, "/api/workforce")
@@ -664,3 +677,359 @@ def test_dashboard_state_and_execution_routes_require_admin_when_auth_is_configu
     )
     assert status == 401
     assert denied_action["ok"] is False
+
+
+
+def test_improvement_report_endpoint_is_admin_only_and_observe_only(workforce_http):
+    base, _ = workforce_http
+    status, denied = request_json(base, "/api/improvement/report", RESEARCHER)
+    assert status == 403
+    assert denied["ok"] is False
+
+    # Create two matching blockers so the observe-only report has a supported signal.
+    for title in ("Research source A", "Research source B"):
+        status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+            "title": title, "capability": "research",
+        })
+        assert status == 201
+        task_id = created["task"]["id"]
+        status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+            "capabilities": ["research"], "task_id": task_id,
+        })
+        assert status == 200
+        status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+            "task_id": task_id,
+            "status": "blocked",
+            "lease_token": claimed["task"]["lease_token"],
+            "blocker": "Source temporarily unavailable",
+        })
+        assert status == 200
+        assert blocked["task"]["status"] == "blocked"
+
+    status, response = request_json(base, "/api/improvement/report", ADMIN)
+    assert status == 200
+    report = response["report"]
+    assert report["mode"] == "observe_only"
+    assert report["actions_taken"] == []
+    assert any(item["signal"] == "repeated_blocker_text" for item in report["observations"])
+    assert all(item["adoption"] == "requires_independent_evaluation_and_human_approval"
+               for item in report["proposals"])
+
+
+
+def test_logic_map_page_is_served_and_explains_llm_timing(workforce_http):
+    base, _ = workforce_http
+    with urlopen(base + "/logic", timeout=3) as response:
+        page = response.read().decode("utf-8")
+        assert response.status == 200
+        assert "整体逻辑流程与规则 / LLM 生效时机" in page
+        assert "当前有三条并存的执行路径" in page
+        assert "数字分身 ↔ 数字员工：双向协作闭环" in page
+        assert "员工不能自己批准自己的结果" in page
+        assert "心跳只代表存活，不代表工作成功" in page
+        assert "真正持续管理" in page
+        assert "研究任务要求真实搜索 provider" in page
+        assert "任务状态、权限、心跳、租约、重试次数、验收门槛" in page
+        assert "不自动改代码或上线" in page
+
+    # Trace-specific assertions belong to /trace, not the /logic map.
+    with urlopen(base + "/trace", timeout=3) as response:
+        trace_page = response.read().decode("utf-8")
+        assert response.status == 200
+        assert "流程追踪与验收" in trace_page
+        assert "最近心跳" in trace_page
+        assert 'id="improvementReport"' in trace_page
+        assert 'id="createTwinGoal"' in trace_page
+        assert 'id="reviewTwinProject"' in trace_page
+        assert 'fetch("/api/twin/review"' in trace_page
+        assert "未知阻塞会升级人工诊断" in trace_page
+        assert 'id="advanceTwinProject"' in trace_page
+        assert 'fetch("/api/twin/advance"' in trace_page
+        assert "分身与员工验收清单" in page
+        assert "TWIN_EMPLOYEE_ACCEPTANCE.md" in page
+
+
+
+def test_dashboard_run_route_starts_background_execution(workforce_http, monkeypatch):
+    import threading
+
+    base, _ = workforce_http
+    started = threading.Event()
+    seen = []
+
+    def fake_execute(goal):
+        seen.append(goal)
+        with server.LOCK:
+            server.STATE["phase"] = "decision"
+        started.set()
+
+    monkeypatch.setattr(server, "execute", fake_execute)
+    status, response = request_json(base, "/api/run", ADMIN, {"goal": "Test goal"})
+    assert status == 202
+    assert response["accepted"] is True
+    assert started.wait(2)
+    assert seen == ["Test goal"]
+
+    status, invalid = request_json(base, "/api/run", ADMIN, {"goal": " "})
+    assert status == 400
+    assert invalid["ok"] is False
+
+
+
+def test_twin_goal_defaults_to_single_employee_task(workforce_http):
+    base, _ = workforce_http
+    status, denied = request_json(base, "/api/twin/goal", payload={"goal": "Research AI-native game demand"})
+    assert status == 401
+    assert denied["ok"] is False
+
+    status, response = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+    })
+    assert status == 201
+    assert response["strategy"] == "single_agent"
+    assert response["plan_mode"] == "single_agent_first"
+    assert len(response["tasks"]) == 1
+    task = response["tasks"][0]
+    assert task["capability"] == "research"
+    assert task["status"] == "queued"
+    assert task["evidence_required"] is True
+    assert response["project_id"] in task["success_criteria"]["project_id"]
+    assert response["next_step"].startswith("员工领取任务")
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    decision = next(event for event in snapshot["events"] if event["type"] == "twin_decision")
+    planned = next(event for event in snapshot["events"] if event["type"] == "twin_goal_planned")
+    assert decision["decision"] == "single_agent_first"
+    assert decision["planner"] == "deterministic_rules"
+    assert decision["llm_used"] is False
+    assert planned["llm_used"] is False
+
+
+def test_twin_can_explicitly_decompose_goal_into_temporary_tasks(workforce_http, monkeypatch):
+    base, _ = workforce_http
+    def fake_plan(goal, llm_client=None):
+        assert goal == "Evaluate an AI-native game"
+        return {
+            "mode": "deterministic_fallback",
+            "warnings": ["LLM planner unavailable; deterministic plan used."],
+            "tasks": [
+                {"id": "research", "title": "Collect source-backed market evidence", "capability": "research"},
+                {"id": "analysis", "title": "Analyze feasibility and risks", "capability": "analysis"},
+            ],
+        }
+    monkeypatch.setattr(server, "plan_project", fake_plan)
+
+    status, response = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Evaluate an AI-native game",
+        "strategy": "decompose",
+    })
+    assert status == 201
+    assert response["strategy"] == "decompose"
+    assert len(response["tasks"]) == 2
+    assert {task["capability"] for task in response["tasks"]} == {"research", "analysis"}
+    assert all(task["success_criteria"]["project_id"] == response["project_id"]
+               for task in response["tasks"])
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    decision = next(event for event in snapshot["events"] if event["type"] == "twin_decision")
+    planned_event = next(event for event in snapshot["events"] if event["type"] == "twin_goal_planned")
+    assert decision["decision"] == "decompose"
+    assert decision["planner"] == "deterministic_rules"
+    assert decision["llm_used"] is False
+    assert planned_event["plan_mode"] == "deterministic_fallback"
+    assert planned_event["llm_used"] is False
+    snapshot_status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert snapshot_status == 200
+    assert any(event["type"] == "twin_goal_planned" and event["project_id"] == response["project_id"]
+               for event in snapshot["events"])
+
+
+
+def test_digital_twin_coordinator_drives_employee_feedback_and_acceptance(workforce_http):
+    from mvp.twin import DigitalTwinCoordinator
+
+    base, registry = workforce_http
+
+    class TestEmployee:
+        capabilities = ["analysis"]
+
+        def run_once(self):
+            status, claim = request_json(
+                base, "/api/workforce/claim", ANALYST,
+                {"capabilities": self.capabilities},
+            )
+            assert status == 200
+            task = claim["task"]
+            if task is None:
+                return {"status": "idle"}
+            token = task["lease_token"]
+            status, progress = request_json(base, "/api/workforce/report", ANALYST, {
+                "task_id": task["id"], "status": "in_progress",
+                "lease_token": token, "output": "Started bounded analysis",
+            })
+            assert status == 200
+            status, result = request_json(base, "/api/workforce/report", ANALYST, {
+                "task_id": task["id"], "status": "completed",
+                "lease_token": token,
+                "output": json.dumps({"result": "Acceptance-test result", "simulated": True}),
+            })
+            assert status == 200
+            return {"status": result["task"]["status"], "task_id": task["id"]}
+
+    twin = DigitalTwinCoordinator(base, ADMIN)
+    result = twin.execute_goal(
+        "Validate the Twin-to-employee workflow",
+        [TestEmployee()],
+        max_cycles=3,
+        tasks=[{
+            "title": "Run a bounded workflow check",
+            "capability": "analysis",
+            "priority": 5,
+            "description": "Test the task feedback and acceptance path.",
+            "success_criteria": {},
+        }],
+        execution_profile={
+            "complexity": 1,
+            "parallelizable": False,
+            "quality_requirement": 1,
+            "risk_level": 1,
+            "expected_parallel_quality_gain": 0.0,
+            "expected_parallel_time_savings": 0.0,
+            "team_cost_multiplier": 1.5,
+        },
+    )
+
+    assert result["execution_decision"]["mode"] == "single_agent"
+    assert result["counts"]["completed"] == 1
+    assert result["status"] == "completed"
+    assert result["metrics"]["accepted_outputs"] == 1
+    assert any(event.get("type") == "worker_reported" for event in registry.events)
+    assert any(event.get("type") == "goal_finished" and event.get("status") == "completed"
+               for event in result["events"])
+
+
+
+def test_twin_reviews_blocked_employee_feedback_without_auto_retry(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Search provider returned no accepted evidence",
+    })
+    assert status == 200
+    assert blocked["task"]["status"] == "blocked"
+
+    status, review = request_json(base, "/api/twin/review", ADMIN, {"project_id": project_id})
+    assert status == 200
+    assert review["decision"] == "replan_required"
+    assert review["next_actions"][0]["task_id"] == task_id
+    assert "不会自动重试" in review["reason"]
+    assert review["llm_used"] is False
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    review_events = [event for event in snapshot["events"]
+                     if event["type"] == "twin_reviewed" and event["project_id"] == project_id]
+    assert review_events
+    review_event = review_events[-1]
+    assert review_event["decision"] == review["decision"]
+    assert review_event["reason"] == review["reason"]
+    assert review_event["next_actions"] == review["next_actions"]
+    assert review_event["llm_used"] is False
+    assert task_id in review_event["task_ids"]
+
+
+def test_twin_advance_retries_only_recognized_transient_blockers(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Research AI-native game demand",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Search provider temporarily unavailable (HTTP 503)",
+    })
+    assert status == 200
+    assert blocked["task"]["status"] == "blocked"
+
+    status, advanced = request_json(base, "/api/twin/advance", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert advanced["decision"] == "transient_retry_queued"
+    assert advanced["action_task_id"] == task_id
+    assert advanced["llm_used"] is False
+    assert advanced["next_actions"][0]["status"] == "queued"
+    assert "No result is auto-accepted" in advanced["safety_note"]
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    task_after = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+    assert task_after["status"] == "queued"
+    assert any(event["type"] == "twin_advanced"
+               and event["project_id"] == project_id
+               and event["decision"] == "transient_retry_queued"
+               for event in snapshot["events"])
+
+
+def test_twin_advance_does_not_retry_unknown_blockers(workforce_http):
+    base, _ = workforce_http
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Evaluate an AI-native game concept",
+        "capability": "research",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = task["success_criteria"]["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"], "task_id": task_id,
+    })
+    assert status == 200
+    status, blocked = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claimed["task"]["lease_token"],
+        "blocker": "Research evidence conflicts and requires human diagnosis",
+    })
+    assert status == 200
+
+    status, advanced = request_json(base, "/api/twin/advance", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert advanced["decision"] == "human_review_required"
+    assert advanced["action_task_id"] is None
+    assert advanced["next_actions"][0]["task_id"] == task_id
+
+    status, snapshot = request_json(base, "/api/workforce", ADMIN)
+    assert status == 200
+    task_after = next(item for item in snapshot["tasks"] if item["id"] == task_id)
+    assert task_after["status"] == "blocked"

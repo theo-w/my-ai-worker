@@ -10,16 +10,22 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </style>
 </head>
 <body><main>
-<header class="top"><div><div class="eyebrow">JARVIS / OBSERVABILITY</div><h1>数字分身 · 流程追踪与验收</h1><div class="muted">查看任务分配、员工反馈、输入输出、重试决策与事件时间线。此页面只读，不会自动修改任务。</div></div><div><a href="/">← 返回工作台</a></div></header>
+<header class="top"><div><div class="eyebrow">JARVIS / OBSERVABILITY</div><h1>数字分身 · 流程追踪与验收</h1><div class="muted">查看任务分配、员工反馈、输入输出、重试决策与事件时间线。此页面只读，不会自动修改任务。</div><div class="muted" style="margin-top:6px"><a href="https://github.com/theo-w/my-ai-worker/blob/feat/observe-only-self-improvement/docs/LOGIC_FLOW_AND_LLM_TIMING.md" target="_blank" rel="noopener noreferrer">查看整体逻辑流程：规则何时执行、LLM 何时调用、哪些环节仍待验证 →</a></div><div style="margin-top:6px"><a href="/logic">查看整体逻辑与 LLM 生效时机（英文版）↗</a> · <a href="https://github.com/theo-w/my-ai-worker/blob/feat/observe-only-self-improvement/docs/%E6%95%B4%E4%BD%93%E9%80%BB%E8%BE%91%E6%B5%81%E7%A8%8B%E4%B8%8ELLM%E8%B0%83%E7%94%A8%E6%97%B6%E6%9C%BA.md" target="_blank" rel="noopener noreferrer">查看中文版：数字分身与员工协作流程 ↗</a></div></div><div><a href="/">← 返回工作台</a></div></header>
 <section class="panel">
  <h2>连接运行中的工作区</h2>
  <div class="auth"><input id="token" type="password" autocomplete="off" placeholder="管理员 Token（仅保存在当前页面内存）"><button class="primary" id="connect">连接并查看</button><button id="refresh" disabled>立即刷新</button><label style="display:flex;align-items:center;gap:6px"><input id="auto" type="checkbox" checked style="min-width:auto"> 每 5 秒刷新</label></div>
  <div id="status" class="notice">尚未连接。请使用运行中 JARVIS 服务配置的管理员 Token。</div>
 </section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字分身 ↔ 数字员工：职责与协作边界</h2><span class="pill">设计视图 · 非运行事件</span></div><div class="detailgrid"><div class="sub"><h3>数字分身 / Twin · 目标负责人</h3><strong>决定“下一步做什么”</strong><ul><li>理解目标、约束与验收标准</li><li>优先判断单员工是否足够</li><li>分配、合并、取消或重规划任务</li><li>处理员工反馈、阻塞与风险</li><li>汇总验收结果并向用户汇报</li></ul><div class="muted">模型可以提出规划或重规划建议；权限、状态、重试上限仍由规则约束。</div></div><div class="sub"><h3>数字员工 / Worker · 任务执行者</h3><strong>负责“把当前任务做好并反馈”</strong><ul><li>只领取能力范围内的授权任务</li><li>按租约执行并报告进度/心跳</li><li>提交结果、来源证据或阻塞原因</li><li>根据分身反馈继续、修正或等待</li><li>不能自行把结果判定为最终通过</li></ul><div class="muted">LLM 生成内容只是执行产物；研究证据必须来自实际来源，验收需要独立判断。</div></div><div class="sub"><h3>规则何时生效</h3><ul><li>目标进入时：输入、权限与风险检查</li><li>派发时：能力、状态、租约和依赖检查</li><li>执行中：事件权限、心跳与超时规则</li><li>验收时：证据要求、审批和状态转换</li><li>失败时：重试预算和终止条件</li></ul></div><div class="sub"><h3>LLM 何时生效</h3><ul><li>规划：拆解目标、提出任务组合</li><li>执行：生成研究分析、代码或其他产物</li><li>反馈后：解释阻塞并建议下一步</li><li>调研：只有有效来源通过门槛后才可辅助综合</li><li>验收：只有明确配置独立审查器时才参与，不能自批</li></ul></div></div><div class="notice">重要现状：持久化员工任务 API 与自主规划/执行路径仍未完全统一。此卡片说明职责和规则边界，不代表每个 Twin 决策都已被运行时记录。真实决策轨迹接通后，应在下方事件时间线中区分 Twin 决策、员工动作、规则判定和 LLM 调用。</div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">运行环境与真实性标记</h2><span id="runtimeMode" class="pill">尚未读取</span></div><div id="runtimeInfo" class="muted">连接后读取当前执行器配置。模拟执行、真实模型调用和外部搜索会明确区分。</div></section>
 <section class="metrics" id="metrics">
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>待验证 / 已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
 </section>
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">数字分身：目标规划</h2><span class="pill">管理员操作</span></div><div class="detailgrid"><div class="sub"><label for="twinGoal"><strong>目标</strong></label><textarea id="twinGoal" rows="3" maxlength="4000" placeholder="例如：评估一款 AI 原生游戏的海外市场需求与技术可行性"></textarea><div class="muted">默认单员工优先；需要明确分工收益时再拆分。创建任务不代表已执行或验收。</div></div><div class="sub"><label for="twinStrategy"><strong>任务组织方式</strong></label><select id="twinStrategy"><option value="single_agent">单员工优先</option><option value="decompose">拆分任务</option></select><div style="margin-top:10px"><button class="primary" id="createTwinGoal">规划目标并创建任务</button></div><div id="twinGoalResult" class="muted" style="margin-top:10px">尚未提交目标。</div></div></div></section>
+
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">分身检查员工反馈 · 下一步决策</h2><span class="pill">当前为确定性状态审查</span></div><div class="detailgrid"><div class="sub"><div class="muted">“检查决策”只读分析状态；“推进一步”最多执行一个受限动作：仅对识别出的临时基础设施故障重试一次，未知阻塞会升级人工诊断，不会自动验收或部署。</div><button id="reviewTwinProject" class="primary" disabled style="margin-top:10px">检查分身下一步决策</button> <button id="advanceTwinProject" disabled style="margin-top:10px">让分身推进一步</button></div><div class="sub"><h3>分身决策结果</h3><pre id="twinReviewResult" class="content">创建目标后，可以检查分身如何处理员工反馈。尚未执行审查。</pre></div></div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">员工在线与心跳</h2><span id="workerCount" class="muted">0 名员工</span></div><div id="workers" class="detailgrid"><div class="empty">连接后显示员工状态与最近心跳。</div></div></section>
 
 <div class="grid">
@@ -28,13 +34,15 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </div>
 
 
+<section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">递归自我改进 · 观察模式</h2><button id="refreshImprovement">刷新改进建议</button><span id="improvementMode" class="pill">尚未读取</span></div><div id="improvementReport" class="detailgrid"><div class="empty">连接后展示重复阻塞、重试和验收失败的观察信号。这里只提出建议，不会自动改动任务或代码。</div></div><div class="notice">建议来自已记录的任务元数据，只是诊断线索，不代表已确认根因。任何方案都需要回归测试、独立评估和人工批准。</div></section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">全局事件时间线</h2><span id="eventCount" class="muted">0 条事件</span></div><div id="events" class="events empty">连接后显示事件。</div></section>
 <div class="notice">安全说明：管理员 Token 不写入 localStorage 或 URL；数据通过带 Authorization 的只读接口获取。请只在可信环境使用管理员凭证。模型输出、员工反馈和已验证结论应分别判断，不要仅凭状态为 completed 就认定事实正确。</div>
 </main>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null;
+ let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null,improvement=null,currentProjectId="";
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
  const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",awaiting_validation:"等待验证",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
@@ -42,13 +50,57 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  function setStatus(msg,cls=""){ $("status").className="notice "+cls; $("status").textContent=msg; }
  function rows(){return Array.isArray(snapshot&&snapshot.tasks)?snapshot.tasks:[];}
  function eventRows(){return Array.isArray(snapshot&&snapshot.events)?snapshot.events:[];}
+ async function createTwinGoal(){
+  const goal=$("twinGoal").value.trim();
+  if(!token){setStatus("请先连接管理员 Token。","error");return;}
+  if(!goal){$("twinGoalResult").textContent="请先输入目标。";return;}
+  const button=$("createTwinGoal");button.disabled=true;$("reviewTwinProject").disabled=true;$("advanceTwinProject").disabled=true;$("twinGoalResult").textContent="正在规划…";
+  try{
+   const response=await fetch("/api/twin/goal",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({goal:goal,strategy:$("twinStrategy").value})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+   currentProjectId=data.project_id||"";$("reviewTwinProject").disabled=!currentProjectId;$("advanceTwinProject").disabled=!currentProjectId;
+   $("twinGoalResult").textContent="项目 "+(data.project_id||"")+"；规划模式："+(data.plan_mode||"unknown")+"；创建任务："+((data.tasks||[]).length)+" 个。";
+   $("reviewTwinProject").disabled=!currentProjectId;
+   $("twinReviewResult").textContent="目标已创建。点击‘检查分身下一步决策’后，分身会读取该项目员工的状态和反馈。";
+   setStatus("数字分身已创建员工任务；请查看任务状态和后续反馈。","ok");
+   await load();
+  }catch(e){$("twinGoalResult").textContent="规划失败："+e.message;setStatus("数字分身未能创建任务："+e.message,"error");}
+  finally{button.disabled=false;}
+ }
+ async function advanceTwinProject(){
+  if(!token){setStatus("请先连接管理员 Token。","error");return;}
+  if(!currentProjectId){$("twinReviewResult").textContent="请先通过上方表单创建一个目标。";return;}
+  const button=$("advanceTwinProject");button.disabled=true;$("twinReviewResult").textContent="分身正在评估是否存在安全、有限的推进动作…";
+  try{
+   const response=await fetch("/api/twin/advance",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({project_id:currentProjectId})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+   $("twinReviewResult").textContent=JSON.stringify({project_id:data.project_id,decision:data.decision,reason:data.reason,action_task_id:data.action_task_id,llm_used:data.llm_used,next_actions:data.next_actions,safety_note:data.safety_note},null,2);
+   await load();
+  }catch(e){$("twinReviewResult").textContent="推进失败："+e.message;}
+  finally{button.disabled=false;}
+ }
+ async function reviewTwinProject(){
+  if(!token){setStatus("请先连接管理员 Token。","error");return;}
+  if(!currentProjectId){$("twinReviewResult").textContent="请先通过上方表单创建一个目标。";return;}
+  const button=$("reviewTwinProject");button.disabled=true;$("twinReviewResult").textContent="分身正在检查员工状态、阻塞和验收状态…";
+  try{
+   const response=await fetch("/api/twin/review",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({project_id:currentProjectId})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+   $("twinReviewResult").textContent=JSON.stringify({project_id:data.project_id,decision:data.decision,reason:data.reason,llm_used:data.llm_used,next_actions:data.next_actions},null,2);
+   await load();
+  }catch(e){$("twinReviewResult").textContent="检查失败："+e.message;}
+  finally{button.disabled=false;}
+ }
  async function load(){
   if(!token||busy)return;busy=true;$("refresh").disabled=true;
   try{
    const r=await fetch("/api/workforce",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
-   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
+   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}try{const ir=await fetch("/api/improvement/report",{headers:{Authorization:"Bearer "+token},cache:"no-store"});const idata=await ir.json().catch(()=>({}));if(!ir.ok)throw new Error(idata.error||("HTTP "+ir.status));improvement=idata.report;}catch(e){improvement={error:e.message};}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
   }catch(e){setStatus("读取失败："+e.message+"。请检查 Token、服务状态和权限。","error");}
   finally{busy=false;$("refresh").disabled=false;}
  }
@@ -113,9 +165,22 @@ function renderTasks(){
   $("events").className="events";
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
- function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
+ function renderImprovement(){
+  const root=$("improvementReport"),mode=$("improvementMode");
+  if(!improvement){mode.textContent="尚未读取";root.innerHTML='<div class="empty">尚无改进报告。</div>';return;}
+  if(improvement.error){mode.textContent="读取失败";root.innerHTML='<div class="sub error">'+esc(improvement.error)+'</div>';return;}
+  mode.textContent="观察模式 · 不自动执行";
+  const m=improvement.metrics||{};
+  const metrics='<div class="sub"><h3>观察指标</h3><pre class="content">'+esc(pretty(m))+'</pre></div>';
+  const observations=Array.isArray(improvement.observations)?improvement.observations:[];
+  const proposals=Array.isArray(improvement.proposals)?improvement.proposals:[];
+  const obs='<div class="sub"><h3>观察信号（'+observations.length+'）</h3>'+(observations.length?observations.map(x=>'<div style="margin:7px 0"><strong>'+esc(x.signal)+'</strong><div class="muted">样本：'+esc(x.sample_count)+' · 任务：'+esc((x.task_ids||[]).join(", "))+'</div><div>'+esc(x.detail||"")+'</div><div class="muted">'+esc(x.interpretation||"")+'</div></div>').join(""):'<div class="muted">当前样本不足，暂不提出问题假设。</div>')+'</div>';
+  const props='<div class="sub"><h3>待评估建议（'+proposals.length+'）</h3>'+(proposals.length?proposals.map(p=>'<div style="margin:8px 0"><strong>'+esc(p.title)+'</strong><div>'+esc(p.hypothesis)+'</div><div class="muted">实验：'+esc(p.experiment)+'</div><div class="muted">成功指标：'+esc(p.success_metric)+'</div><div class="pill warn">需要独立评估与人工批准</div></div>').join(""):'<div class="muted">暂无达到样本门槛的建议。</div>')+'</div>';
+  root.className="detailgrid";root.innerHTML=metrics+obs+props+'<div class="sub"><h3>安全边界</h3><pre class="content">'+esc(pretty({actions_taken:improvement.actions_taken,adoption_requires:improvement.adoption_requires,truth_claim:improvement.truth_claim}))+'</pre></div>';
+ }
+ function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();renderImprovement();}
  function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
- $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
+ $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("refreshImprovement").addEventListener("click",load);$("createTwinGoal").addEventListener("click",createTwinGoal);$("reviewTwinProject").addEventListener("click",reviewTwinProject);$("advanceTwinProject").addEventListener("click",advanceTwinProject);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
  $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
  timer=setInterval(load,5000);
