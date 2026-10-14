@@ -59,8 +59,30 @@ def evaluate_improvement(
     reasons: list[str] = []
     if not isinstance(proposal, dict) or not str(proposal.get("hypothesis", "")).strip():
         reasons.append("missing_hypothesis")
-    if iteration < 1 or max_iterations < 1 or iteration > max_iterations:
+
+    valid_iteration = (
+        isinstance(iteration, int) and not isinstance(iteration, bool)
+        and isinstance(max_iterations, int) and not isinstance(max_iterations, bool)
+        and iteration >= 1 and max_iterations >= 1 and iteration <= max_iterations
+    )
+    if not valid_iteration:
         reasons.append("iteration_budget_exceeded")
+
+    valid_min_samples = (
+        isinstance(min_samples, int) and not isinstance(min_samples, bool)
+        and min_samples >= 1
+    )
+    if not valid_min_samples:
+        reasons.append("invalid_minimum_sample_count")
+        min_samples = 1
+
+    valid_min_gain = (
+        isinstance(min_gain, (int, float)) and not isinstance(min_gain, bool)
+        and math.isfinite(min_gain) and 0 <= min_gain <= 1
+    )
+    if not valid_min_gain:
+        reasons.append("invalid_minimum_gain")
+        min_gain = 1.0
     if not isinstance(baseline, dict) or not isinstance(candidate, dict):
         reasons.append("invalid_metrics")
         baseline = baseline if isinstance(baseline, dict) else {}
