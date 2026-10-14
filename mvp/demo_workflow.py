@@ -124,12 +124,14 @@ def main() -> int:
             {"name": "simulation_label_present", "passed": "[SIMULATED DEMO OUTPUT" in output},
             {"name": "limitations_disclosed", "passed": "没有外部证据" in output},
             {"name": "next_step_present", "passed": "下一步：" in output},
+            {
+                "name": "source_evidence_present",
+                "passed": not evidence_required,
+                "note": "This synthetic demo intentionally supplies no external sources.",
+            },
         ],
         "evidence": [],
         "evidence_count": 0,
-        "checks": [
-            { "name": "source_structure", "passed": not evidence_required },
-        ],
         "notes": "Demo only: structural checks passed, but no source evidence was supplied.",
         "verified_truth": False,
     }
