@@ -699,5 +699,5 @@ def test_workforce_task_and_event_survive_registry_reload(workforce_http):
     assert persisted_task["blocker"] == "Persistence acceptance blocker"
     event_types = [event["type"] for event in snapshot["events"] if event.get("task_id") == task_id]
     assert "task_created" in event_types
-    assert "worker_claimed" in event_types
+    assert "task_assigned" in event_types
     assert "worker_reported" in event_types
