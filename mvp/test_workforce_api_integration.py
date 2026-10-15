@@ -664,3 +664,40 @@ def test_dashboard_state_and_execution_routes_require_admin_when_auth_is_configu
     )
     assert status == 401
     assert denied_action["ok"] is False
+
+
+def test_workforce_task_and_event_survive_registry_reload(workforce_http):
+    """Persistence check: a fresh registry reads the task and events from disk."""
+    base, registry = workforce_http
+    status, created = request_json(base, "/api/workforce/tasks", ADMIN, {
+        "title": "Persistence acceptance check",
+        "description": "Verify persisted task state and lifecycle events after reload.",
+        "capability": "research",
+    })
+    assert status == 201
+    task_id = created["task"]["id"]
+
+    status, claim = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["research"],
+        "task_id": task_id,
+    })
+    assert status == 200
+    status, reported = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "blocked",
+        "lease_token": claim["task"]["lease_token"],
+        "blocker": "Persistence acceptance blocker",
+        "output": "This output is only a persistence test fixture.",
+    })
+    assert status == 200
+    assert reported["task"]["status"] == "blocked"
+
+    reloaded = WorkforceRegistry(path=str(registry.path))
+    snapshot = reloaded.snapshot()
+    persisted_task = next(task for task in snapshot["tasks"] if task["id"] == task_id)
+    assert persisted_task["status"] == "blocked"
+    assert persisted_task["blocker"] == "Persistence acceptance blocker"
+    event_types = [event["type"] for event in snapshot["events"] if event.get("task_id") == task_id]
+    assert "task_created" in event_types
+    assert "worker_claimed" in event_types
+    assert "worker_reported" in event_types
