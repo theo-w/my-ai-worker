@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JARVIS · Digital Twin / Digital Workforce</title>
+<style>
+:root{--bg:#080d18;--panel:#101827;--panel2:#141f32;--line:#263650;--text:#edf4ff;--muted:#91a0bb;--accent:#65d9ff;--good:#58e39b;--warn:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#1a2c52 0,#080d18 40%);color:var(--text);font:14px/1.55 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:1480px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.brand{font-size:21px;font-weight:850;letter-spacing:.07em}.tagline{margin-top:4px;color:var(--muted)}.status{color:var(--accent);font:11px ui-monospace,monospace}.panel{background:rgba(16,24,39,.93);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 35px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.grid{display:grid;grid-template-columns:1.05fr 1.55fr 1.05fr;gap:14px;margin-top:14px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;font-weight:800}.sub{color:var(--muted);font-size:11px}.input{display:flex;gap:8px}.input input{flex:1;background:#0a1221;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:12px}.btn{background:var(--accent);color:#06101a;border:0;border-radius:9px;padding:0 17px;font-weight:850;cursor:pointer}.btn:disabled{opacity:.45}.hero{display:grid;grid-template-columns:1fr 1fr;gap:14px}.kicker{color:var(--accent);font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.big{font-size:19px;font-weight:850;margin:5px 0}.kv{display:grid;grid-template-columns:88px 1fr;gap:6px;margin:8px 0}.kv b{color:var(--muted);font-size:11px}.kv div{font-size:12px}.flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.node{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0b1323;color:var(--muted);font-size:12px}.node.active{border-color:var(--accent);color:var(--text)}.arrow{color:#51617f}.agents{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.agent{padding:12px;border:1px solid var(--line);border-radius:10px;background:#0b1323;cursor:pointer}.agent.selected{border-color:var(--accent)}.agent-head{display:flex;justify-content:space-between;font-weight:750}.pill{font-size:10px;padding:2px 7px;border-radius:999px;background:#1b2742;color:var(--muted)}.running{color:var(--accent)}.completed{color:var(--good)}.bar{height:4px;background:#202b45;border-radius:4px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.evidence{max-height:260px;overflow:auto}.ev{padding:9px 0;border-bottom:1px solid #202a42}.confidence{color:var(--good);font:11px ui-monospace,monospace}.decision{border-left:3px solid var(--good);padding-left:12px}.decision h2{margin:0 0 4px;color:var(--good)}.risk{color:var(--warn);margin:5px 0}.outcome{border:1px solid #2a4860;background:#0b1726;border-radius:10px;padding:12px}.footer{margin-top:14px;color:var(--muted);font-size:11px;text-align:center}@media(max-width:1000px){.grid,.hero{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:600px){.agents{grid-template-columns:1fr}.app{padding:12px}.input{flex-direction:column}.btn{height:42px}}
+</style>
+</head>
+<body><div class="app">
+<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div id="status" class="status">IDLE</div></div>
+
+<div class="panel wide">
+ <div class="hero">
+  <div><div class="kicker">01 · DIGITAL TWIN</div><div class="big">我的数字分身负责“我想做什么”</div><div class="sub">它代表业务目标、判断标准、授权边界与最终决策，而不是一个普通 Agent。</div></div>
+  <div><div class="kicker">02 · DIGITAL WORKFORCE</div><div class="big">数字员工负责“谁来把它做成”</div><div class="sub">Digital Twin 根据业务目标动态组建、分工和管理 Workers。</div></div>
+ </div>
+</div>
+
+<div class="panel wide" style="margin-top:14px">
+ <div class="section-title"><span>Business Goal · 让数字分身替我完成什么业务</span><span class="sub">Natural Language</span></div>
+ <div class="input"><input id="goal" value="评估一款玩家可以与长期记忆 NPC 建立关系的 AI 原生 RPG 是否值得进入 Prototype"><button id="run" class="btn">启动 JARVIS</button></div>
+</div>
+
+<div class="panel wide" style="margin-top:14px">
+ <div class="section-title"><span>Business Journey</span><span id="phase" class="status">IDLE</span></div>
+ <div id="flow" class="flow"></div>
+</div>
+
+<div class="grid">
+ <div class="panel">
+  <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
+  <div id="twin">等待业务目标...</div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>Business Context</span><span class="sub">WHY</span></div>
+  <div class="kv"><b>Objective</b><div id="businessContext">用最小成本验证业务机会，只有值得做才进入 Prototype。</div><b>Intent</b><div id="intent">等待目标...</div><b>Outcome</b><div>Business Decision → Execution → Feedback</div></div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>Workforce Formation</span><span class="sub" id="teamSummary">0 workers</span></div>
+  <div id="teamWhy" class="sub">Digital Twin 会根据目标决定需要哪些数字员工。</div>
+ </div>
+
+ <div class="panel">
+  <div class="section-title"><span>Digital Workers</span><span class="sub" id="agentCount">0</span></div>
+  <div id="agents" class="agents"></div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>Worker Detail</span><span class="sub">EXECUTION</span></div>
+  <div id="detail" class="sub">选择一个数字员工查看任务、输入、输出与证据。</div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>Business Decision</span><span class="sub">EVIDENCE FIRST</span></div>
+  <div id="decision" class="sub">等待数字分身完成判断。</div>
+ </div>
+
+ <div class="panel wide">
+  <div class="section-title"><span>Evidence Stream</span><span class="sub">SIMULATED · MVP</span></div>
+  <div id="evidence" class="evidence"></div>
+ </div>
+
+ <div class="panel wide">
+  <div class="section-title"><span>Business Execution / Prototype</span><span class="sub">AFTER DECISION</span></div>
+  <div id="prototype" class="outcome">决策后，Digital Twin 可以把结果交给下一阶段的执行团队。</div>
+ </div>
+</div>
+<div class="footer">MVP：编排、Digital Twin policy、团队形成、状态流转与 Prototype handoff 为真实流程；Research / Evidence 仍明确标记为 simulated。下一阶段：真实 Web Research + LLM Synthesis + Persistent Twin Memory。</div>
+</div>
+<script>
+let state=null,selected=0;
+const phases=["planning","team","evaluation","decision","prototype"];
+const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Business Execution"};
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function render(){
+ if(!state)return;
+ document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
+ document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
+ const idx=Math.max(0,phases.indexOf(state.phase));
+ const names=["Goal","Digital Twin","Workforce","Workers","Evidence","Decision","Business Execution"];
+ document.getElementById("flow").innerHTML=names.map((x,i)=>{const active=i===0|| (i===1&&idx>=0)||(i===2&&idx>=1)||(i===3&&idx>=1)||(i===4&&idx>=1)||(i===5&&idx>=3)||(i===6&&idx>=4);return '<span class="node '+(active?'active':'')+'">'+x+'</span>'+((i<6)?'<span class="arrow">→</span>':'')}).join("");
+ const t=state.twin;
+ document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>Intent</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
+ document.getElementById("intent").textContent=state.goal||"等待目标...";
+ document.getElementById("teamSummary").textContent=(t?t.team_size:0)+" Digital Workers";
+ document.getElementById("teamWhy").innerHTML=t?'<b>Why these workers?</b><br>根据当前 Business Goal，Digital Twin 选择最相关的能力组合，并受 max parallel = '+t.policy.max_parallel_workers+' 约束。':'Digital Twin 会根据业务目标决定团队。';
+ document.getElementById("agentCount").textContent=(state.agents||[]).filter(a=>a.status==="completed").length+"/"+(state.agents||[]).length+" completed";
+ document.getElementById("agents").innerHTML=(state.agents||[]).map((a,i)=>'<div class="agent '+(i===selected?'selected':'')+'" onclick="selected='+i+';render()"><div class="agent-head"><span>'+esc(a.worker)+'</span><span class="pill '+a.status+'">'+esc(a.status)+'</span></div><div class="sub">'+esc(a.task)+'</div><div class="bar"><i style="width:'+a.progress+'%"></i></div></div>').join("");
+ const a=(state.agents||[])[selected];
+ document.getElementById("detail").innerHTML=a?'<div class="kv"><b>Worker</b><div>'+esc(a.worker)+'</div><b>Status</b><div>'+esc(a.status)+' · '+a.progress+'%</div><b>Input</b><div>'+esc(a.input)+'</div><b>Output</b><div>'+esc(a.output||"工作中…")+'</div><b>Evidence</b><div>'+((a.evidence||[]).length)+' items</div></div>':'暂无数字员工';
+ document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
+ const d=state.decision;
+ document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待数字分身完成判断…';
+ const p=state.prototype;
+ document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">Business decision 已转化为可执行的下一阶段工作。</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&d.recommendation==="GO_TO_PROTOTYPE"?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
+}
+async function poll(){try{const r=await fetch("/api/state");state=await r.json();render()}catch(e){}}
+document.getElementById("run").onclick=async()=>{const b=document.getElementById("run");b.disabled=true;await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal:document.getElementById("goal").value})});b.disabled=false};
+async function startPrototype(){const r=await fetch("/api/prototype",{method:"POST"});if(r.ok)poll()}
+setInterval(poll,300);poll();
+</script></body></html>
