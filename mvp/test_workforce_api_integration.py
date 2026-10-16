@@ -88,7 +88,7 @@ def test_http_twin_to_worker_to_twin_happy_path(workforce_http):
     status, completed = request_json(
         base, "/api/workforce/report", RESEARCHER,
         {"task_id": task_id, "status": "completed", "lease_token": lease_token,
-         "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}]})},
+         "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}], "simulated": False})},
     )
     assert status == 200
     assert completed["task"]["status"] == "awaiting_validation"
@@ -461,7 +461,7 @@ def test_admin_verification_endpoint_records_check_without_claiming_truth(workfo
     assert status == 200
     status, reported = request_json(base, "/api/workforce/report", RESEARCHER, {
         "task_id": task_id, "status": "completed",
-        "lease_token": claim["task"]["lease_token"], "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}]}),
+        "lease_token": claim["task"]["lease_token"], "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}], "simulated": False}),
     })
     assert status == 200
     status, forbidden = request_json(base, "/api/workforce/verify", RESEARCHER, {
@@ -526,7 +526,7 @@ def test_acceptance_scenario_blocker_retry_completion_and_verification(workforce
         "task_id": task_id,
         "status": "completed",
         "lease_token": second_token,
-        "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}]}),
+        "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}], "simulated": False}),
     })
     assert status == 200
     assert completed["task"]["status"] == "awaiting_validation"
@@ -613,7 +613,7 @@ def test_verification_endpoint_records_review_without_claiming_truth(workforce_h
         "task_id": task_id,
         "status": "completed",
         "lease_token": claimed["task"]["lease_token"],
-        "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}]}),
+        "output": json.dumps({"sources": [{"title": "Test source", "url": "https://example.com/report", "snippet": "A sample source excerpt used only by the automated test."}], "simulated": False}),
     })
     assert status == 200
 
