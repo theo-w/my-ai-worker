@@ -1,17 +1,18 @@
 services:
   - type: web
-    name: my-ai-worker
-    runtime: node
-    plan: starter
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /health
+    name: jarvis-loophole-playtest
+    runtime: python
+    plan: free
+    branch: feat/autonomous-twin-project-loop
+    buildCommand: python -m compileall -q mvp
+    startCommand: python -m mvp.server
+    healthCheckPath: /api/llm/status
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: JARVIS_STORE_PATH
-        value: /var/data/runtime.json
-    disk:
-      name: jarvis-runtime-data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: HOST
+        value: 0.0.0.0
+      - key: JARVIS_PUBLIC_DEMO
+        value: "false"
+      - key: JARVIS_ADMIN_TOKEN
+        sync: false
