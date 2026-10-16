@@ -51,7 +51,26 @@ def run_worker(worker: str, capability: str, goal: str) -> list[Evidence]:
     return [Evidence(worker, item, 0.78) for item in findings[capability]]
 
 
-def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
+def evaluate(goal: str, evidence: list[Evidence], demo_mode: bool = False) -> Decision:
+    if not evidence and demo_mode:
+        recommendation = "DEMO_GO_TO_PROTOTYPE"
+        demo_fallback = True
+    elif not evidence:
+        recommendation = "HOLD_FOR_EVIDENCE"
+        demo_fallback = False
+    elif all(item.simulated for item in evidence) and demo_mode:
+        # Demo-only handoff is opt-in and never represents real business approval.
+        recommendation = "DEMO_GO_TO_PROTOTYPE"
+        demo_fallback = True
+    elif all(item.simulated for item in evidence):
+        recommendation = "HOLD_FOR_EVIDENCE"
+        demo_fallback = False
+    elif not any(getattr(item, "source", None) for item in evidence):
+        recommendation = "HOLD_FOR_EVIDENCE"
+        demo_fallback = False
+    else:
+        recommendation = "GO_TO_PROTOTYPE"
+        demo_fallback = False
     return Decision(
         recommendation=recommendation,
         confidence=78 if recommendation == "GO_TO_PROTOTYPE" else (50 if demo_fallback else 42),
@@ -60,7 +79,7 @@ def evaluate(goal: str, evidence: list[Evidence]) -> Decision:
             "NPC memory and behavior can drift",
             "Inference cost and latency may limit production economics",
         ],
-        next_step="AI Game Prototype Sprint" if recommendation in {"GO_TO_PROTOTYPE", "DEMO_GO_TO_PROTOTYPE"} else "Evidence Collection Sprint",
+        next_step=("AI Game Prototype Sprint (demo only)" if recommendation == "DEMO_GO_TO_PROTOTYPE" else ("AI Game Prototype Sprint" if recommendation == "GO_TO_PROTOTYPE" else "Evidence Collection Sprint")),
     )
 
 
