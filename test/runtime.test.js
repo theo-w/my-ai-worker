@@ -41,8 +41,11 @@ test('task can be created, accepted, progressed, and completed', async (t) => {
   assert.equal((await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret')).body.task.status, 'accepted');
   assert.equal((await request('/tasks/' + id + '/events', 'POST', { event_type: 'progress', summary: 'Researching', progress: 40 }, 'test-worker-secret')).body.task.status, 'running');
   const result = await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Done', result: { verdict: 'promising' }, evidence: ['research notes'] }, 'test-worker-secret');
-  assert.equal(result.body.task.status, 'succeeded');
-  assert.equal((await request('/tasks/' + id)).body.events.length, 4);
+  assert.equal(result.body.task.status, 'awaiting_validation');
+  assert.equal((await request('/tasks/' + id + '/validate', 'POST', { validated: true, summary: 'Acceptance criteria checked', evidence: ['test://acceptance-check-1'] })).body.task.status, 'succeeded');
+  const detail = await request('/tasks/' + id);
+  assert.equal(detail.body.events.length, 5);
+  assert.ok(detail.body.events.some((event) => event.event_type === 'validation'));
 });
 
 test('approval-required task needs explicit admin approval', async (t) => {
@@ -51,9 +54,25 @@ test('approval-required task needs explicit admin approval', async (t) => {
   const id = created.body.task.task_id;
   await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
   const result = await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Draft ready', result: { draft: 'Review me' } }, 'test-worker-secret');
-  assert.equal(result.body.task.status, 'awaiting_approval');
+  assert.equal(result.body.task.status, 'awaiting_validation');
+  assert.equal((await request('/tasks/' + id + '/validate', 'POST', { validated: true, summary: 'Draft reviewed', evidence: ['test://draft-review'] }, 'test-worker-secret')).status, 403);
+  assert.equal((await request('/tasks/' + id + '/validate', 'POST', { validated: true, summary: 'Draft reviewed', evidence: ['test://draft-review'] })).body.task.status, 'awaiting_approval');
   assert.equal((await request('/tasks/' + id + '/approve', 'POST', { approved: true }, 'test-worker-secret')).status, 403);
   assert.equal((await request('/tasks/' + id + '/approve', 'POST', { approved: true })).body.task.status, 'succeeded');
+});
+
+
+test('result cannot succeed without admin validation and validation requires evidence', async (t) => {
+  const { request } = await setup(t);
+  const created = await request('/tasks', 'POST', { goal: 'Verify a claim' });
+  const id = created.body.task.task_id;
+  await request('/tasks/' + id + '/accept', 'POST', {}, 'test-worker-secret');
+  const result = await request('/tasks/' + id + '/events', 'POST', { event_type: 'result', summary: 'Claim drafted', result: { claim: 'works' } }, 'test-worker-secret');
+  assert.equal(result.body.task.status, 'awaiting_validation');
+  assert.equal((await request('/tasks/' + id + '/validate', 'POST', { validated: true, summary: 'No evidence supplied', evidence: [] })).status, 400);
+  assert.equal((await request('/tasks/' + id + '/validate', 'POST', { validated: true, summary: 'Worker self-approval', evidence: ['test://evidence'] }, 'test-worker-secret')).status, 403);
+  const rejected = await request('/tasks/' + id + '/validate', 'POST', { validated: false, summary: 'Evidence does not support claim', evidence: ['test://contradicting-evidence'] });
+  assert.equal(rejected.body.task.status, 'blocked');
 });
 
 test('blocked task retries only within attempt limit', async (t) => {

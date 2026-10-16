@@ -12,13 +12,14 @@ The first domain pack is AI-native game feasibility and game-operations analysis
 
 - JARVIS game-operation copilot demo: `demo/JARVIS_AI_Game_Operation_Copilot_V4.html`.
 - Task lifecycle and worker feedback contract: [Digital Workforce Protocol](docs/DIGITAL_WORKFORCE_PROTOCOL.md).
+- Future improvement direction: [Recursive Self-Improvement Protocol](docs/RECURSIVE_SELF_IMPROVEMENT.md) — staged, evidence-driven, bounded, and rollback-capable; design only, not yet implemented.
 - Node.js HTTP runtime: `src/server.js`, with task APIs, worker feedback, approval gates, retries, and health endpoint.
 - Bearer-token authentication and role-based access control are now implemented. Configure separate `JARVIS_ADMIN_TOKEN` and `JARVIS_WORKER_TOKEN` secrets. The worker identity is configured with `JARVIS_WORKER_ID`.
 - `GET /health` is public for deployment probes. All task routes require `Authorization: Bearer <token>`.
-- Admin can create tasks, inspect tasks, retry tasks, and approve/reject approval-gated results. Worker credentials can inspect available/assigned tasks, accept work only as their configured identity, and post events only for tasks assigned to that identity.
+- Admin can create tasks, inspect tasks, validate worker results, retry tasks, and approve/reject approval-gated results. Worker credentials can inspect available/assigned tasks, accept work only as their configured identity, and post events only for tasks assigned to that identity.
 - CI tests cover missing/invalid credentials, role boundaries, approval gating, and task lifecycle. Verify the latest GitHub Actions run before considering this revision fully tested.
 - **Security limitations:** this MVP uses long-lived bearer secrets, not individual user accounts, SSO, or short-lived sessions. Store secrets in the hosting provider's secret manager; never commit tokens. Use HTTPS in production. Worker tokens are shared within the configured worker identity and should later become per-worker credentials. Rate limiting, rotation workflow, and a production database remain future work.
-- **Not yet complete:** autonomous scheduling, LLM-powered worker execution, acknowledgement-timeout reassignment, multi-worker dependency orchestration, and verified deployment. Authentication does not by itself make public deployment production-ready.
+- **Not yet complete:** autonomous scheduling, LLM-powered worker execution, automatic stale-worker/acknowledgement-timeout reassignment, multi-worker dependency orchestration, and verified deployment. Authentication does not by itself make public deployment production-ready.
 
 ## Configure and run locally
 
@@ -41,7 +42,10 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 - `GET /tasks` — admin lists all tasks; worker sees queued or assigned tasks
 - `GET /tasks/:id` — task detail and events, subject to role checks
 - `POST /tasks/:id/accept` — worker accepts as its configured identity
+- `POST /tasks/:id/heartbeat` — assigned worker refreshes its heartbeat; heartbeat events are persisted in task history
+- `GET /monitoring/workers` — admin-only worker/task heartbeat view, including stale-heartbeat flags (default timeout 60 seconds; set `JARVIS_HEARTBEAT_TIMEOUT_MS` to override, minimum 5 seconds)
 - `POST /tasks/:id/events` — assigned worker reports `progress`, `result`, `blocked`, or `failed`
+- `POST /tasks/:id/validate` — admin records a validation decision and evidence; successful results cannot skip this gate
 - `POST /tasks/:id/approve` — admin approves/rejects a gated result
 - `POST /tasks/:id/retry` — admin requeues eligible tasks within the attempt limit
 
@@ -54,7 +58,8 @@ The server listens on `0.0.0.0:10000` by default. Override `PORT` and `JARVIS_ST
 5. Move durable state to a production database before concurrent/multi-instance use.
 6. Verify deployment with configured secrets and an end-to-end smoke test.
 7. Add multi-worker dependency graphs and reusable domain packs.
+8. After the execution and verification loop is reliable, implement observe-only self-improvement reports, then offline regression evaluation and reversible adoption.
 
 ## MVP success criteria
 
-A task can be created, accepted by an authenticated worker, updated with progress, completed with evidence, or marked blocked/failed; approval-gated results cannot be approved by a worker token; events persist on persistent storage; retries are bounded; and CI plus deployed health checks pass.
+A task can be created, accepted by an authenticated worker, updated with progress, submit a result that waits for admin validation with evidence, or be marked blocked/failed; approval-gated results cannot be approved by a worker token; events persist on persistent storage; retries are bounded; and CI plus deployed health checks pass.
