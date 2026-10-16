@@ -34,6 +34,23 @@ def test_evidence_gate_reads_sources_inside_worker_content_envelope():
     assert result["verified_truth"] is False
 
 
+def test_evidence_gate_rejects_source_records_without_explicit_live_provenance():
+    result = verify_task_output({
+        "id": "t1", "output": json.dumps({
+            "sources": [{
+                "title": "Example source", "url": "https://example.com/source",
+                "snippet": "A source excerpt without executor provenance",
+            }],
+        }),
+    }, require_evidence=True)
+    assert result["accepted"] is False
+    assert result["provenance"] == "unknown"
+    assert any(
+        check["name"] == "non_simulated_evidence" and not check["passed"]
+        for check in result["checks"]
+    )
+
+
 def test_evidence_gate_rejects_incomplete_source():
     result = verify_task_output({
         "id": "t1", "output": json.dumps({
