@@ -67,7 +67,7 @@ def verify_task_output(task: dict, require_evidence: bool = False,
     need_sources = require_evidence or bool(criteria.get("require_sources", False))
     source_ok = not need_sources or bool(valid)
     result["checks"].append({"name": "source_structure", "passed": source_ok})
-    if need_sources and simulated is not False:
+    if need_sources and ("simulated" not in envelope or simulated is not False):
         # Research evidence must carry an explicit executor provenance marker.
         # Missing provenance is unknown, not proof that output came from live tools.
         result["checks"].append({
