@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-digital-workforce-mvp"
+version = "0.7.1"
+description = "JARVIS Digital Twin and Digital Workforce MVP"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["mvp"]
+pythonpath = ["."]
+addopts = "-ra"
