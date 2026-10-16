@@ -67,8 +67,14 @@ def verify_task_output(task: dict, require_evidence: bool = False,
     need_sources = require_evidence or bool(criteria.get("require_sources", False))
     source_ok = not need_sources or bool(valid)
     result["checks"].append({"name": "source_structure", "passed": source_ok})
-    if need_sources and result["simulated"]:
-        result["checks"].append({"name": "non_simulated_evidence", "passed": False})
+    if need_sources and simulated is not False:
+        # Research evidence must carry an explicit executor provenance marker.
+        # Missing provenance is unknown, not proof that output came from live tools.
+        result["checks"].append({
+            "name": "non_simulated_evidence",
+            "passed": False,
+            "reason": "Evidence-required tasks must explicitly mark simulated=false.",
+        })
     if criteria.get("required_phrases") is not None:
         phrases = criteria["required_phrases"]
         if not isinstance(phrases, list) or any(not isinstance(p, str) or not p.strip() for p in phrases):
