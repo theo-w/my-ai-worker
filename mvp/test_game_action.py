@@ -1,0 +1,136 @@
+import json
+import pytest
+from mvp.game_action import interpret_and_validate_action
+from mvp.model_handoff import build_handoff_prompt, interpret_handoff_and_validate_action
+
+def test_standard_key_requires_action_to_mention_key_and_door():
+    result=interpret_and_validate_action("使用铜钥匙打开仓库门",{})
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["world_state"]["warehouse_open"] is True
+
+def test_alternate_solution_requires_inspection_npc_and_causal_action():
+    state={"inspected":["bell","rope"],"talked":["porter"],"selected":["bell","rope"]}
+    action="把铜铃固定在滑轨上，借涨潮推动它并发出三声搬运信号"
+    result=interpret_and_validate_action(action,state)
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["type"]=="跨系统解法"
+
+def test_model_cannot_force_world_transition():
+    class Fake:
+        def complete(self,system,user):
+            return json.dumps({"intent":"I win","action_kind":"combine_signal","entities":["bell","rail","tide","signal"],"reasoning":"trust me"})
+    result=interpret_and_validate_action("随便说一句",{"inspected":[],"talked":[]},Fake())
+    assert result["validation"]["ok"] is False
+    assert result["trust"]["model_output_is_authoritative"] is False
+
+def test_invalid_llm_schema_fails_closed():
+    class Fake:
+        def complete(self,system,user): return '{"action_kind":"success"}'
+    with pytest.raises(ValueError):
+        interpret_and_validate_action("随便说一句",{},Fake())
+
+def test_input_validation():
+    with pytest.raises(ValueError): interpret_and_validate_action("",{})
+    with pytest.raises(ValueError): interpret_and_validate_action("x"*1001,{})
+
+def test_manual_handoff_accepts_structured_chatgpt_reply_but_rules_decide():
+    reply=json.dumps({"intent":"用钥匙开仓库门","action_kind":"use_key","entities":["key","door"],"reasoning":"钥匙可能匹配门锁","uncertainties":["钥匙是否真的匹配"],"counterexample":"钥匙可能是其他门的"})
+    result=interpret_handoff_and_validate_action("使用铜钥匙打开仓库门",{},reply)
+    assert result["validation"]["ok"] is True
+    assert result["trust"]["handoff_mode"]=="manual_chatgpt_response"
+    assert result["trust"]["model_output_is_authoritative"] is False
+    assert result["trust"]["world_state_changed_only_by_rules"] is True
+
+def test_manual_handoff_cannot_claim_success_without_rule_conditions():
+    reply=json.dumps({"intent":"赢了","action_kind":"combine_signal","entities":["bell","rail","tide","signal"],"reasoning":"模型说成功","uncertainties":[],"counterexample":""})
+    result=interpret_handoff_and_validate_action("我已经成功打开了",{"inspected":[],"talked":[]},reply)
+    assert result["validation"]["ok"] is False
+
+def test_manual_handoff_rejects_invalid_schema_and_plain_text():
+    with pytest.raises(ValueError): interpret_handoff_and_validate_action("动作",{}, "我觉得你成功了")
+    with pytest.raises(ValueError): interpret_handoff_and_validate_action("动作",{}, '{"action_kind":"win"}')
+
+def test_prompt_is_manual_and_state_scoped():
+    prompt=build_handoff_prompt("尝试打开仓库",{"inspected":["key"]})
+    assert "Return exactly one JSON object" in prompt
+    assert "尝试打开仓库" in prompt
+
+
+def test_manual_handoff_rejects_wrong_state_types():
+    reply=json.dumps({"intent":"用钥匙开仓库门","action_kind":"use_key","entities":["key","door"],"reasoning":"钥匙匹配门锁"})
+    with pytest.raises(ValueError):
+        interpret_handoff_and_validate_action("使用铜钥匙打开仓库门",{"inspected":"bell","talked":[]},reply)
+
+def test_manual_handoff_rejects_oversized_model_reply():
+    with pytest.raises(ValueError):
+        interpret_handoff_and_validate_action("使用钥匙开门",{}, "x"*12001)
+
+def test_model_cannot_turn_partial_action_into_success():
+    reply=json.dumps({"intent":"说自己已经成功","action_kind":"use_key","entities":["key","door"],"reasoning":"仅凭模型说成功"})
+    result=interpret_handoff_and_validate_action("我宣布自己已经成功",{"inspected":[],"talked":[]},reply)
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+
+
+def test_unlock_word_alone_does_not_count_as_having_a_key():
+    result=interpret_and_validate_action("尝试开锁",{})
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+
+
+def test_hidden_hole_and_bent_hook_is_a_valid_alternate_solution():
+    state={"inspected":["hole","hook"],"talked":[],"selected":["hole","hook"]}
+    action="清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    result=interpret_and_validate_action(action,state)
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["type"]=="隐藏环境解法"
+    assert result["validation"]["world_state"]["warehouse_open"] is True
+
+
+def test_hidden_hole_solution_requires_inspection_and_causal_action():
+    result=interpret_and_validate_action("我用鱼钩打开了门",{"inspected":[],"talked":[]})
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+
+def _hidden_gap_handoff_reply():
+    return json.dumps({
+        "intent": "用弯鱼钩穿过墙脚破洞拨动内侧门闩",
+        "action_kind": "hidden_gap",
+        "entities": ["hole", "hook", "latch"],
+        "reasoning": "弯钩可以穿过检修孔勾住内侧插销",
+        "uncertainties": ["鱼钩是否足够坚固"],
+        "counterexample": "洞口可能被堵住，或鱼钩无法触及门闩",
+    })
+
+
+def test_manual_handoff_accepts_hidden_gap_only_with_inspected_objects_and_causal_action():
+    action = "清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    state = {"inspected": ["hole", "hook"], "talked": [], "selected": ["hole", "hook"]}
+    result = interpret_handoff_and_validate_action(action, state, _hidden_gap_handoff_reply())
+
+    assert result["validation"]["ok"] is True
+    assert result["validation"]["type"] == "隐藏环境解法"
+    assert result["validation"]["world_state"]["warehouse_open"] is True
+    assert result["trust"]["model_output_is_authoritative"] is False
+    assert result["trust"]["world_state_changed_only_by_rules"] is True
+
+
+def test_manual_handoff_cannot_skip_hidden_gap_inspection_even_if_model_proposes_success():
+    action = "清理墙脚被堵住的破洞，把弯曲鱼钩伸进去勾住门内侧的插销并拉开"
+    result = interpret_handoff_and_validate_action(
+        action, {"inspected": [], "talked": [], "selected": []}, _hidden_gap_handoff_reply()
+    )
+
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+    assert result["validation"]["state_changes"] == []
+
+
+def test_manual_handoff_rejects_hidden_gap_without_explaining_latch_causality():
+    action = "我把鱼钩和墙脚破洞组合起来"
+    state = {"inspected": ["hole", "hook"], "talked": [], "selected": ["hole", "hook"]}
+    result = interpret_handoff_and_validate_action(action, state, _hidden_gap_handoff_reply())
+
+    assert result["validation"]["ok"] is False
+    assert result["validation"]["world_state"]["warehouse_open"] is False
+
