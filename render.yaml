@@ -3,7 +3,7 @@ services:
     name: jarvis-loophole-playtest
     runtime: python
     plan: free
-    branch: feat/autonomous-twin-project-loop
+    branch: main
     buildCommand: python -m compileall -q mvp
     startCommand: python -m mvp.server
     healthCheckPath: /api/llm/status
