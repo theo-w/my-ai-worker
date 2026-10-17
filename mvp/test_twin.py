@@ -1,5 +1,9 @@
 from mvp.run import WORKERS
-from mvp.twin import DigitalTwin
+from mvp.twin import (
+    AutonomousProjectLoop,
+    DigitalTwin,
+    PersistentTwinMemory,
+)
 
 
 def test_digital_twin_forms_task_specific_team():
@@ -15,3 +19,167 @@ def test_digital_twin_snapshot_contains_policy_and_intent():
     assert snapshot["name"] == "AI CEO / Digital Twin"
     assert snapshot["intent"] == "AI RPG"
     assert snapshot["policy"]["decision_style"] == "evidence_first"
+
+
+def test_project_loop_replans_a_failed_task_and_keeps_audit_events():
+    loop = AutonomousProjectLoop(max_iterations=3)
+    tasks = [{"id": "first", "title": "Inspect project", "status": "queued"}]
+
+    def executor(task):
+        if task["id"] == "first":
+            raise RuntimeError("temporary failure")
+        return "verified test artifact"
+
+    def replanner(goal, failed_tasks, iteration):
+        assert goal == "Ship the smallest MVP"
+        assert failed_tasks[0]["id"] == "first"
+        assert iteration == 1
+        return [{"id": "replacement", "title": "Retry with smaller scope", "status": "queued"}]
+
+    report = loop.run(
+        "Ship the smallest MVP", tasks, executor, replanner=replanner
+    )
+
+    assert report["status"] == "completed"
+    assert report["completed_tasks"] == 1
+    assert report["superseded_tasks"] == 1
+    assert report["tasks"][0]["status"] == "superseded"
+    assert report["tasks"][1]["status"] == "completed"
+    event_types = [event["type"] for event in report["events"]]
+    assert "task_finished" in event_types
+    assert "plan_revised" in event_types
+    assert event_types[-1] == "checkpoint_created"
+
+
+def test_project_loop_blocks_high_impact_actions_before_execution():
+    loop = AutonomousProjectLoop()
+    called = []
+    report = loop.run(
+        "Deploy to production",
+        [{"id": "deploy", "title": "Deploy", "status": "queued"}],
+        lambda task: called.append(task) or "should not run",
+        requested_actions=["production_release"],
+    )
+
+    assert report["status"] == "needs_approval"
+    assert called == []
+    assert any(event["type"] == "approval_required" for event in report["events"])
+
+
+def test_persistent_twin_memory_round_trips_preferences_decisions_and_lessons(tmp_path):
+    path = tmp_path / "twin-memory.json"
+    memory = PersistentTwinMemory(path=str(path))
+    memory.remember_preference("delivery_priority", "fastest_mvp")
+    decision = memory.record_decision(
+        "Ship MVP", "Fix reset and test state consistency",
+        alternatives=["Polish animations"], outcome="pending",
+    )
+    memory.record_lesson("Never equate simulated output with verified evidence", "CI")
+
+    reloaded = PersistentTwinMemory(path=str(path))
+    assert reloaded.preferences["delivery_priority"] == "fastest_mvp"
+    assert reloaded.decisions[0]["goal"] == "Ship MVP"
+    assert reloaded.decisions[0]["recommendation"] == decision["recommendation"]
+    assert reloaded.lessons[0]["context"] == "CI"
+
+
+
+def test_project_loop_exposes_verified_outcome_summary_for_recursive_review():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [
+        {
+            "id": "verified",
+            "title": "Evidence-backed result",
+            "status": "queued",
+            "verified": True,
+            "provenance": "live",
+        },
+        {
+            "id": "blocked",
+            "title": "Research without sources",
+            "status": "queued",
+            "verified": False,
+            "provenance": "llm",
+            "failure_category": "missing_sources",
+        },
+    ]
+
+    def executor(task):
+        return "result with evidence reference" if task["id"] == "verified" else ""
+
+    report = loop.run(
+        "Assess an AI-native game", tasks, executor,
+        verifier=lambda task, output: {
+            "accepted": task["id"] == "verified",
+            "evidence_refs": ["https://example.test/evidence"] if task["id"] == "verified" else [],
+            "reason": "test verifier decision",
+        },
+    )
+
+    assert report["improvement_summary"]["sample_count"] == 2
+    assert report["improvement_summary"]["verified_successes"] == 1
+    assert report["improvement_summary"]["failure_categories"] == {
+        "missing_sources": 1,
+    }
+    assert any(
+        event["type"] == "improvement_review_snapshot"
+        for event in report["events"]
+    )
+
+
+
+def test_project_loop_does_not_treat_execution_as_verification_without_verifier():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "unverified", "title": "Candidate result", "verified": True}]
+
+    report = loop.run("Collect a result", tasks, lambda task: "looks successful")
+
+    assert report["tasks"][0]["status"] == "completed"
+    assert report["tasks"][0]["verified"] is False
+    assert report["tasks"][0]["verification_status"] == "not_configured"
+    assert report["improvement_summary"]["verified_successes"] == 0
+    assert any(event["type"] == "validation_skipped" for event in report["events"])
+
+
+def test_project_loop_requires_evidence_refs_for_verifier_acceptance():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "no-evidence", "title": "Unsupported claim"}]
+
+    report = loop.run(
+        "Verify a result", tasks, lambda task: "claim",
+        verifier=lambda task, output: {
+            "accepted": True,
+            "evidence_refs": [],
+            "reason": "No auditable evidence attached",
+        },
+    )
+
+    assert report["tasks"][0]["status"] == "blocked"
+    assert report["tasks"][0]["verified"] is False
+    assert report["tasks"][0]["failure_category"] == "verification_rejected"
+    assert report["improvement_summary"]["verified_successes"] == 0
+
+
+def test_project_loop_records_independent_verification_and_evidence():
+    loop = AutonomousProjectLoop(max_iterations=1)
+    tasks = [{"id": "verified", "title": "Evidence-backed result"}]
+
+    report = loop.run(
+        "Verify a result", tasks, lambda task: "result",
+        verifier=lambda task, output: {
+            "accepted": True,
+            "evidence_refs": ["https://example.test/source", "artifact://report-1"],
+            "reason": "Sources checked",
+        },
+    )
+
+    assert report["tasks"][0]["status"] == "completed"
+    assert report["tasks"][0]["verified"] is True
+    assert report["tasks"][0]["evidence_refs"] == [
+        "https://example.test/source", "artifact://report-1",
+    ]
+    assert report["improvement_summary"]["verified_successes"] == 1
+    assert any(
+        event["type"] == "validation_decision" and event["accepted"] is True
+        for event in report["events"]
+    )
