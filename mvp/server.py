@@ -10,6 +10,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 try:
     from .run import WORKERS, evaluate, run_worker
@@ -347,7 +348,8 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return body
     def do_HEAD(self):
-        # Render and other HTTP monitors commonly probe the root with HEAD.
+        # Route on the pathname only; tracking/query parameters must not cause 404s.
+        self.path = urlsplit(self.path).path
         if self.path in ("/", "/index.html", "/playtest", "/trace"):
             page = "loophole.html" if self.path == "/playtest" else "trace.html" if self.path == "/trace" else "dashboard.html"
             try:
@@ -363,6 +365,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_GET(self):
+        # BaseHTTPRequestHandler includes query strings in self.path.
+        self.path = urlsplit(self.path).path
         if self.path == "/api/workforce":
             try:
                 authenticate_workforce(self.headers, "admin")
@@ -431,6 +435,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        # Query parameters must not prevent API route matching.
+        self.path = urlsplit(self.path).path
         if self.path in ("/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
