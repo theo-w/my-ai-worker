@@ -26,6 +26,8 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
    <textarea id="twinGoal" rows="4" maxlength="4000" style="display:block;width:100%;margin:7px 0;background:#17243a;color:var(--text);border:1px solid #354b6c;border-radius:8px;padding:10px;font:inherit" placeholder="例如：评估某个 AI 原生游戏玩法是否值得制作原型"></textarea>
    <label for="twinStrategy">组织策略</label>
    <select id="twinStrategy" style="display:block;margin:7px 0 10px"><option value="single_agent">单员工优先（默认）</option><option value="decompose">明确拆分为多任务</option></select>
+   <label for="twinTemplate">目标模板</label>
+   <select id="twinTemplate" style="display:block;margin:7px 0 10px"><option value="general">通用目标</option><option value="ai_game_feasibility">AI 原生游戏可行性评估（中英文证据）</option></select>
    <button class="primary" id="twinCreate" disabled>创建目标</button>
   </div>
   <div class="sub">
@@ -164,7 +166,7 @@ function renderTasks(){
  $("twinCreate").addEventListener("click",()=>{
   const goal=$("twinGoal").value.trim();
   if(!goal){$("twinActionStatus").textContent="请先填写目标描述。";$("twinActionStatus").className="notice error";return;}
-  twinAction("/api/twin/goal",{goal,strategy:$("twinStrategy").value},"目标已创建");
+  twinAction("/api/twin/goal",{goal,strategy:$("twinStrategy").value,template:$("twinTemplate").value},"目标已创建");
  });
  $("twinReview").addEventListener("click",()=>twinAction("/api/twin/review",{project_id:$("twinProject").value.trim()},"分身复核完成"));
  $("twinAdvance").addEventListener("click",()=>twinAction("/api/twin/advance",{project_id:$("twinProject").value.trim()},"推进判断完成"));

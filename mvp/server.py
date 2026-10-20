@@ -660,13 +660,41 @@ class Handler(BaseHTTPRequestHandler):
                     strategy = body.get("strategy", "single_agent")
                     if strategy not in ("single_agent", "decompose"):
                         raise ValueError("strategy must be single_agent or decompose")
+                    template = body.get("template", "general")
+                    if template not in ("general", "ai_game_feasibility"):
+                        raise ValueError("template must be general or ai_game_feasibility")
                     project_id = __import__("uuid").uuid4().hex[:12]
+                    game_feasibility = template == "ai_game_feasibility"
+                    if game_feasibility:
+                        assessment_context = (
+                            "AI 原生游戏可行性评估验收清单：\n"
+                            "1. 中英文来源分别检索并记录可追溯 URL、日期、原始摘录/数据与来源类型；\n"
+                            "2. 区分真实玩家需求信号、普通抱怨、重复内容、疑似营销/水军及无法核实的说法，不把噪声当需求；\n"
+                            "3. 提出可证伪的核心玩法/市场假设，说明支持证据、反证和不确定性；\n"
+                            "4. 设计成本最低的可玩原型或玩家实验，写明样本/方法与观察指标；\n"
+                            "5. 在执行前定义成功阈值、失败阈值及停止条件；\n"
+                            "6. 给出 GO / ITERATE / NO-GO 建议并逐条映射到证据；独立验收前不得声称结论已证实。"
+                        )
+                        assessment_criteria = {
+                            "template": "ai_game_feasibility",
+                            "bilingual_sources": {"required": True, "languages": ["zh", "en"], "fields": ["url", "date", "source_type", "evidence_excerpt"]},
+                            "signal_quality": {"required": True, "separate_noise_from_demand": True, "flag_suspected_manipulation": True},
+                            "falsifiable_hypotheses": {"required": True, "include_counter_evidence": True},
+                            "prototype_experiment": {"required": True, "include_method_and_metrics": True},
+                            "decision_thresholds": {"required": True, "include_success_failure_and_stop_conditions": True},
+                            "decision": {"allowed": ["GO", "ITERATE", "NO-GO"], "must_link_to_evidence": True},
+                            "independent_validation_required": True,
+                            "verified_truth": False,
+                        }
+                    else:
+                        assessment_context = ""
+                        assessment_criteria = {"template": "general", "independent_validation_required": True, "verified_truth": False}
                     if strategy == "single_agent":
                         capability = body.get("capability")
                         if capability is None:
                             lower_goal = goal.lower()
                             capability = (
-                                "research" if any(word in lower_goal for word in ("research", "market", "调研", "市场"))
+                                "research" if game_feasibility or any(word in lower_goal for word in ("research", "market", "调研", "市场"))
                                 else "analysis" if any(word in lower_goal for word in ("assess", "evaluate", "feasibility", "分析", "评估", "可行性"))
                                 else "general"
                             )
@@ -691,16 +719,18 @@ class Handler(BaseHTTPRequestHandler):
                     for item in planned["tasks"]:
                         task = WORKFORCE.create_task(
                             title=str(item.get("title", goal))[:200],
-                            description=(f"项目目标：{goal}\n子任务：{item.get('title', goal)}")[:5000],
-                            capability=str(item.get("capability", "general")),
+                            description=(f"项目目标：{goal}\n子任务：{item.get('title', goal)}"
+                                         + (f"\n\n{assessment_context}" if assessment_context else ""))[:5000],
+                            capability=str(item.get("capability", "research" if game_feasibility else "general")),
                             priority=3,
                             success_criteria={
                                 "project_id": project_id,
                                 "goal": goal,
                                 "task": str(item.get("title", goal)),
                                 "acceptance": "结果须独立验收；LLM 输出不自动视为事实",
+                                **assessment_criteria,
                             },
-                            evidence_required=str(item.get("capability", "")).lower() in ("research", "market_research"),
+                            evidence_required=game_feasibility or str(item.get("capability", "")).lower() in ("research", "market_research"),
                         )
                         created_tasks.append(task)
                     llm_used = planned.get("mode") == "llm_decomposed"
@@ -724,6 +754,7 @@ class Handler(BaseHTTPRequestHandler):
                         "project_id": project_id,
                         "goal": goal,
                         "strategy": strategy,
+                        "template": template,
                         "plan_mode": planned.get("mode"),
                         "warnings": planned.get("warnings", []),
                         "tasks": created_tasks,
