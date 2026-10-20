@@ -16,6 +16,30 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  <div class="auth"><input id="token" type="password" autocomplete="off" placeholder="管理员 Token（仅保存在当前页面内存）"><button class="primary" id="connect">连接并查看</button><button id="refresh" disabled>立即刷新</button><label style="display:flex;align-items:center;gap:6px"><input id="auto" type="checkbox" checked style="min-width:auto"> 每 5 秒刷新</label></div>
  <div id="status" class="notice">尚未连接。请使用运行中 JARVIS 服务配置的管理员 Token。</div>
 </section>
+
+<section class="panel wide">
+ <div class="toolbar"><h2 style="margin:0;flex:1">数字分身 · 目标控制</h2><span class="pill">管理员操作</span></div>
+ <div class="detailgrid">
+  <div class="sub">
+   <h3>建立目标</h3>
+   <label for="twinGoal">目标描述（支持中文或英文）</label>
+   <textarea id="twinGoal" rows="4" maxlength="4000" style="display:block;width:100%;margin:7px 0;background:#17243a;color:var(--text);border:1px solid #354b6c;border-radius:8px;padding:10px;font:inherit" placeholder="例如：评估某个 AI 原生游戏玩法是否值得制作原型"></textarea>
+   <label for="twinStrategy">组织策略</label>
+   <select id="twinStrategy" style="display:block;margin:7px 0 10px"><option value="single_agent">单员工优先（默认）</option><option value="decompose">明确拆分为多任务</option></select>
+   <button class="primary" id="twinCreate" disabled>创建目标</button>
+  </div>
+  <div class="sub">
+   <h3>复核与推进</h3>
+   <label for="twinProject">当前项目 ID</label>
+   <input id="twinProject" placeholder="创建目标后自动填入" style="display:block;width:100%;margin:7px 0 10px">
+   <div class="toolbar"><button id="twinReview" disabled>分身复核</button><button id="twinAdvance" disabled>安全推进一步</button></div>
+   <div class="muted">复核只给出判断，不自动验收或改派；推进每次最多执行一个受限动作，未知阻塞会升级人工处理。</div>
+  </div>
+ </div>
+ <div id="twinActionStatus" class="notice">连接管理员 Token 后可操作。目标创建、复核与推进会写入审计事件。</div>
+ <pre id="twinActionResult" class="content" style="margin-top:8px;max-height:300px"></pre>
+</section>
+
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">运行环境与真实性标记</h2><span id="runtimeMode" class="pill">尚未读取</span></div><div id="runtimeInfo" class="muted">连接后读取当前执行器配置。模拟执行、真实模型调用和外部搜索会明确区分。</div></section>
 <section class="metrics" id="metrics">
  <div class="metric"><strong>—</strong><span>任务总数</span></div><div class="metric"><strong>—</strong><span>执行中</span></div><div class="metric"><strong>—</strong><span>待处理</span></div><div class="metric"><strong>—</strong><span>待验证 / 已阻塞 / 失败</span></div><div class="metric"><strong>—</strong><span>事件记录</span></div>
@@ -114,7 +138,42 @@ function renderTasks(){
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
  function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
- function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}load();}
+
+ async function twinAction(path,payload,successLabel){
+  if(!token){$("twinActionStatus").textContent="请先连接管理员 Token。";$("twinActionStatus").className="notice error";return;}
+  const status=$("twinActionStatus");status.className="notice";status.textContent="请求处理中…";
+  $("twinCreate").disabled=true;$("twinReview").disabled=true;$("twinAdvance").disabled=true;
+  try{
+   const r=await fetch(path,{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store"});
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
+   if(data.project_id)$("twinProject").value=data.project_id;
+   $("twinActionResult").textContent=JSON.stringify(data,null,2);
+   status.className="notice ok";status.textContent=successLabel+" · "+new Date().toLocaleTimeString()+"。请结合事件时间线独立判断结果。";
+   await load();
+  }catch(e){status.className="notice error";status.textContent="操作失败："+e.message;}
+  finally{
+   const connected=Boolean(token);
+   $("twinCreate").disabled=!connected;$("twinReview").disabled=!connected;$("twinAdvance").disabled=!connected;
+  }
+ }
+ function syncTwinControls(){
+  const connected=Boolean(token);
+  $("twinCreate").disabled=!connected;
+  const hasProject=Boolean($("twinProject").value.trim());
+  $("twinReview").disabled=!connected||!hasProject;
+  $("twinAdvance").disabled=!connected||!hasProject;
+ }
+ $("twinCreate").addEventListener("click",()=>{
+  const goal=$("twinGoal").value.trim();
+  if(!goal){$("twinActionStatus").textContent="请先填写目标描述。";$("twinActionStatus").className="notice error";return;}
+  twinAction("/api/twin/goal",{goal,strategy:$("twinStrategy").value},"目标已创建");
+ });
+ $("twinReview").addEventListener("click",()=>twinAction("/api/twin/review",{project_id:$("twinProject").value.trim()},"分身复核完成"));
+ $("twinAdvance").addEventListener("click",()=>twinAction("/api/twin/advance",{project_id:$("twinProject").value.trim()},"推进判断完成"));
+ $("twinProject").addEventListener("input",syncTwinControls);
+
+ function connect(){token=$("token").value.trim();if(!token){setStatus("请先输入管理员 Token。","error");return;}syncTwinControls();load();}
  $("connect").addEventListener("click",connect);$("refresh").addEventListener("click",load);$("filter").addEventListener("change",renderTasks);
  $("token").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
  $("auto").addEventListener("change",()=>{if(timer)clearInterval(timer);timer=$("auto").checked?setInterval(load,5000):null;});
