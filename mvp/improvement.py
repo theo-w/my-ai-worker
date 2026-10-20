@@ -18,7 +18,7 @@ def _task_rows(snapshot: dict) -> list[dict]:
 
 
 def _normalize_blocker(value: object) -> str:
-    return re.sub(r"\\s+", " ", str(value or "").strip().lower())[:300]
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())[:300]
 
 
 def build_improvement_report(snapshot: dict, min_samples: int = 2, max_proposals: int = 5) -> dict:
