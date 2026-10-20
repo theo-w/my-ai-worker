@@ -14,5 +14,9 @@ services:
         value: 0.0.0.0
       - key: JARVIS_PUBLIC_DEMO
         value: "false"
+      - key: JARVIS_SEARCH_ENDPOINT
+        value: https://api.tavily.com/search
+      - key: JARVIS_SEARCH_API_KEY
+        sync: false
       - key: JARVIS_ADMIN_TOKEN
         sync: false
