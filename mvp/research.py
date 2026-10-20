@@ -96,17 +96,36 @@ class JsonHttpSearchProvider:
 
     def search(self, query: str, limit: int = 5) -> list[ResearchSource]:
         import json
-        from urllib.parse import urlencode
+        from urllib.parse import urlencode, urlsplit
         from urllib.request import Request, urlopen
 
         limit = max(1, min(int(limit), 10))
-        url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
-            "q": query, "limit": limit
-        })
-        headers = {"Accept": "application/json", "User-Agent": "JARVIS-ResearchAdapter/1.0"}
-        if self.api_key:
-            headers["Authorization"] = "Bearer " + self.api_key
-        request = Request(url, headers=headers, method="GET")
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "JARVIS-ResearchAdapter/1.0",
+        }
+        host = (urlsplit(self.endpoint).hostname or "").lower()
+        if host == "api.tavily.com" or host.endswith(".tavily.com"):
+            # Tavily's native API uses POST JSON, not the generic GET contract.
+            if not self.api_key:
+                raise ValueError("Tavily requires JARVIS_SEARCH_API_KEY.")
+            body = json.dumps({
+                "api_key": self.api_key,
+                "query": query,
+                "max_results": limit,
+                "search_depth": "basic",
+                "include_answer": False,
+            }).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+            request = Request(self.endpoint, data=body, headers=headers, method="POST")
+        else:
+            url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
+                "q": query, "limit": limit
+            })
+            if self.api_key:
+                headers["Authorization"] = "Bearer " + self.api_key
+            request = Request(url, headers=headers, method="GET")
+
         with urlopen(request, timeout=self.timeout) as response:
             if response.status < 200 or response.status >= 300:
                 raise RuntimeError("Search provider returned HTTP " + str(response.status))
@@ -121,13 +140,15 @@ class JsonHttpSearchProvider:
                 continue
             title = str(row.get("title", "")).strip()
             source_url = str(row.get("url", "")).strip()
-            snippet = str(row.get("snippet", row.get("description", ""))).strip()
+            # Tavily calls the excerpt field "content"; generic providers often use snippet/description.
+            snippet = str(row.get("snippet", row.get("content", row.get("description", "")))).strip()
             if not title or not source_url.startswith("https://") or not snippet:
                 continue
             sources.append(ResearchSource(
                 title=title, url=source_url, snippet=snippet,
-                provider=str(row.get("provider", "json_http")),
-                published_at=row.get("published_at"),
+                provider="tavily" if (host == "api.tavily.com" or host.endswith(".tavily.com"))
+                         else str(row.get("provider", "json_http")),
+                published_at=row.get("published_at", row.get("published_date")),
             ))
         return sources
 
