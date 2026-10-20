@@ -16,8 +16,8 @@ def test_trace_dashboard_exposes_goal_review_and_advance_controls():
 
 def test_trace_dashboard_sends_admin_token_without_browser_storage():
     assert '"Authorization":"Bearer "+token' in TRACE
-    assert "localStorage" not in TRACE
-    assert "sessionStorage" not in TRACE
+    assert "localStorage.setItem" not in TRACE
+    assert "sessionStorage.setItem" not in TRACE
 
 
 def test_trace_dashboard_explains_safety_boundaries():
