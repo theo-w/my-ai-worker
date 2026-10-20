@@ -152,10 +152,7 @@ function renderTasks(){
    status.className="notice ok";status.textContent=successLabel+" · "+new Date().toLocaleTimeString()+"。请结合事件时间线独立判断结果。";
    await load();
   }catch(e){status.className="notice error";status.textContent="操作失败："+e.message;}
-  finally{
-   const connected=Boolean(token);
-   $("twinCreate").disabled=!connected;$("twinReview").disabled=!connected;$("twinAdvance").disabled=!connected;
-  }
+  finally{syncTwinControls();}
  }
  function syncTwinControls(){
   const connected=Boolean(token);
