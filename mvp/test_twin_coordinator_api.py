@@ -193,3 +193,77 @@ def test_twin_goal_rejects_unknown_assessment_template(twin_http):
     assert result["ok"] is False
     assert "template must be" in result["error"]
 
+
+
+def test_full_twin_employee_review_and_independent_acceptance_loop(twin_http):
+    """A worker's completion is only a candidate until independent verification."""
+    base, registry = twin_http
+    # General work lets this test exercise the lifecycle without requiring live
+    # source evidence; research tasks have a separate server-side evidence gate.
+    import os
+    os.environ["JARVIS_WORKER_CAPABILITIES"] = json.dumps(
+        {"researcher": ["research", "general"]}
+    )
+
+    status, goal = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Complete a small internal workflow",
+        "capability": "general",
+    })
+    assert status == 201
+    task = goal["tasks"][0]
+    task_id = task["id"]
+    project_id = goal["project_id"]
+
+    status, claimed = request_json(base, "/api/workforce/claim", RESEARCHER, {
+        "capabilities": ["general"], "task_id": task_id,
+    })
+    assert status == 200
+    assert claimed["task"]["status"] == "assigned"
+
+    status, submitted = request_json(base, "/api/workforce/report", RESEARCHER, {
+        "task_id": task_id,
+        "status": "completed",
+        "output": "Candidate result: workflow completed and output artifact recorded.",
+        "lease_token": claimed["task"]["lease_token"],
+    })
+    assert status == 200
+    assert submitted["task"]["status"] == "awaiting_validation"
+    assert submitted["task"].get("verification") is None
+
+    status, review = request_json(base, "/api/twin/review", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert review["decision"] == "awaiting_independent_validation"
+
+    status, verified = request_json(base, "/api/workforce/verify", ADMIN, {
+        "task_id": task_id,
+        "verification": {
+            "accepted": True,
+            "checks": [{"name": "artifact_present", "passed": True}],
+            "notes": "Independent structural acceptance check passed.",
+        },
+    })
+    assert status == 200
+    assert verified["task"]["status"] == "completed"
+    assert verified["task"]["verified_truth"] is False
+
+    status, final_review = request_json(base, "/api/twin/review", ADMIN, {
+        "project_id": project_id,
+    })
+    assert status == 200
+    assert final_review["decision"] == "goal_completed"
+
+    snapshot = registry.snapshot()
+    relevant = [
+        event for event in snapshot["events"]
+        if event.get("task_id") == task_id
+    ]
+    event_types = [event["type"] for event in relevant]
+    assert "task_assigned" in event_types
+    assert "worker_reported" in event_types
+    assert "verification_recorded" in event_types
+    assert any(event["type"] == "twin_reviewed"
+               and event.get("project_id") == project_id
+               and event.get("decision") == "goal_completed"
+               for event in snapshot["events"])
