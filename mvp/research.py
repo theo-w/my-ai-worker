@@ -158,9 +158,12 @@ def research_environment_status() -> dict:
     import os
     endpoint = os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip()
     configured = bool(endpoint)
+    from urllib.parse import urlsplit
+    host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
+    provider = "tavily" if host == "api.tavily.com" or host.endswith(".tavily.com") else ("json_http" if configured else None)
     return {
         "configured": configured,
-        "provider": "json_http" if configured else None,
+        "provider": provider,
         "message": "Search provider configured." if configured
                    else "No live search provider configured; real research is unavailable.",
     }
