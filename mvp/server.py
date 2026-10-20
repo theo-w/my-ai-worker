@@ -24,6 +24,7 @@ try:
     from .game_action import interpret_and_validate_action
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
+    from .improvement import build_improvement_report
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -36,6 +37,7 @@ except ImportError:  # Direct script execution from mvp/
     from game_action import interpret_and_validate_action
     from model_handoff import interpret_handoff_and_validate_action
     from workforce import WorkforceRegistry
+    from improvement import build_improvement_report
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -368,6 +370,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         # BaseHTTPRequestHandler includes the query string in self.path; route on pathname only.
         self.path = urlsplit(self.path).path
+        if self.path == "/api/improvement/report":
+            try:
+                authenticate_workforce(self.headers, "admin")
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            report = build_improvement_report(WORKFORCE.snapshot())
+            self._json({"ok": True, "report": report})
+            return
         if self.path == "/api/workforce":
             try:
                 authenticate_workforce(self.headers, "admin")
