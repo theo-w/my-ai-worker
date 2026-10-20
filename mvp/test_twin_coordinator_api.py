@@ -156,3 +156,40 @@ def test_twin_advance_does_not_retry_unknown_blocker(twin_http):
     assert status == 200
     task_after = next(item for item in snapshot["tasks"] if item["id"] == task["id"])
     assert task_after["status"] == "blocked"
+
+def test_game_feasibility_template_requires_bilingual_evidence_and_falsifiable_experiment(twin_http):
+    base, _ = twin_http
+    status, result = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Assess whether an AI-native game mechanic is worth prototyping",
+        "template": "ai_game_feasibility",
+    })
+    assert status == 201
+    assert result["template"] == "ai_game_feasibility"
+    assert result["strategy"] == "single_agent"
+    assert len(result["tasks"]) == 1
+    task = result["tasks"][0]
+    assert task["capability"] == "research"
+    assert task["evidence_required"] is True
+    criteria = task["success_criteria"]
+    assert criteria["bilingual_sources"]["languages"] == ["zh", "en"]
+    assert criteria["signal_quality"]["separate_noise_from_demand"] is True
+    assert criteria["falsifiable_hypotheses"]["include_counter_evidence"] is True
+    assert criteria["prototype_experiment"]["include_method_and_metrics"] is True
+    assert criteria["decision_thresholds"]["include_success_failure_and_stop_conditions"] is True
+    assert criteria["decision"]["allowed"] == ["GO", "ITERATE", "NO-GO"]
+    assert criteria["independent_validation_required"] is True
+    assert criteria["verified_truth"] is False
+    assert "成功阈值" in task["description"]
+    assert "中英文来源" in task["description"]
+
+
+def test_twin_goal_rejects_unknown_assessment_template(twin_http):
+    base, _ = twin_http
+    status, result = request_json(base, "/api/twin/goal", ADMIN, {
+        "goal": "Evaluate a game opportunity",
+        "template": "invented_template",
+    })
+    assert status == 400
+    assert result["ok"] is False
+    assert "template must be" in result["error"]
+
