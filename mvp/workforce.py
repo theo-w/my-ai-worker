@@ -36,6 +36,23 @@ class WorkforceRegistry:
         self.events.append({"type": event_type, "at": _stamp(), **details})
         self.events = self.events[-2000:]
 
+    def record_twin_decision(self, goal: str, decision: str, reason: str,
+                             llm_used: bool = False, task_id: str | None = None):
+        """Persist an auditable Digital Twin orchestration decision."""
+        if not isinstance(goal, str) or not goal.strip() or len(goal) > 2000:
+            raise ValueError("goal must be between 1 and 2000 characters")
+        if not isinstance(decision, str) or not decision.strip() or len(decision) > 100:
+            raise ValueError("decision must be between 1 and 100 characters")
+        if not isinstance(reason, str) or len(reason) > 1000:
+            raise ValueError("reason must be at most 1000 characters")
+        with self.lock:
+            self._event(
+                "twin_decision", goal=goal, decision=decision, reason=reason,
+                planner="llm" if llm_used else "deterministic_rules",
+                llm_used=bool(llm_used), task_id=task_id,
+            )
+            self.save()
+
     def load(self):
         with self.lock:
             try:
