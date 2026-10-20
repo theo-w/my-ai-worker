@@ -8,10 +8,13 @@ TRACE = Path(__file__).with_name("trace.html").read_text(encoding="utf-8")
 def test_trace_dashboard_exposes_goal_review_and_advance_controls():
     assert 'id="twinGoal"' in TRACE
     assert 'id="twinStrategy"' in TRACE
+    assert 'id="twinTemplate"' in TRACE
+    assert 'value="ai_game_feasibility"' in TRACE
     assert 'id="twinProject"' in TRACE
     assert '"/api/twin/goal"' in TRACE
     assert '"/api/twin/review"' in TRACE
     assert '"/api/twin/advance"' in TRACE
+    assert 'template:$("twinTemplate").value' in TRACE
 
 
 def test_trace_dashboard_sends_admin_token_without_browser_storage():
