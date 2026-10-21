@@ -1,0 +1,69 @@
+"""Tests for the conservative commercial-feasibility decision gate."""
+import unittest
+
+try:
+    from .commercial_feasibility import (
+        build_feasibility_contract,
+        evaluate_commercial_feasibility,
+        REQUIRED_DIMENSIONS,
+    )
+except ImportError:
+    from commercial_feasibility import (
+        build_feasibility_contract,
+        evaluate_commercial_feasibility,
+        REQUIRED_DIMENSIONS,
+    )
+
+
+def strong_report():
+    return {
+        "dimensions": {
+            name: {"score": 4, "evidence_refs": ["evidence-1"], "rationale": "Supported by reviewed evidence"}
+            for name in REQUIRED_DIMENSIONS
+        },
+        "independent_source_count": 4,
+        "prototype_evidence_refs": ["prototype-test-1"],
+        "cost_model": {
+            "assumptions": ["AI cost per session"],
+            "scenarios": {"conservative": {}, "base": {}, "optimistic": {}},
+        },
+        "counter_evidence_refs": ["counter-1"],
+    }
+
+
+class CommercialFeasibilityTests(unittest.TestCase):
+    def test_contract_exposes_grill_me_questions_and_dimensions(self):
+        contract = build_feasibility_contract("评估 AI 原生玩法", budget=1000, timebox_days=14)
+        self.assertEqual(contract["status"], "contract_ready")
+        self.assertEqual(set(contract["dimensions"]), set(REQUIRED_DIMENSIONS))
+        self.assertTrue(contract["questions"]["unit_economics"])
+        self.assertEqual(contract["budget_limit"], 1000)
+
+    def test_missing_evidence_never_passes(self):
+        result = evaluate_commercial_feasibility({"dimensions": {}})
+        self.assertEqual(result["decision"], "INSUFFICIENT_EVIDENCE")
+        self.assertTrue(result["missing_dimensions"])
+        self.assertFalse(result["verified_truth"])
+
+    def test_strong_complete_report_only_passes_to_prototype(self):
+        result = evaluate_commercial_feasibility(strong_report())
+        self.assertEqual(result["decision"], "GO_TO_PROTOTYPE")
+        self.assertFalse(result["verified_truth"])
+        self.assertTrue(any(c["name"] == "cost_model" and c["passed"] for c in result["checks"]))
+
+    def test_weak_dimension_blocks_go(self):
+        report = strong_report()
+        report["dimensions"]["player_value"]["score"] = 1
+        result = evaluate_commercial_feasibility(report)
+        self.assertNotEqual(result["decision"], "GO_TO_PROTOTYPE")
+        self.assertIn("player_value", result["weak_dimensions"])
+
+    def test_missing_cost_model_blocks_go(self):
+        report = strong_report()
+        report["cost_model"] = {}
+        result = evaluate_commercial_feasibility(report)
+        self.assertNotEqual(result["decision"], "GO_TO_PROTOTYPE")
+
+
+if __name__ == "__main__":
+    unittest.main()
