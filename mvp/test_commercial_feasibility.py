@@ -51,12 +51,18 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertFalse(result["verified_truth"])
         self.assertTrue(any(c["name"] == "cost_model" and c["passed"] for c in result["checks"]))
 
-    def test_weak_dimension_blocks_go(self):
+    def test_weak_dimension_requests_iteration_not_automatic_no_go(self):
         report = strong_report()
         report["dimensions"]["player_value"]["score"] = 1
         result = evaluate_commercial_feasibility(report)
-        self.assertNotEqual(result["decision"], "GO_TO_PROTOTYPE")
+        self.assertEqual(result["decision"], "ITERATE")
         self.assertIn("player_value", result["weak_dimensions"])
+
+    def test_explicit_critical_blocker_can_return_no_go(self):
+        report = strong_report()
+        report["critical_blockers"] = [{"reason": "Core mechanic cannot be delivered within legal constraints"}]
+        result = evaluate_commercial_feasibility(report)
+        self.assertEqual(result["decision"], "NO_GO")
 
     def test_missing_cost_model_blocks_go(self):
         report = strong_report()
