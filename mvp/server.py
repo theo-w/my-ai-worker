@@ -65,6 +65,8 @@ def _build_worker_executor():
 WORKER_EXECUTOR = _build_worker_executor()
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
+    "chat_messages": [],
+    "pending_direction": None,
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
     "phase": "idle",
     "agents": [],
@@ -873,6 +875,7 @@ class Handler(BaseHTTPRequestHandler):
         protected_dashboard_routes = {
             "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
             "/api/experience-design", "/api/game-action", "/api/model-handoff",
+            "/api/twin/chat",
         }
         if self.path in protected_dashboard_routes:
             try:
@@ -880,6 +883,48 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
+        if self.path == "/api/twin/chat":
+            body = self._read_json(max_bytes=8192)
+            if body is None:
+                return
+            message = body.get("message")
+            if not isinstance(message, str) or not message.strip() or len(message) > 2000:
+                self._json({"ok": False, "error": "Please enter a message of 1–2000 characters."}, 400)
+                return
+            with LOCK:
+                status = {"goal": STATE.get("goal"), "phase": STATE.get("phase"),
+                          "agents": [{"worker": a.get("worker"), "status": a.get("status")} for a in STATE.get("agents", [])],
+                          "evidence_count": len(STATE.get("evidence") or []),
+                          "research": (STATE.get("research") or {}).get("status")}
+                history = STATE.setdefault("chat_messages", [])
+                history.append({"role": "user", "text": message.strip(), "at": time.time()})
+                history[:] = history[-30:]
+            if message.strip().startswith(("新目标：", "新方向：", "切换目标：")):
+                direction = message.split("：", 1)[1].strip() if "：" in message else ""
+                with LOCK:
+                    STATE["pending_direction"] = direction
+                reply = "收到新方向。我没有中断当前任务；请检查并确认页面顶部的目标，再点击“启动 JARVIS”执行。"
+                mode = "direction_recorded"
+            else:
+                client = getattr(WORKER_EXECUTOR, "client", None)
+                if client is not None:
+                    try:
+                        reply = client.complete(
+                            "你是用户的数字分身 Jarvis。用中文回答，只根据提供的实时状态，不得捏造任务进度或研究证据。新方向只有在用户明确确认后才改变当前任务。",
+                            "当前状态 JSON：\n" + json.dumps(status, ensure_ascii=False) + "\n用户消息：\n" + message.strip()
+                        )
+                        mode = "llm"
+                    except (ValueError, RuntimeError, OSError):
+                        reply = "暂时无法连接语言模型。当前目标：" + str(status["goal"]) + "；阶段：" + str(status["phase"]) + "；证据条目：" + str(status["evidence_count"]) + "。"
+                        mode = "status_fallback"
+                else:
+                    reply = "当前目标：" + str(status["goal"]) + "；阶段：" + str(status["phase"]) + "；调研状态：" + str(status["research"]) + "；证据条目：" + str(status["evidence_count"]) + "。目前没有配置语言模型，所以暂时只能提供状态摘要。"
+                    mode = "status_fallback"
+            with LOCK:
+                STATE["chat_messages"].append({"role": "assistant", "text": reply, "at": time.time(), "mode": mode})
+                STATE["chat_messages"][:] = STATE["chat_messages"][-30:]
+            self._json({"ok": True, "reply": reply, "mode": mode, "pending_direction": STATE.get("pending_direction")})
+            return
         if self.path not in ("/api/run", "/api/prototype", "/api/autonomous", "/api/research", "/api/experience-design", "/api/game-action", "/api/model-handoff"):
             self.send_error(404)
             return
