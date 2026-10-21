@@ -47,6 +47,12 @@
  <div class="sub" style="margin-bottom:10px">先明确评估范围与完成标准；评估结果需要证据、反证、原型实验和成本情景。建立契约不代表市场已验证。</div>
  <div class="input" style="flex-wrap:wrap"><input id="feasibilityBudget" type="number" min="0" step="100" placeholder="预算上限（可选）" aria-label="预算上限" style="max-width:220px"><input id="feasibilityDays" type="number" min="1" max="365" step="1" placeholder="时间盒天数（可选）" aria-label="时间盒天数" style="max-width:220px"><button id="feasibilityCreate" class="btn" type="button">建立评估契约</button></div>
  <div id="feasibilityResult" class="sub" style="margin-top:10px;white-space:pre-wrap">尚未建立商业可行性评估契约。</div>
+ <details style="margin-top:12px"><summary>评估报告（高级：提交证据化 JSON）</summary>
+  <div class="sub" style="margin:8px 0">契约建立后，由调研/原型流程填充证据，再提交评估。此表单不会自动验证 URL 真实性或来源独立性；请勿把未做过的实验标成已完成。</div>
+  <textarea id="feasibilityReport" rows="14" spellcheck="false" style="width:100%;font:12px ui-monospace,monospace" aria-label="商业可行性 JSON 报告"></textarea>
+  <div class="input" style="margin-top:8px"><button id="feasibilityEvaluate" class="btn" type="button">提交报告并评估</button></div>
+  <div id="feasibilityEvaluation" class="sub" style="margin-top:8px;white-space:pre-wrap">尚未提交评估报告。</div>
+ </details>
 </div>
 
 <div class="grid">
@@ -333,6 +339,30 @@ async function createFeasibilityContract(){
  finally{button.disabled=false;}
 }
 document.getElementById("feasibilityCreate").addEventListener("click",createFeasibilityContract);
+const feasibilityReportInput=document.getElementById("feasibilityReport");
+feasibilityReportInput.value=JSON.stringify({
+ dimensions:Object.fromEntries(["player_value","differentiation","technical_feasibility","market_evidence","unit_economics","production_cost","retention_and_replayability","risk_and_compliance"].map(name=>[name,{score:3,evidence_refs:[],rationale:"请替换为真实证据支持的判断"}])),
+ independent_source_count:0,
+ prototype_evidence_refs:[],
+ cost_model:{assumptions:[],scenarios:{conservative:{},base:{},optimistic:{}}},
+ counter_evidence_refs:[],
+ critical_blockers:[]
+},null,2);
+async function evaluateFeasibilityReport(){
+ const button=document.getElementById("feasibilityEvaluate"),out=document.getElementById("feasibilityEvaluation");
+ button.disabled=true;out.textContent="正在评估…";
+ try{
+  let report;try{report=JSON.parse(feasibilityReportInput.value);}catch(_){throw new Error("JSON 格式无效，请检查括号、逗号和引号。");}
+  const response=await apiFetch("/api/feasibility/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report})});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},e=f.evaluation||{};
+  document.getElementById("feasibilityStatus").textContent=String(e.decision||f.status||"EVALUATED");
+  out.textContent="决策："+(e.decision||"UNKNOWN")+"\\n维度平均分："+(e.average_dimension_score==null?"未知":e.average_dimension_score)+"\\n已评分维度："+(e.dimension_count_scored||0)+"/8\\n缺失维度："+((e.missing_dimensions||[]).join("、")||"无")+"\\n薄弱维度："+((e.weak_dimensions||[]).join("、")||"无")+"\\n\\n检查项：\\n"+(e.checks||[]).map(x=>(x.passed?"✓ ":"✗ ")+x.name+(x.reason?" — "+x.reason:"")).join("\\n")+"\\n\\n限制：评分与引用尚未由系统独立核验；GO 仅允许进入有边界的原型实验，不等于批准完整开发。";
+ }catch(e){out.textContent="评估失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityEvaluate").addEventListener("click",evaluateFeasibilityReport);
 async function startPrototype(){const r=await apiFetch("/api/prototype",{method:"POST"});if(r.ok)poll();else document.getElementById("status").textContent="Prototype API "+r.status}
 const tokenInput=document.getElementById("adminToken");
 const rememberToken=document.getElementById("rememberToken");
