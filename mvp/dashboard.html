@@ -140,14 +140,10 @@ function render(){
  const detail=document.getElementById("detail");
  document.getElementById("detailStatus").textContent=a?(a.status+" · "+(a.progress||0)+"%"):"选择员工查看";
  if(a){
-  const msgs=[
-   {kind:"user",label:"任务输入 · Digital Twin",body:a.input||state.goal||"未记录任务输入"},
-   {kind:"worker",label:"员工执行反馈 · "+a.worker,body:a.output||((["running","in_progress","working"].includes(String(a.status||"").toLowerCase()))?"正在执行，等待员工反馈…":"当前没有输出内容")},
-   {kind:"meta",label:"执行状态",body:"状态："+a.status+" · 进度："+(a.progress||0)+"% · 证据条目："+((a.evidence||[]).length)}
-  ];
-  if(a.execution)msgs.push({kind:"meta",label:"运行模式",body:(a.execution.mode||"unknown")+(a.execution.simulated?" · 模拟输出，非真实证据":"")});
-  for(const ev of (a.evidence||[]))msgs.push({kind:"worker",label:"证据回传",body:ev.finding||JSON.stringify(ev)});
-  detail.innerHTML='<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc((a.evidence||[]).length)+' 条证据</span></div>'+msgs.map((m,i)=>'<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" class="chat-body '+(m.body.length>420?'clamped':'')+'">'+esc(m.body)+'</div>'+(m.body.length>420?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">展开全文</button></div>':'')+'</div>').join("");
+  const events=(state.conversation||[]).filter(e=>e.worker===a.worker);
+  const msgs=events.map(e=>({kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body:e.text||""}));
+  if(!msgs.length)msgs.push({kind:"meta",label:"暂无对话事件",body:"本轮尚未记录该员工的派发或反馈事件。"});
+  detail.innerHTML='<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc((a.evidence||[]).length)+' 条证据</span><span>事件记录</span></div>'+msgs.map((m,i)=>'<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" class="chat-body '+(m.body.length>300?'clamped':'')+'">'+esc(m.body)+'</div>'+(m.body.length>300?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">展开全文</button></div>':'')+'</div>').join("");
  }else detail.innerHTML='<div class="sub">暂无数字员工</div>';
  document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
  const d=state.decision;
