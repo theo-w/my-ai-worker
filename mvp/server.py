@@ -79,90 +79,117 @@ def reset(goal: str):
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
+        STATE["run_id"] = str(int(time.time() * 1000))
         STATE["agents"] = [
-            {"id": i, "worker": w, "capability": c, "status": "queued",
-             "progress": 0, "task": c, "input": goal, "output": "", "evidence": []}
-            for i, (w, c) in enumerate(team)
+            {"id": i, "worker": w, "capability": cap, "status": "queued",
+             "progress": 0, "task": cap, "input": goal, "output": "", "evidence": []}
+            for i, (w, cap) in enumerate(team)
         ]
         STATE["evidence"] = []
+        STATE["research"] = {"status": "queued", "query": goal, "sources": [], "quality": None, "error": None}
+        STATE["design"] = {"status": "blocked", "reason": "等待本轮真实调研与可接受证据", "brief": None}
         STATE["decision"] = None
         STATE["prototype"] = None
         STATE["twin"] = TWIN.snapshot(goal, team)
 
 def execute(goal: str):
-    """Run the Dashboard workforce using the configured executor.
-
-    Simulated outputs may populate the demo evidence stream. LLM outputs are
-    displayed as task artifacts, never promoted to source-backed evidence.
-    """
+    """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
     time.sleep(.1)
     with LOCK:
         STATE["phase"] = "team"
         for agent in STATE["agents"]:
             agent["status"] = "ready"
-
-    with LOCK:
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
 
     for idx, (worker, capability) in enumerate(planned):
         with LOCK:
-            agent = STATE["agents"][idx]
-            agent["status"] = "running"
-            agent["progress"] = 20
-
+            STATE["agents"][idx]["status"] = "running"
+            STATE["agents"][idx]["progress"] = 20
         try:
             if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor):
                 items = run_worker(worker, capability, goal)
                 output = " [SIMULATED] ".join(item.finding for item in items)
-                result_data = {
-                    "mode": "simulation",
-                    "simulated": True,
-                    "output_is_verified_evidence": False,
-                }
+                result_data = {"mode": "simulation", "simulated": True, "output_is_verified_evidence": False}
             else:
-                task = {
-                    "id": str(idx),
-                    "title": capability.replace("_", " "),
-                    "capability": capability,
-                    "worker": worker,
-                }
+                task = {"id": str(idx), "title": capability.replace("_", " "), "capability": capability, "worker": worker}
                 result = WORKER_EXECUTOR.execute(task, goal)
-                output = result.output
-                result_data = result.to_dict()
-                # LLM prose is a task artifact, not source-backed evidence.
-                items = []
-
+                output, result_data, items = result.output, result.to_dict(), []
             with LOCK:
                 agent = STATE["agents"][idx]
-                agent["progress"] = 70
-                agent["output"] = output
-                agent["execution"] = result_data
-                agent["evidence"] = [item.__dict__ for item in items]
-                agent["status"] = "completed"
-                agent["progress"] = 100
+                agent.update({"progress": 100, "output": output, "execution": result_data,
+                              "evidence": [item.__dict__ for item in items], "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
         except Exception as exc:
             with LOCK:
                 agent = STATE["agents"][idx]
-                agent["status"] = "blocked"
-                agent["progress"] = 100
-                agent["output"] = "执行失败：" + type(exc).__name__
-                agent["execution"] = {
-                    "mode": "hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor) else ("llm" if isinstance(WORKER_EXECUTOR, LLMWorkerExecutor) else "simulation"),
-                    "status": "failed",
-                    "error_type": type(exc).__name__,
-                }
+                agent.update({"status": "blocked", "progress": 100, "output": "执行失败：" + type(exc).__name__,
+                              "execution": {"status": "failed", "error_type": type(exc).__name__}})
+
+    # Research is part of this run; missing providers fail closed rather than fabricating results.
+    with LOCK:
+        STATE["phase"] = "research"
+        STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
+    try:
+        result = run_live_research(goal, 5)
+        quality = result.get("quality") or {}
+        accepted = quality.get("accepted", 0)
+        with LOCK:
+            STATE["research"] = {
+                "status": result.get("status", "unknown"), "query": goal,
+                "sources": result.get("sources", []), "quality": quality,
+                "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
+                "error": result.get("error") or result.get("message"),
+            }
+            if result.get("ok") and accepted:
+                for item in result.get("evidence", []):
+                    source = item.get("source")
+                    if source and source.get("url"):
+                        STATE["evidence"].append({"worker": "Live Research Adapter",
+                            "finding": item.get("finding", ""), "confidence": item.get("confidence", 0),
+                            "simulated": False, "source": source})
+                STATE["phase"] = "design"
+                STATE["design"] = {"status": "running", "reason": None, "brief": None}
+            else:
+                STATE["design"] = {"status": "blocked",
+                    "reason": "本轮调研没有返回可接受的真实来源证据；创意生成已暂停。", "brief": None}
+    except Exception as exc:
+        with LOCK:
+            STATE["research"] = {"status": "failed", "query": goal, "sources": [],
+                                  "quality": None, "error": type(exc).__name__}
+            STATE["design"] = {"status": "blocked", "reason": "真实调研失败，不能生成本轮创意。", "brief": None}
+
+    with LOCK:
+        should_design = STATE["design"]["status"] == "running"
+    if should_design:
+        try:
+            llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+            if llm_client is None:
+                with LOCK:
+                    STATE["design"] = {"status": "blocked",
+                        "reason": "本轮调研已完成，但未配置可用 LLM；未生成创意，也不会用旧模板冒充本轮结果。",
+                        "brief": None, "run_id": STATE.get("run_id")}
+            else:
+                with LOCK:
+                    source_rows = list((STATE.get("research") or {}).get("sources") or [])
+                context = "\\n".join(
+                    f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
+                    for row in source_rows
+                )[:5000]
+                source_game = (goal[:160] or "AI 原生游戏机会")
+                brief = create_design_brief(source_game, "本轮原创游戏概念", llm_client, research_context=context)
+                with LOCK:
+                    STATE["design"] = {"status": "completed",
+                        "reason": "基于本轮真实调研来源生成；仍是设计假设，不代表市场验证。",
+                        "brief": brief, "run_id": STATE.get("run_id")}
+        except Exception as exc:
+            with LOCK:
+                STATE["design"] = {"status": "failed", "reason": "创意生成失败：" + type(exc).__name__, "brief": None}
 
     with LOCK:
         STATE["phase"] = "evaluation"
-    time.sleep(.1)
     evidence = [type("E", (), item) for item in STATE["evidence"]]
-    # Only the explicit simulated executor may use the demo handoff.
-    decision = evaluate(
-        goal, evidence,
-        demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor),
-    )
+    decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
@@ -878,6 +905,13 @@ class Handler(BaseHTTPRequestHandler):
             self._json(result)
             return
         if self.path == "/api/experience-design":
+            with LOCK:
+                research_state = STATE.get("research") or {}
+                accepted = (research_state.get("quality") or {}).get("accepted", 0)
+                sources = research_state.get("sources") or []
+                if research_state.get("status") != "completed" or accepted < 1 or not sources:
+                    self._json({"ok": False, "error": "Concept generation requires accepted source evidence from the current JARVIS run."}, 409)
+                    return
             body = self._read_json(max_bytes=65536)
             if body is None:
                 return
@@ -890,8 +924,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": "source_game and concept_name must be at most 160 characters."}, 400)
                 return
             llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+            if llm_client is None:
+                self._json({"ok": False, "error": "LLM is not configured; no current-run concept was generated."}, 503)
+                return
+            with LOCK:
+                rows = list((STATE.get("research") or {}).get("sources") or [])
+            research_context = "\\n".join(
+                f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
+                for row in rows
+            )[:5000]
             try:
-                brief = create_design_brief(source_game, concept_name, llm_client)
+                brief = create_design_brief(source_game, concept_name, llm_client, research_context=research_context)
             except (ValueError, RuntimeError, OSError) as exc:
                 self._json({"ok": False, "error": "Design brief generation failed: " + type(exc).__name__}, 502)
                 return
@@ -1008,7 +1051,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         goal = str(body.get("goal", "")).strip() or "评估一个 AI 原生游戏机会"
         with LOCK:
-            if STATE["phase"] in {"planning", "team", "evaluation"}:
+            if STATE["phase"] in {"planning", "team", "research", "design", "evaluation"}:
                 self._json({"ok": False, "error": "A run is already in progress."}, 409)
                 return
             STATE["phase"] = "planning"  # Reserve atomically before starting the worker thread.
