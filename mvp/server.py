@@ -25,6 +25,7 @@ try:
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
+    from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -38,6 +39,7 @@ except ImportError:  # Direct script execution from mvp/
     from model_handoff import interpret_handoff_and_validate_action
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
+    from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
@@ -74,6 +76,7 @@ STATE = {
     "decision": None,
     "twin": TWIN.snapshot("评估一个 AI 原生游戏机会", WORKERS),
     "prototype": None,
+    "feasibility": {"status": "not_started", "contract": None, "report": None, "evaluation": None},
 }
 
 def reset(goal: str):
@@ -431,6 +434,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             with LOCK:
                 self._json(dict(STATE))
+            return
+        if self.path == "/api/feasibility":
+            try:
+                authenticate_dashboard(self.headers)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            with LOCK:
+                self._json({"ok": True, "feasibility": dict(STATE.get("feasibility") or {})})
             return
         if self.path == "/api/research/status":
             self._json(research_environment_status())
@@ -875,7 +887,7 @@ class Handler(BaseHTTPRequestHandler):
         protected_dashboard_routes = {
             "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
             "/api/experience-design", "/api/game-action", "/api/model-handoff",
-            "/api/twin/chat",
+            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate",
         }
         if self.path in protected_dashboard_routes:
             try:
@@ -883,6 +895,48 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
+        if self.path == "/api/feasibility/contract":
+            body = self._read_json(max_bytes=8192)
+            if body is None:
+                return
+            goal = body.get("goal")
+            budget = body.get("budget")
+            timebox_days = body.get("timebox_days")
+            if not isinstance(goal, str) or not goal.strip() or len(goal) > 2000:
+                self._json({"ok": False, "error": "goal must be a non-empty string up to 2000 characters."}, 400)
+                return
+            if budget is not None and (isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget < 0):
+                self._json({"ok": False, "error": "budget must be a finite non-negative number."}, 400)
+                return
+            if timebox_days is not None and (isinstance(timebox_days, bool) or not isinstance(timebox_days, int) or timebox_days < 1 or timebox_days > 365):
+                self._json({"ok": False, "error": "timebox_days must be an integer from 1 to 365."}, 400)
+                return
+            contract = build_feasibility_contract(goal, budget, timebox_days)
+            with LOCK:
+                STATE["feasibility"] = {"status": "contract_ready", "contract": contract, "report": None, "evaluation": None}
+            self._json({"ok": True, "feasibility": dict(STATE["feasibility"])})
+            return
+        if self.path == "/api/feasibility/evaluate":
+            body = self._read_json(max_bytes=65536)
+            if body is None:
+                return
+            report = body.get("report")
+            if not isinstance(report, dict):
+                self._json({"ok": False, "error": "report must be an object."}, 400)
+                return
+            try:
+                evaluation = evaluate_commercial_feasibility(report, body.get("thresholds"))
+            except (TypeError, ValueError) as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
+            with LOCK:
+                prior = STATE.get("feasibility") or {}
+                STATE["feasibility"] = {
+                    "status": "evaluated", "contract": prior.get("contract"),
+                    "report": report, "evaluation": evaluation,
+                }
+            self._json({"ok": True, "feasibility": dict(STATE["feasibility"])})
+            return
         if self.path == "/api/twin/chat":
             body = self._read_json(max_bytes=8192)
             if body is None:
