@@ -86,9 +86,9 @@
  <div class="input">
   <input id="sourceGame" value="塞尔达传说：王国之泪" aria-label="Reference game">
   <input id="conceptName" value="潮痕档案馆" aria-label="New game concept name">
-  <button id="designRun" class="btn">生成游戏创意</button>
+  <button id="designRun" class="btn" disabled>等待调研完成</button>
  </div>
- <div id="designResult" class="sub" style="margin-top:12px">等待当前业务流程进入创意生成阶段。</div>
+ <div id="designResult" class="sub" style="margin-top:12px">当前轮次尚无已验收的调研证据。完成真实搜索并获得可接受来源后，才开放创意生成。</div>
  <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开可玩原型 ↗</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
 </div>
 
@@ -179,7 +179,11 @@ document.getElementById("researchRun").onclick=async function(){
  try{
   const response=await apiFetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
   const result=await response.json();
-  if(!response.ok||!result.ok){out.textContent="研究请求未执行："+(result.error||result.message||response.status);return;}
+  if(!response.ok||!result.ok){currentRunResearchReady=false;document.getElementById("designRun").disabled=true;document.getElementById("designRun").textContent="等待有效调研证据";out.textContent="研究请求未执行："+(result.error||result.message||response.status);return;}
+  currentRunResearchReady=(result.sources||[]).length>0 && (result.quality||{}).accepted>0;
+  const designButton=document.getElementById("designRun");
+  designButton.disabled=!currentRunResearchReady;
+  designButton.textContent=currentRunResearchReady?"进入创意生成阶段":"证据不足，暂不可生成创意";
   const quality=result.quality||{}, det=result.synthesis||{}, llm=result.llm_synthesis||{};
   const sources=(result.sources||[]).map(function(s){
    return '<div class="ev"><b>'+esc(s.title)+'</b><div class="sub">'+esc(s.snippet)+'</div><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.url)+'</a></div>';
@@ -191,6 +195,7 @@ document.getElementById("researchRun").onclick=async function(){
  finally{button.disabled=false;}
 };
 document.getElementById("designRun").onclick=async function(){
+ if(!currentRunResearchReady){document.getElementById("designResult").textContent="尚未完成本轮调研，不能生成本轮创意。请先完成真实调研并确认来源证据。";return;}
  const button=document.getElementById("designRun");
  const out=document.getElementById("designResult");
  button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
