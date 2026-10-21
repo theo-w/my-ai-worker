@@ -105,7 +105,8 @@ function apiFetch(url,options={}){
 const phases=["planning","team","evaluation","decision","prototype"];
 const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Business Execution"};
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
-function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el)return;const collapsed=el.classList.toggle("clamped");const btn=el.parentElement.querySelector("button");if(btn)btn.textContent=collapsed?"展开全文":"收起内容";}
+const expandedMessages=new Set();
+function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el)return;const id=el.dataset.messageId;const collapsed=el.classList.toggle("clamped");if(collapsed)expandedMessages.delete(id);else expandedMessages.add(id);const btn=el.parentElement.querySelector("button");if(btn)btn.textContent=collapsed?"展开全文":"收起内容";}
 function render(){
  if(!state)return;
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
@@ -141,9 +142,9 @@ function render(){
  document.getElementById("detailStatus").textContent=a?(a.status+" · "+(a.progress||0)+"%"):"选择员工查看";
  if(a){
   const events=(state.conversation||[]).filter(e=>e.worker===a.worker);
-  const msgs=events.map(e=>({kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body:e.text||""}));
+  const msgs=events.map(e=>{let body=e.text||"";if(e.kind==="reply"){try{const parsed=JSON.parse(body);if(parsed&&typeof parsed==="object"&&(parsed.accepted_evidence||parsed.evidence)){const n=(parsed.accepted_evidence||parsed.evidence||[]).length;body="员工已提交执行反馈，包含 "+n+" 条证据。具体证据与来源摘要请查看下方 Evidence Stream。";}}catch(err){}}return {id:String(e.id||e.from+"-"+e.to),kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body};});
   if(!msgs.length)msgs.push({kind:"meta",label:"暂无对话事件",body:"本轮尚未记录该员工的派发或反馈事件。"});
-  detail.innerHTML='<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc((a.evidence||[]).length)+' 条证据</span><span>事件记录</span></div>'+msgs.map((m,i)=>'<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" class="chat-body '+(m.body.length>300?'clamped':'')+'">'+esc(m.body)+'</div>'+(m.body.length>300?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">展开全文</button></div>':'')+'</div>').join("");
+  detail.innerHTML='<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc((a.evidence||[]).length)+' 条证据</span><span>事件记录</span></div>'+msgs.map((m,i)=>{const id=m.id||String(i);const long=m.body.length>300;const expanded=expandedMessages.has(id);return '<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" data-message-id="'+esc(id)+'" class="chat-body '+(long&&!expanded?'clamped':'')+'">'+esc(m.body)+'</div>'+(long?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">'+(expanded?'收起内容':'展开全文')+'</button></div>':'')+'</div>';}).join("");
  }else detail.innerHTML='<div class="sub">暂无数字员工</div>';
  document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
  const d=state.decision;
