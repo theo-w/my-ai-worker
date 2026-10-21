@@ -10,7 +10,7 @@ The gate is inspired by a Grill-Me style discovery loop: expose assumptions, ask
 
 - `GO_TO_PROTOTYPE`: evidence is strong enough to fund only the next bounded prototype/vertical-slice experiment. This is not permission for full production.
 - `ITERATE`: the idea may be promising, but one or more weak dimensions need another targeted experiment.
-- `NO_GO`: a core assumption has been contradicted, economics fail under reasonable scenarios, or risk is unacceptable.
+- `NO_GO`: a specific, evidence-backed critical blocker makes the concept unacceptable or infeasible. A low score alone should normally trigger `ITERATE`, not an automatic rejection.
 - `INSUFFICIENT_EVIDENCE`: required dimensions or evidence are missing. This is a valid research outcome, not a pass.
 
 ## Required dimensions
@@ -68,4 +68,4 @@ A completed *assessment* may conclude NO_GO or INSUFFICIENT_EVIDENCE. Completion
 
 ## Current implementation boundary
 
-`mvp/commercial_feasibility.py` currently creates the discovery contract and applies conservative structural gates. Its evaluator checks that a report contains dimension scores, evidence references, source-count metadata, counter-evidence, prototype evidence and a cost model. It cannot independently prove that cited sources are genuinely independent, that estimates are accurate, or that a prototype actually ran. Those need server-side evidence resolution, real experiment records and independent verification before this gate can be treated as production-grade.
+The server exposes authenticated `POST /api/feasibility/contract` and `POST /api/feasibility/evaluate` routes, plus `GET /api/feasibility` for the current in-memory assessment state. The evaluator creates the discovery contract and applies conservative structural gates. Its evaluator checks that a report contains dimension scores, evidence references, source-count metadata, counter-evidence, prototype evidence and a cost model. It cannot independently prove that cited sources are genuinely independent, that estimates are accurate, or that a prototype actually ran. Those need server-side evidence resolution, real experiment records and independent verification before this gate can be treated as production-grade.
