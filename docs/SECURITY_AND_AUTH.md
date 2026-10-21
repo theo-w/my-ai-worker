@@ -30,7 +30,7 @@ python -m mvp.server
 
 ## Dashboard API 访问模式
 
-- 默认模式要求管理员 Token；主工作台和试玩页可在顶部输入 Token，凭证只保留在当前页面内存中。
+- 默认模式要求管理员 Token；主工作台可在顶部输入 Token。默认只保留在当前页面内存中；测试期间如在可信的个人设备上频繁使用，可勾选“在此设备记住”，令牌将保存于该浏览器的 localStorage，取消勾选即可清除。共享设备请勿启用此选项，XSS 或本机浏览器访问者可能读取已保存的令牌。
 - 纯本地、无真实模型/搜索配置的模拟演示，可显式设置 `JARVIS_PUBLIC_DEMO=true`。此模式禁止同时配置任何 workforce token、搜索端点或模型凭证。
 - 不要在公网服务上启用 `JARVIS_PUBLIC_DEMO=true`。部署环境应设置强随机 `JARVIS_ADMIN_TOKEN`，并将 `JARVIS_PUBLIC_DEMO=false`。
 - 未配置管理员 Token 时，受保护 API 会 fail closed；健康状态接口仍可用于服务存活探测。
@@ -49,7 +49,7 @@ python -m mvp.server
 - 工作台：`http://127.0.0.1:8765/`
 - 流程追踪：`http://127.0.0.1:8765/trace`
 
-在流程追踪页面输入 `JARVIS_ADMIN_TOKEN`。令牌只保留在页面内存中，不写入 URL 或 localStorage；关闭页面后应重新输入。
+在流程追踪页面输入 `JARVIS_ADMIN_TOKEN`。默认令牌只保留在页面内存中；主工作台的“在此设备记住”是可选的本地便利功能，仅建议在可信的个人设备上启用。不要把令牌写入 URL、代码库或截图。
 
 ## 重要注意
 
