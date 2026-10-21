@@ -1029,7 +1029,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         goal = str(body.get("goal", "")).strip() or "评估一个 AI 原生游戏机会"
         with LOCK:
-            if STATE["phase"] in {"planning", "team", "evaluation"}:
+            if STATE["phase"] in {"planning", "team", "research", "design", "evaluation"}:
                 self._json({"ok": False, "error": "A run is already in progress."}, 409)
                 return
             STATE["phase"] = "planning"  # Reserve atomically before starting the worker thread.
