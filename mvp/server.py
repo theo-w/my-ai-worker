@@ -80,6 +80,7 @@ def reset(goal: str):
         STATE["goal"] = goal
         STATE["phase"] = "planning"
         STATE["run_id"] = str(int(time.time() * 1000))
+        STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
         STATE["agents"] = [
             {"id": i, "worker": w, "capability": cap, "status": "queued",
              "progress": 0, "task": cap, "input": goal, "output": "", "evidence": []}
@@ -98,6 +99,7 @@ def execute(goal: str):
     time.sleep(.1)
     with LOCK:
         STATE["phase"] = "team"
+        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-team", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "团队已组建，开始逐个执行分配任务。"})
         for agent in STATE["agents"]:
             agent["status"] = "ready"
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
@@ -106,6 +108,7 @@ def execute(goal: str):
         with LOCK:
             STATE["agents"][idx]["status"] = "running"
             STATE["agents"][idx]["progress"] = 20
+            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-dispatch-" + str(idx), "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": worker, "worker": worker, "text": "任务派发：" + capability + "。目标：" + goal})
         try:
             if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor):
                 items = run_worker(worker, capability, goal)
@@ -120,16 +123,19 @@ def execute(goal: str):
                 agent.update({"progress": 100, "output": output, "execution": result_data,
                               "evidence": [item.__dict__ for item in items], "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-reply-" + str(idx), "at": time.time(), "kind": "reply", "from": worker, "to": "Digital Twin", "worker": worker, "text": output, "simulated": bool(result_data.get("simulated", False))})
         except Exception as exc:
             with LOCK:
                 agent = STATE["agents"][idx]
                 agent.update({"status": "blocked", "progress": 100, "output": "执行失败：" + type(exc).__name__,
                               "execution": {"status": "failed", "error_type": type(exc).__name__}})
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-error-" + str(idx), "at": time.time(), "kind": "system", "from": worker, "to": "Digital Twin", "worker": worker, "text": "员工执行受阻：" + type(exc).__name__})
 
     # Research is part of this run; missing providers fail closed rather than fabricating results.
     with LOCK:
         STATE["phase"] = "research"
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
+        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
     try:
         result = run_live_research(goal, 5)
         quality = result.get("quality") or {}
@@ -141,6 +147,7 @@ def execute(goal: str):
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
             }
+            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research-result", "at": time.time(), "kind": "reply" if result.get("ok") else "system", "from": "Live Research Adapter", "to": "Digital Twin", "worker": "Live Research Adapter", "text": "调研返回 " + str(len(result.get("sources", []))) + " 个来源，" + str(accepted) + " 条证据通过门禁。" if result.get("ok") else "调研未成功：" + str(result.get("error") or result.get("message") or result.get("status")), "simulated": False})
             if result.get("ok") and accepted:
                 for item in result.get("evidence", []):
                     source = item.get("source")
