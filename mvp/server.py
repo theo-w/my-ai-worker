@@ -164,11 +164,24 @@ def execute(goal: str):
     if should_design:
         try:
             llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
-            brief = create_design_brief("基于本轮目标与调研证据：" + goal, "本轮原创游戏概念", llm_client)
-            with LOCK:
-                STATE["design"] = {"status": "completed",
-                    "reason": "基于本轮真实调研生成；仍是设计假设，不代表市场验证。",
-                    "brief": brief, "run_id": STATE.get("run_id")}
+            if llm_client is None:
+                with LOCK:
+                    STATE["design"] = {"status": "blocked",
+                        "reason": "本轮调研已完成，但未配置可用 LLM；未生成创意，也不会用旧模板冒充本轮结果。",
+                        "brief": None, "run_id": STATE.get("run_id")}
+            else:
+                with LOCK:
+                    source_rows = list((STATE.get("research") or {}).get("sources") or [])
+                context = "\\n".join(
+                    f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
+                    for row in source_rows
+                )[:5000]
+                source_game = (goal[:160] or "AI 原生游戏机会")
+                brief = create_design_brief(source_game, "本轮原创游戏概念", llm_client, research_context=context)
+                with LOCK:
+                    STATE["design"] = {"status": "completed",
+                        "reason": "基于本轮真实调研来源生成；仍是设计假设，不代表市场验证。",
+                        "brief": brief, "run_id": STATE.get("run_id")}
         except Exception as exc:
             with LOCK:
                 STATE["design"] = {"status": "failed", "reason": "创意生成失败：" + type(exc).__name__, "brief": None}
@@ -911,8 +924,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": "source_game and concept_name must be at most 160 characters."}, 400)
                 return
             llm_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+            if llm_client is None:
+                self._json({"ok": False, "error": "LLM is not configured; no current-run concept was generated."}, 503)
+                return
+            with LOCK:
+                rows = list((STATE.get("research") or {}).get("sources") or [])
+            research_context = "\\n".join(
+                f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
+                for row in rows
+            )[:5000]
             try:
-                brief = create_design_brief(source_game, concept_name, llm_client)
+                brief = create_design_brief(source_game, concept_name, llm_client, research_context=research_context)
             except (ValueError, RuntimeError, OSError) as exc:
                 self._json({"ok": False, "error": "Design brief generation failed: " + type(exc).__name__}, 502)
                 return
