@@ -42,6 +42,13 @@
  <div id="signalCaption" class="sub">启动 JARVIS 后，这里会根据实际流程状态显示分身调度、员工执行、证据回传和决策反馈；动画只表示当前状态，不代表虚构的实时思考。</div>
 </div>
 
+<div class="panel wide" style="margin-top:14px" id="feasibilityPanel">
+ <div class="section-title"><span>商业可行性闸门 · Grill-Me</span><span id="feasibilityStatus" class="status">NOT STARTED</span></div>
+ <div class="sub" style="margin-bottom:10px">先明确评估范围与完成标准；评估结果需要证据、反证、原型实验和成本情景。建立契约不代表市场已验证。</div>
+ <div class="input" style="flex-wrap:wrap"><input id="feasibilityBudget" type="number" min="0" step="100" placeholder="预算上限（可选）" aria-label="预算上限" style="max-width:220px"><input id="feasibilityDays" type="number" min="1" max="365" step="1" placeholder="时间盒天数（可选）" aria-label="时间盒天数" style="max-width:220px"><button id="feasibilityCreate" class="btn" type="button">建立评估契约</button></div>
+ <div id="feasibilityResult" class="sub" style="margin-top:10px;white-space:pre-wrap">尚未建立商业可行性评估契约。</div>
+</div>
+
 <div class="grid">
  <div class="panel">
   <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
@@ -306,6 +313,26 @@ document.getElementById("designRun").onclick=async function(){
  }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
 };
+async function createFeasibilityContract(){
+ const button=document.getElementById("feasibilityCreate"),out=document.getElementById("feasibilityResult"),status=document.getElementById("feasibilityStatus");
+ const payload={goal:document.getElementById("goal").value.trim()};
+ const budget=document.getElementById("feasibilityBudget").value;
+ const days=document.getElementById("feasibilityDays").value;
+ if(budget!=="")payload.budget=Number(budget);
+ if(days!=="")payload.timebox_days=Number(days);
+ if(!payload.goal){out.textContent="请先填写业务目标。";return;}
+ button.disabled=true;status.textContent="CREATING";
+ try{
+  const response=await apiFetch("/api/feasibility/contract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},c=f.contract||{};
+  status.textContent=String(f.status||"READY").toUpperCase();
+  out.textContent="评估目标："+(c.goal||payload.goal)+"\\n必须覆盖维度："+(c.dimensions||[]).join("、")+"\\n预算上限："+(c.budget_limit==null?"未设置":c.budget_limit)+"\\n时间盒："+(c.timebox_days==null?"未设置":c.timebox_days+" 天")+"\\n\\n下一步：调研支持证据与反证、估算保守/基准/乐观成本，并运行可证伪的最小原型。契约已建立，但尚未形成可行性结论。";
+ }catch(e){status.textContent="ERROR";out.textContent="建立失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityCreate").addEventListener("click",createFeasibilityContract);
 async function startPrototype(){const r=await apiFetch("/api/prototype",{method:"POST"});if(r.ok)poll();else document.getElementById("status").textContent="Prototype API "+r.status}
 const tokenInput=document.getElementById("adminToken");
 const rememberToken=document.getElementById("rememberToken");
