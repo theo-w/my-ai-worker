@@ -892,6 +892,13 @@ class Handler(BaseHTTPRequestHandler):
             self._json(result)
             return
         if self.path == "/api/experience-design":
+            with LOCK:
+                research_state = STATE.get("research") or {}
+                accepted = (research_state.get("quality") or {}).get("accepted", 0)
+                sources = research_state.get("sources") or []
+                if research_state.get("status") != "completed" or accepted < 1 or not sources:
+                    self._json({"ok": False, "error": "Concept generation requires accepted source evidence from the current JARVIS run."}, 409)
+                    return
             body = self._read_json(max_bytes=65536)
             if body is None:
                 return
