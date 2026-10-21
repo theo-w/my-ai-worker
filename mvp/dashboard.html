@@ -148,8 +148,39 @@ async function poll(){
   const r=await apiFetch("/api/state");
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
-  state=data;render();
+  state=data;render();renderRunOutputs(data);
  }catch(e){document.getElementById("status").textContent="API unavailable";}
+}
+function renderRunOutputs(data){
+ const research=data.research||{};
+ const researchOut=document.getElementById("researchResult");
+ const phase=data.phase||"idle";
+ const labels={planning:"正在规划",team:"员工执行中",research:"真实调研中",design:"创意生成中",evaluation:"独立评估中",decision:"阶段决策已形成",prototype:"原型阶段"};
+ document.getElementById("signalSummary").textContent=(labels[phase]||phase.toUpperCase())+" · "+(data.run_id||"无运行 ID");
+ if(research.status==="running"||research.status==="queued"){
+  researchOut.textContent=research.status==="running"?"本轮自动调研正在执行，结果返回后会显示在这里。":"等待本轮调研阶段。";
+ }else if(research.status==="provider_error"||research.status==="provider_unconfigured"||research.status==="failed"){
+  researchOut.textContent="本轮调研未成功："+(research.error||"搜索服务未配置或请求失败")+"。未生成可验证的真实研究结果。";
+ }else if(research.status==="completed"||research.status==="no_results"){
+  const sources=(research.sources||[]).map(s=>'<div class="ev"><b>'+esc(s.title||"未命名来源")+'</b><div class="sub">'+esc(s.snippet||"")+'</div><a href="'+esc(s.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(s.url||"")+'</a></div>').join("");
+  const q=research.quality||{};
+  researchOut.innerHTML='<div class="kv"><b>本轮状态</b><div>'+esc(research.status)+'</div><b>证据门禁</b><div>'+esc(String(q.accepted||0))+' 条可接受 / '+esc(String(q.total||0))+' 条候选</div></div>'+(sources||'<div class="sub">本轮没有返回来源。</div>');
+ }else{
+  researchOut.textContent="本轮尚未进入调研阶段；点击「启动 JARVIS」后将自动执行。";
+ }
+ const design=data.design||{};
+ const designButton=document.getElementById("designRun");
+ if(design.status==="completed"&&design.brief){
+  currentRunResearchReady=true;
+  designButton.disabled=false;designButton.textContent="基于当前证据重新生成";
+  const b=design.brief, concept=b.original_concept||{};
+  document.getElementById("designResult").innerHTML='<div class="outcome"><div class="kicker">本轮生成 · '+esc(design.status)+'</div><div class="big">'+esc(concept.title||"本轮原创概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="sub">'+esc(design.reason||"")+" · 市场可行性尚未验证</div></div>";
+ }else{
+  currentRunResearchReady=false;
+  designButton.disabled=true;
+  designButton.textContent=design.status==="running"?"正在生成…":"等待调研完成";
+  document.getElementById("designResult").textContent=design.reason||"等待本轮真实调研与有效证据；不会提前展示旧版创意作为本轮结果。";
+ }
 }
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run");b.disabled=true;
