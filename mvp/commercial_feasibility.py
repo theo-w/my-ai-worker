@@ -159,10 +159,19 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
 
     average = round(sum(scores) / len(scores), 2) if scores else None
     hard_fail = any(not check.get("passed", False) for check in checks)
+    blockers = report.get("critical_blockers", [])
+    explicit_critical_blocker = isinstance(blockers, list) and any(
+        (isinstance(item, str) and item.strip()) or
+        (isinstance(item, dict) and isinstance(item.get("reason"), str) and item["reason"].strip())
+        for item in blockers
+    )
     if missing:
         decision = "INSUFFICIENT_EVIDENCE"
+    elif explicit_critical_blocker:
+        decision = "NO_GO"
     elif weak or hard_fail or average is None or average < policy["min_overall_score"]:
-        decision = "NO_GO" if weak else "ITERATE"
+        # A weak score is a signal to test or refine, not automatically to abandon.
+        decision = "ITERATE"
     else:
         decision = "GO_TO_PROTOTYPE"
 
