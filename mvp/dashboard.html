@@ -159,12 +159,34 @@ function render(){
  const p=state.prototype;
  document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
 }
+function renderTwinChat(data){
+ const log=document.getElementById("twinChatLog");const rows=(data.chat_messages||[]);
+ if(!rows.length)return;
+ const nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<60;
+ log.innerHTML=rows.map(m=>'<div class="twin-bubble '+(m.role==="user"?"user":"assistant")+'"><div class="bubble-meta">'+(m.role==="user"?"你":"Digital Twin")+'</div>'+esc(m.text)+'</div>').join("");
+ if(nearBottom)log.scrollTop=log.scrollHeight;
+}
+async function sendTwinMessage(){
+ const input=document.getElementById("twinChatInput");const text=input.value.trim();if(!text)return;
+ const send=document.getElementById("twinChatSend");send.disabled=true;input.value="";
+ document.getElementById("twinChatStatus").textContent="发送中…";
+ try{
+  const response=await apiFetch("/api/twin/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+  const result=await response.json();if(!response.ok)throw new Error(result.error||("HTTP "+response.status));
+  if(result.pending_direction){document.getElementById("goal").value=result.pending_direction;document.getElementById("twinChatStatus").textContent="新方向已填入目标框 · 待确认启动";}
+  else document.getElementById("twinChatStatus").textContent=result.mode==="llm"?"已回复 · 上下文对话":"已回复 · 状态摘要";
+  await poll();
+ }catch(e){document.getElementById("twinChatStatus").textContent="发送失败："+e.message;input.value=text;}
+ finally{send.disabled=false;}
+}
+document.getElementById("twinChatSend").addEventListener("click",sendTwinMessage);
+document.getElementById("twinChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendTwinMessage();}});
 async function poll(){
  try{
   const r=await apiFetch("/api/state");
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
-  state=data;render();renderRunOutputs(data);
+  state=data;render();renderRunOutputs(data);renderTwinChat(data);
  }catch(e){document.getElementById("status").textContent="API unavailable";}
 }
 function renderRunOutputs(data){
