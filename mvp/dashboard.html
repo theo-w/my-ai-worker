@@ -28,25 +28,6 @@
  <div id="flow" class="flow"></div>
 </div>
 
-<div class="panel wide workflow-panel" style="margin-top:14px">
- <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
- <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
- <div class="input"><input id="researchQuery" value="AI-native game market opportunities and persistent NPC memory" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
- <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
-</div>
-
-<div class="panel wide workflow-panel" style="margin-top:14px">
- <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
- <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
- <div class="input">
-  <input id="sourceGame" value="塞尔达传说：王国之泪" aria-label="Reference game">
-  <input id="conceptName" value="潮痕档案馆" aria-label="New game concept name">
-  <button id="designRun" class="btn">生成游戏创意</button>
- </div>
- <div id="designResult" class="sub" style="margin-top:12px">等待当前业务流程进入创意生成阶段。</div>
- <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开可玩原型 ↗</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
-</div>
-
 <div class="grid">
  <div class="panel">
   <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
@@ -84,6 +65,26 @@
   <div id="prototype" class="outcome">决策后，Digital Twin 可以把结果交给下一阶段的执行团队。</div>
  </div>
 </div>
+
+<div class="panel wide workflow-panel" style="margin-top:14px">
+ <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
+ <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
+ <div class="input"><input id="researchQuery" value="AI-native game market opportunities and persistent NPC memory" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
+ <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
+</div>
+
+<div class="panel wide workflow-panel" style="margin-top:14px">
+ <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
+ <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
+ <div class="input">
+  <input id="sourceGame" value="塞尔达传说：王国之泪" aria-label="Reference game">
+  <input id="conceptName" value="潮痕档案馆" aria-label="New game concept name">
+  <button id="designRun" class="btn">生成游戏创意</button>
+ </div>
+ <div id="designResult" class="sub" style="margin-top:12px">等待当前业务流程进入创意生成阶段。</div>
+ <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开可玩原型 ↗</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
+</div>
+
 <div class="footer">MVP：编排、Digital Twin policy、团队形成、状态流转与 Prototype handoff 为真实流程；Research / Evidence 仍明确标记为 simulated。下一阶段：真实 Web Research + LLM Synthesis + Persistent Twin Memory。</div>
 </div>
 <script>
