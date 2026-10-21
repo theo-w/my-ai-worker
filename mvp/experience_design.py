@@ -95,7 +95,8 @@ def _template_brief(source_game: str) -> dict:
 
 def create_design_brief(source_game: str = "塞尔达传说：王国之泪",
                         concept_name: str = "潮痕档案馆",
-                        llm_client=None) -> dict:
+                        llm_client=None,
+                        research_context: str = "") -> dict:
     """Create a structured brief; use the configured LLM when available.
 
     If no LLM is configured, return a clearly labeled deterministic template.
@@ -106,6 +107,8 @@ def create_design_brief(source_game: str = "塞尔达传说：王国之泪",
         raise ValueError("source_game must be between 1 and 160 characters.")
     if not concept_name or len(concept_name) > 160:
         raise ValueError("concept_name must be between 1 and 160 characters.")
+    if not isinstance(research_context, str) or len(research_context) > 5000:
+        raise ValueError("research_context must be a string up to 5000 characters.")
 
     if llm_client is None:
         brief = _template_brief(source_game)
@@ -116,6 +119,8 @@ def create_design_brief(source_game: str = "塞尔达传说：王国之泪",
     prompt = (
         "参考游戏：" + source_game + "\n"
         "候选新游戏名：" + concept_name + "\n"
+        "本轮调研证据（未经独立事实核验；仅用于形成假设，不可声称市场已验证）：\n"
+        + (research_context or "未提供调研上下文。") + "\n"
         "请按系统约定的 JSON schema 生成完整的机制分析和原创游戏 MVP brief。"
         "请避免复制参考游戏的具体表达。所有玩家心理与市场判断都标注为假设。"
     )
