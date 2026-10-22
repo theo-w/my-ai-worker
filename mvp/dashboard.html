@@ -385,7 +385,14 @@ function renderRunOutputs(data){
 }
 function renderAutomaticFeasibility(data){
  const f=data.feasibility||{}, report=f.report||{}, evaluation=f.evaluation||{};
- if(!report.dimensions||!evaluation.decision)return;
+ if(!report.dimensions||!evaluation.decision){
+  if(f.status==="not_applicable"){
+   document.getElementById("feasibilityStatus").textContent="NOT APPLICABLE";
+   document.getElementById("feasibilityResult").textContent="当前目标不是游戏玩法可行性评估任务；数字分身将按通用任务流程执行。";
+   document.getElementById("feasibilityEvaluation").textContent="游戏专用可行性闸门未应用。";
+  }
+  return;
+ }
  document.getElementById("feasibilityStatus").textContent=String(evaluation.decision);
  const dimensions=Object.entries(report.dimensions).map(([name,item])=>{
   const score=item.score==null?"未知":String(item.score)+"/5";
