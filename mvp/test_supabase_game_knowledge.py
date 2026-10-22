@@ -6,8 +6,10 @@ from unittest.mock import patch
 from urllib.error import URLError
 
 try:
+    from . import supabase_game_knowledge as supabase_module
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:
+    import supabase_game_knowledge as supabase_module
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
 
@@ -36,7 +38,7 @@ class SupabaseKnowledgeTests(unittest.TestCase):
                     return FakeResponse(b"[]")
                 return FakeResponse(b"")
 
-            with patch("supabase_game_knowledge.urlopen", fake_urlopen):
+            with patch.object(supabase_module, "urlopen", fake_urlopen):
                 store = SupabaseGameKnowledgeBase(
                     "https://project.supabase.co", "sb_secret_test",
                     path=str(Path(directory) / "knowledge.json"),
@@ -56,7 +58,7 @@ class SupabaseKnowledgeTests(unittest.TestCase):
 
     def test_reports_json_fallback_when_supabase_is_unreachable(self):
         with tempfile.TemporaryDirectory() as directory:
-            with patch("supabase_game_knowledge.urlopen", side_effect=URLError("offline")):
+            with patch.object(supabase_module, "urlopen", side_effect=URLError("offline")):
                 store = SupabaseGameKnowledgeBase(
                     "https://project.supabase.co", "sb_secret_test",
                     path=str(Path(directory) / "knowledge.json"),
