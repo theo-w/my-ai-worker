@@ -194,16 +194,48 @@ async function sendTwinMessage(){
  finally{send.disabled=false;}
 }
 document.getElementById("twinChatSpeak").addEventListener("change",function(){if(!this.checked&&"speechSynthesis" in window)window.speechSynthesis.cancel();});
+let twinRecognition=null;
+let twinRecognitionActive=false;
+let twinRecognitionSession=0;
 document.getElementById("twinChatMic").addEventListener("click",()=>{
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!Recognition){document.getElementById("twinVoiceNote").textContent="此浏览器未提供语音识别。请使用系统键盘听写，或继续输入文字。";return;}
  const button=document.getElementById("twinChatMic");const note=document.getElementById("twinVoiceNote");
- const recognition=new Recognition();recognition.lang="zh-CN";recognition.interimResults=true;recognition.maxAlternatives=1;
- button.disabled=true;button.textContent="🎙 正在聆听…";note.textContent="请说话；识别完成后会填入输入框，由你检查并发送。";
- recognition.onresult=e=>{let transcript="";for(let i=e.resultIndex;i<e.results.length;i++)transcript+=e.results[i][0].transcript;document.getElementById("twinChatInput").value=transcript;};
- recognition.onerror=e=>{note.textContent="语音识别未成功："+e.error+"。可以改用文字输入。";};
- recognition.onend=()=>{button.disabled=false;button.textContent="🎙 语音输入";};
- try{recognition.start();}catch(e){button.disabled=false;button.textContent="🎙 语音输入";note.textContent="无法启动语音识别，请稍后重试或使用文字输入。";}
+ if(!Recognition){note.textContent="此浏览器未提供语音识别。请使用系统键盘听写，或继续输入文字。";return;}
+ if(twinRecognitionActive&&twinRecognition){button.textContent="正在结束…";try{twinRecognition.stop();}catch(_){twinRecognitionActive=false;}return;}
+ const input=document.getElementById("twinChatInput");
+ const baseText=input.value.trim();
+ const separator=baseText?(/[，。！？；、,.!?;:]$/.test(baseText)?"":"，"):"";
+ const basePrefix=baseText?(baseText+separator):"";
+ const session=++twinRecognitionSession;
+ const recognition=new Recognition();twinRecognition=recognition;
+ recognition.lang="zh-CN";recognition.interimResults=true;recognition.maxAlternatives=1;
+ twinRecognitionActive=true;button.disabled=false;button.textContent="⏹ 停止识别";note.textContent="请说话；中途停止后再次点击会接着已有文字，不会清空之前的内容。";
+ let finalTranscript="";
+ recognition.onresult=e=>{
+  if(session!==twinRecognitionSession)return;
+  let interimTranscript="";
+  for(let i=e.resultIndex;i<e.results.length;i++){
+   const result=e.results[i];const words=result[0]&&result[0].transcript||"";
+   if(result.isFinal)finalTranscript+=words;else interimTranscript+=words;
+  }
+  input.value=basePrefix+finalTranscript+interimTranscript;
+ };
+ recognition.onerror=e=>{
+  if(session!==twinRecognitionSession)return;
+  const errors={no-speech:"没有检测到语音",audio-capture:"无法访问麦克风",not-allowed:"麦克风权限被拒绝",network:"语音服务网络错误",aborted:"识别已中断"};
+  note.textContent="语音识别："+(errors[e.error]||e.error||"未成功")+"。已识别的文字会保留，可以再次点击继续或直接编辑。";
+ };
+ recognition.onend=()=>{
+  if(session!==twinRecognitionSession)return;
+  twinRecognitionActive=false;twinRecognition=null;
+  button.disabled=false;button.textContent="🎙 语音输入";
+  if(input.value.trim())note.textContent="本段识别已结束，文字已保留。可编辑后发送，或再次点击继续输入。";
+  else if(note.textContent.indexOf("语音识别：")!==0)note.textContent="本段没有识别到文字。请再次点击重试，或使用文字输入。";
+ };
+ try{recognition.start();}catch(e){
+  twinRecognitionActive=false;twinRecognition=null;button.disabled=false;button.textContent="🎙 语音输入";
+  note.textContent="无法启动语音识别，请稍后重试；已有输入内容不会清空。";
+ }
 });
 document.getElementById("twinChatSend").addEventListener("click",sendTwinMessage);
 document.getElementById("twinChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendTwinMessage();}});
