@@ -342,6 +342,17 @@ function renderRunOutputs(data){
  }else if(feasibility.status==="evaluated"&&feasibility.evaluation){
   feasibilityStatusEl.textContent="EVALUATED · "+String(feasibility.evaluation.decision||"UNKNOWN");
   feasibilityResultEl.textContent="评估结果："+String(feasibility.evaluation.decision||"UNKNOWN")+"\n已评分维度："+String(feasibility.evaluation.dimension_count_scored||0)+"/8\n未完成维度："+((feasibility.evaluation.missing_dimensions||[]).join("、")||"无")+"\n事实真实性仍需独立验证。";
+ }else if(feasibility.status==="researching"||feasibility.status==="contract_ready"){
+  feasibilityStatusEl.textContent=feasibility.status==="researching"?"RESEARCHING · CONTRACT READY":"CONTRACT READY";
+  feasibilityResultEl.textContent="评估范围已建立，正在等待本轮研究和证据。契约不是结论；最终评估还需要独立来源核验、反证、可运行原型证据与完整成本情景。";
+ }else if(feasibility.status==="not_started"){
+  feasibilityStatusEl.textContent="NOT STARTED";
+  feasibilityResultEl.textContent="当前目标尚未进入游戏商业可行性评估。";
+  const currentRun=String(data.run_id||"");
+  if(feasibilityReportEl&&feasibilityReportEl.dataset.runId!==currentRun){
+   feasibilityReportEl.value="";
+   feasibilityReportEl.dataset.runId=currentRun;
+  }
  }
  const researchOut=document.getElementById("researchResult");
  const phase=data.phase||"idle";
