@@ -126,6 +126,8 @@ Check `GET /api/llm/status` to see whether the server started in `llm` or `simul
 
 LLM calls are bounded by `JARVIS_LLM_MAX_TOKENS` (default 768, allowed 64–4096) and `JARVIS_LLM_TIMEOUT_SECONDS` (default 45, allowed 1–120). The authenticated Dashboard button “验证模型连接” calls `POST /api/llm/smoke-test` once with a per-call 64-token cap. It reports only a safe status/model/latency summary and does not echo the provider response or exception detail. This validates a real provider round trip only when the button is clicked with valid admin authentication.
 
+For the official DeepSeek API, use `deepseek-flash` or `deepseek-v4-pro`. The legacy `deepseek-chat` and `deepseek-reasoner` aliases were retired in July 2026; the dashboard now warns when those aliases are configured. See the [official model changelog](https://api-docs.deepseek.com/updates/). The feasibility draft can estimate inference-only usage costs for recognized DeepSeek models using the official peak/cache-miss rates (checked 2026-10-22), or custom rates supplied through `JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS` and `JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS`. These are illustrative scenarios, not observed usage or a complete production budget.
+
 The default Dashboard research pipeline remains separate: configure `JARVIS_SEARCH_ENDPOINT` to use the JSON search adapter. LLM execution and live search are distinct integrations and must both be configured to provide a real research-and-synthesis workflow.
 
 

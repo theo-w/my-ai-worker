@@ -56,6 +56,11 @@ def close(httpd, thread):
     thread.join(timeout=2)
 
 
+def request_get_json(base, path):
+    with urlopen(base + path, timeout=3) as response:
+        return response.status, json.loads(response.read().decode("utf-8"))
+
+
 def test_llm_smoke_test_requires_admin_authentication(monkeypatch):
     client = FakeLLMClient()
     httpd, thread, base = serve(monkeypatch, client)
@@ -80,6 +85,21 @@ def test_llm_smoke_test_uses_small_token_budget_and_returns_safe_status(monkeypa
         assert result["max_tokens"] == 64
         assert client.max_tokens_seen == 64
         assert "JARVIS_LLM_OK" not in json.dumps(result)
+    finally:
+        close(httpd, thread)
+
+
+def test_llm_status_warns_for_retired_deepseek_model_alias(monkeypatch):
+    client = FakeLLMClient()
+    client.model = "deepseek-chat"
+    monkeypatch.setenv("JARVIS_LLM_BASE_URL", "https://api.deepseek.com/v1")
+    httpd, thread, base = serve(monkeypatch, client)
+    try:
+        status, result = request_get_json(base, "/api/llm/status")
+        assert status == 200
+        assert result["configured"] is True
+        assert "retired" in result["model_warning"].lower()
+        assert result["recommended_models"] == ["deepseek-flash", "deepseek-v4-pro"]
     finally:
         close(httpd, thread)
 

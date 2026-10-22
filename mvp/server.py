@@ -554,6 +554,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/llm/status":
             llm_client = getattr(WORKER_EXECUTOR, "client", None)
             llm_configured = llm_client is not None
+            llm_model = getattr(llm_client, "model", None)
+            llm_host = (urlsplit(os.getenv("JARVIS_LLM_BASE_URL", "").strip()).hostname or "").lower()
+            model_warning = None
+            if llm_host == "api.deepseek.com" and llm_model in {"deepseek-chat", "deepseek-reasoner"}:
+                model_warning = "Retired DeepSeek model alias; use deepseek-flash or deepseek-v4-pro."
+            elif llm_host == "api.deepseek.com" and llm_model not in {
+                None, "deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"
+            }:
+                model_warning = "Unrecognized DeepSeek model ID; verify it against the current official model list."
             llm_env_keys = ("JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL")
             missing_llm_variables = [key for key in llm_env_keys if not os.getenv(key, "").strip()]
             search_configured = bool(os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip())
@@ -564,10 +573,14 @@ class Handler(BaseHTTPRequestHandler):
                 "missing_llm_variables": missing_llm_variables,
                 "llm_configuration_error": not llm_configured and not missing_llm_variables,
                 "mode": "hybrid" if llm_configured and search_configured else "llm" if llm_configured else "search_only" if search_configured else "simulated",
-                "model": getattr(llm_client, "model", None),
-                "message": "LLM configured; outputs and search snippets are not independently verified facts."
+                "model": llm_model,
+                "model_warning": model_warning,
+                "recommended_models": ["deepseek-flash", "deepseek-v4-pro"] if model_warning and llm_host == "api.deepseek.com" else [],
+                "message": model_warning or (
+                    "LLM configured; outputs and search snippets are not independently verified facts."
                     if llm_configured else
-                    "Search is configured, but LLM is not configured; chat summaries may work, while LLM analysis and design generation are unavailable.",
+                    "Search is configured, but LLM is not configured; chat summaries may work, while LLM analysis and design generation are unavailable."
+                ),
             })
             return
         if self.path in ("/", "/index.html", "/playtest", "/trace"):

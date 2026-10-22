@@ -7,6 +7,8 @@ Scores are decision aids, not empirical probabilities.
 from __future__ import annotations
 
 import math
+import os
+from urllib.parse import urlsplit
 from typing import Any
 
 REQUIRED_DIMENSIONS = (
@@ -89,6 +91,98 @@ def build_feasibility_contract(goal: str, budget: float | None = None,
 
 
 
+
+def estimate_model_usage_costs(model: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+    """Estimate inference-only cost under explicit usage assumptions.
+
+    Official DeepSeek peak cache-miss prices are used only for recognized model
+    IDs on api.deepseek.com. Other providers require explicit per-million-token
+    rates via environment variables. This is a scenario estimate, not measured
+    production usage; provider pricing may change.
+    """
+    model_name = (model if model is not None else os.getenv("JARVIS_LLM_MODEL", "")).strip()
+    endpoint = (base_url if base_url is not None else os.getenv("JARVIS_LLM_BASE_URL", "")).strip()
+    host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
+    if host == "api.deepseek.com":
+        if model_name in {"deepseek-chat", "deepseek-reasoner"}:
+            return {
+                "status": "deprecated_model_alias",
+                "model": model_name,
+                "message": "This DeepSeek model alias was retired; switch to deepseek-flash or deepseek-v4-pro before estimating or calling the provider.",
+                "pricing_source": "https://api-docs.deepseek.com/updates/",
+                "pricing_checked_at": "2026-10-22",
+            }
+        rates = {
+            "deepseek-flash": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-flash": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-flash-vision-exp": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-pro": {"input_peak": 1.32, "input_off_peak": 0.66, "output_peak": 3.96, "output_off_peak": 1.98},
+        }
+        rate = rates.get(model_name)
+        source = "https://api-docs.deepseek.com/quick_start/pricing/"
+        pricing_mode = "official_peak_cache_miss_rates"
+    else:
+        try:
+            input_rate = float(os.getenv("JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS", ""))
+            output_rate = float(os.getenv("JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS", ""))
+            if not math.isfinite(input_rate) or not math.isfinite(output_rate) or input_rate < 0 or output_rate < 0:
+                raise ValueError
+            rate = {"input_peak": input_rate, "input_off_peak": input_rate,
+                    "output_peak": output_rate, "output_off_peak": output_rate}
+            source = "operator_configured_rates"
+            pricing_mode = "configured_flat_rates"
+        except (TypeError, ValueError):
+            rate = None
+            source = None
+            pricing_mode = None
+
+    if rate is None:
+        return {
+            "status": "pricing_unavailable",
+            "model": model_name or None,
+            "message": "No recognized official price schedule or configured input/output rates are available.",
+            "required_env": [
+                "JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS",
+                "JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS",
+            ],
+        }
+
+    usage = {
+        "conservative": {"calls_per_session": 12, "input_tokens_per_call": 6000, "output_tokens_per_call": 768, "sessions_per_user_month": 60},
+        "base": {"calls_per_session": 6, "input_tokens_per_call": 3000, "output_tokens_per_call": 512, "sessions_per_user_month": 20},
+        "optimistic": {"calls_per_session": 3, "input_tokens_per_call": 1500, "output_tokens_per_call": 256, "sessions_per_user_month": 10},
+    }
+    scenarios = {}
+    for name, assumptions in usage.items():
+        input_cost = assumptions["input_tokens_per_call"] * rate["input_peak"] / 1_000_000
+        output_cost = assumptions["output_tokens_per_call"] * rate["output_peak"] / 1_000_000
+        per_session = round((input_cost + output_cost) * assumptions["calls_per_session"], 8)
+        monthly_sessions = assumptions["sessions_per_user_month"] * 1000
+        scenarios[name] = {
+            **assumptions,
+            "active_users": 1000,
+            "input_rate_usd_per_million_tokens": rate["input_peak"],
+            "output_rate_usd_per_million_tokens": rate["output_peak"],
+            "model_cost_per_session_usd": per_session,
+            "monthly_ai_inference_cost_usd_at_1000_users": round(per_session * monthly_sessions, 2),
+        }
+    return {
+        "status": "estimated",
+        "model": model_name,
+        "currency": "USD",
+        "pricing_mode": pricing_mode,
+        "price_basis": "peak input cache-miss and output rates; cache savings excluded",
+        "pricing_source": source,
+        "pricing_checked_at": "2026-10-22" if source != "operator_configured_rates" else None,
+        "scenarios": scenarios,
+        "limitations": [
+            "Inference-only; excludes search, storage, hosting, moderation, human labor, and content production.",
+            "Token and session counts are illustrative assumptions, not measured usage.",
+            "Peak cache-miss pricing is used to avoid relying on cache savings or off-peak scheduling.",
+        ],
+    }
+
+
 def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = None,
                             query_errors: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Build a conservative assessment draft without fabricating scores or costs.
@@ -137,10 +231,38 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "break_even_users",
         "gross_margin_percent",
     )
+    usage_estimate = estimate_model_usage_costs()
     scenarios = {
         scenario_name: {field: None for field in cost_fields}
         for scenario_name in ("conservative", "base", "optimistic")
     }
+    if usage_estimate.get("status") == "estimated":
+        for scenario_name, estimate in usage_estimate["scenarios"].items():
+            scenarios[scenario_name]["model_cost_per_session_usd"] = estimate["model_cost_per_session_usd"]
+            scenarios[scenario_name]["monthly_ai_inference_cost_usd_at_1000_users"] = estimate["monthly_ai_inference_cost_usd_at_1000_users"]
+            scenarios[scenario_name]["usage_assumptions"] = {
+                key: estimate[key] for key in (
+                    "calls_per_session", "input_tokens_per_call", "output_tokens_per_call",
+                    "sessions_per_user_month", "active_users"
+                )
+            }
+    cost_assumptions = [
+        "每次会话的调用数与 token 数是可编辑的情景假设，不是线上测量结果。",
+        "AI 推理成本不包括搜索、存储、托管、审核、人力与内容制作。",
+        "制作成本、月度总成本、收入、盈亏平衡点和毛利率仍需要实际输入。",
+    ]
+    if usage_estimate.get("status") == "estimated":
+        cost_assumptions.append("推理价格来源：" + str(usage_estimate.get("pricing_source")) +
+                                "；按峰时未缓存输入价格与输出价格估算，未计缓存折扣。")
+    else:
+        cost_assumptions.append(usage_estimate.get("message", "模型价格未知，尚不能估算美元推理成本。"))
+    required_inputs = [
+        "原型与垂直切片的人周、团队成本和时间盒",
+        "月活跃用户、会话频率、留存、转化与净收入假设",
+    ]
+    if usage_estimate.get("status") != "estimated":
+        required_inputs.insert(0, "模型输入/输出价格（按百万 token）")
+        required_inputs.insert(1, "每次会话的模型调用数、输入/输出 token 数及重试比例")
     report = {
         "goal": goal.strip(),
         "dimensions": dimensions,
@@ -149,18 +271,10 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "source_independence_review": "not_run",
         "prototype_evidence_refs": [],
         "cost_model": {
-            "status": "needs_inputs",
-            "assumptions": [
-                "没有独立核验所选模型的实时输入/输出单价。",
-                "每次核心循环的调用次数与 token 用量尚未通过运行日志测量。",
-                "开发人力成本、目标用户量、留存、转化和定价尚未提供或验证。",
-            ],
-            "required_inputs": [
-                "模型输入/输出价格（按百万 token）",
-                "每次会话的模型调用数、输入/输出 token 数及重试比例",
-                "原型与垂直切片的人周、团队成本和时间盒",
-                "月活跃用户、会话频率、留存、转化与净收入假设",
-            ],
+            "status": "partial_estimate" if usage_estimate.get("status") == "estimated" else "needs_inputs",
+            "assumptions": cost_assumptions,
+            "required_inputs": required_inputs,
+            "pricing_estimate": usage_estimate,
             "scenarios": scenarios,
         },
         "counter_evidence_refs": [],
@@ -173,7 +287,9 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "8 个评估维度尚未有可追溯的评分与理由",
         "来源独立性和关键主张的语义支持尚未独立核验",
         "缺少可运行原型/玩家实验的证据",
-        "成本情景缺少已验证的价格、使用量和商业假设",
+        ("AI 推理成本仅为透明假设下的粗估；制作成本、月度总成本、收入与盈亏平衡仍未验证"
+         if usage_estimate.get("status") == "estimated"
+         else "成本情景缺少可用模型价格与已验证的使用量、商业假设"),
         "反证仍是候选来源，尚未完成逐条审查",
     ]
     if errors:

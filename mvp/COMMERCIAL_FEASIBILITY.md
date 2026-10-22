@@ -53,7 +53,7 @@ The evaluator does not accept an assumptions list plus empty scenario objects as
 
 Costs, revenue and break-even user counts must be non-negative. Assumptions must be explicit and non-empty. These checks validate report completeness, not whether an estimate is true.
 
-The automatic draft deliberately leaves prices and usage-dependent figures unknown when they have not been configured or measured. It can show candidate counter-evidence sources, but it does not promote them to reviewed counter-evidence or count retrieved domains as independent sources.
+The automatic draft can estimate **AI inference cost only** when the configured model has a recognized official price schedule or explicit per-million-token rates are supplied. The DeepSeek price snapshot uses peak input cache-miss and output rates from [the official pricing page](https://api-docs.deepseek.com/quick_start/pricing/) checked on 2026-10-22; legacy `deepseek-chat` and `deepseek-reasoner` are treated as retired rather than silently priced. Usage scenarios are explicit assumptions, not observed production usage. The draft still leaves total production cost, revenue, break-even, and gross margin unknown unless their inputs are provided. It can show candidate counter-evidence sources, but it does not promote them to reviewed counter-evidence or count retrieved domains as independent sources.
 
 ## Grill-Me discovery loop
 
