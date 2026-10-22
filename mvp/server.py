@@ -96,6 +96,17 @@ def reset(goal: str):
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
+        game_goal = any(token in goal.casefold() for token in (
+            "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+            "ai native game", "game feasibility", "游戏可行性"
+        ))
+        prior_feasibility = STATE.get("feasibility") or {}
+        prior_contract = prior_feasibility.get("contract")
+        if game_goal:
+            contract = prior_contract if isinstance(prior_contract, dict) and prior_contract.get("goal") == goal else build_feasibility_contract(goal)
+            STATE["feasibility"] = {"status": "researching", "contract": contract, "report": None, "evaluation": None}
+        else:
+            STATE["feasibility"] = {"status": "not_started", "contract": None, "report": None, "evaluation": None}
         STATE["run_id"] = str(int(time.time() * 1000))
         STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
         STATE["agents"] = [
