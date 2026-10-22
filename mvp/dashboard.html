@@ -56,7 +56,7 @@
 </style>
 </head>
 <body><div class="app">
-<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><label style="display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap"><input id="rememberToken" type="checkbox">在此设备记住</label><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">流程追踪与验收 ↗</a><div id="status" class="status">IDLE</div></div></div>
+<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><label style="display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap"><input id="rememberToken" type="checkbox" checked>在此设备记住</label><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">流程追踪与验收 ↗</a><div id="status" class="status">IDLE</div></div></div>
 
 <div class="panel wide">
  <div class="hero">
@@ -132,7 +132,7 @@
  </div>
 
  <div class="panel wide">
-  <div class="section-title"><span>Evidence Stream</span><span class="sub">SIMULATED · MVP</span></div>
+  <div class="section-title"><span>Evidence Stream</span><span class="sub">LIVE SOURCE / SIMULATION LABELS</span></div>
   <div id="evidence" class="evidence"></div>
  </div>
 
@@ -145,6 +145,7 @@
 <div class="panel wide workflow-panel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
  <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
+ <div class="input"><button id="llmSmokeTest" class="btn" type="button">验证模型连接（最多 64 tokens）</button><span id="llmSmokeResult" class="sub">需要管理员认证；测试只发出一条短请求，不展示或记录密钥。</span></div>
  <div class="input"><input id="researchQuery" value="AI-native game market opportunities and persistent NPC memory" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
  <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
 </div>
@@ -168,7 +169,7 @@
  <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开可玩原型 ↗</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
 </div>
 
-<div class="footer">MVP：编排、Digital Twin policy、团队形成、状态流转与 Prototype handoff 为真实流程；Research / Evidence 仍明确标记为 simulated。下一阶段：真实 Web Research + LLM Synthesis + Persistent Twin Memory。</div>
+<div class="footer">MVP：目标编排、员工状态与反馈、实时搜索、证据结构门禁和成本护栏已接入。多角度搜索覆盖不等于事实已核验；模型综合、来源独立性、成本假设与原型结果必须分别验收。缺少证据时明确阻塞，不将模拟结果或旧创意冒充本轮成果。</div>
 </div>
 <script>
 let state=null,selected=0;
@@ -326,6 +327,34 @@ async function poll(){
 }
 function renderRunOutputs(data){
  const research=data.research||{};
+ const feasibility=data.feasibility||{};
+ const feasibilityStatusEl=document.getElementById("feasibilityStatus");
+ const feasibilityResultEl=document.getElementById("feasibilityResult");
+ const feasibilityReportEl=document.getElementById("feasibilityReport");
+ if(feasibility.status==="incomplete"&&feasibility.completion){
+  const verdict=feasibility.evaluation&&feasibility.evaluation.decision||"INSUFFICIENT_EVIDENCE";
+  feasibilityStatusEl.textContent="INCOMPLETE · "+verdict;
+  feasibilityResultEl.textContent="本轮评估尚未达到完成标准。\n决策："+verdict+"\n\n阻塞项：\n- "+(feasibility.completion.blockers||[]).join("\n- ")+"\n\n自动填入的 JSON 是待补充草稿；未核验的来源、未实测的原型和未知成本不会被当作通过。";
+  const currentRun=String(data.run_id||"");
+  if(feasibilityReportEl&&currentRun&&feasibilityReportEl.dataset.runId!==currentRun){
+   feasibilityReportEl.value=JSON.stringify(feasibility.report||{},null,2);
+   feasibilityReportEl.dataset.runId=currentRun;
+  }
+ }else if(feasibility.status==="evaluated"&&feasibility.evaluation){
+  feasibilityStatusEl.textContent="EVALUATED · "+String(feasibility.evaluation.decision||"UNKNOWN");
+  feasibilityResultEl.textContent="评估结果："+String(feasibility.evaluation.decision||"UNKNOWN")+"\n已评分维度："+String(feasibility.evaluation.dimension_count_scored||0)+"/8\n未完成维度："+((feasibility.evaluation.missing_dimensions||[]).join("、")||"无")+"\n事实真实性仍需独立验证。";
+ }else if(feasibility.status==="researching"||feasibility.status==="contract_ready"){
+  feasibilityStatusEl.textContent=feasibility.status==="researching"?"RESEARCHING · CONTRACT READY":"CONTRACT READY";
+  feasibilityResultEl.textContent="评估范围已建立，正在等待本轮研究和证据。契约不是结论；最终评估还需要独立来源核验、反证、可运行原型证据与完整成本情景。";
+ }else if(feasibility.status==="not_started"){
+  feasibilityStatusEl.textContent="NOT STARTED";
+  feasibilityResultEl.textContent="当前目标尚未进入游戏商业可行性评估。";
+  const currentRun=String(data.run_id||"");
+  if(feasibilityReportEl&&feasibilityReportEl.dataset.runId!==currentRun){
+   feasibilityReportEl.value="";
+   feasibilityReportEl.dataset.runId=currentRun;
+  }
+ }
  const researchOut=document.getElementById("researchResult");
  const phase=data.phase||"idle";
  const labels={planning:"正在规划",team:"员工执行中",research:"真实调研中",design:"创意生成中",evaluation:"独立评估中",decision:"阶段决策已形成",prototype:"原型阶段"};
@@ -337,7 +366,12 @@ function renderRunOutputs(data){
  }else if(research.status==="completed"||research.status==="no_results"){
   const sources=(research.sources||[]).map(s=>'<div class="ev"><b>'+esc(s.title||"未命名来源")+'</b><div class="sub">'+esc(s.snippet||"")+'</div><a href="'+esc(s.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(s.url||"")+'</a></div>').join("");
   const q=research.quality||{};
-  researchOut.innerHTML='<div class="kv"><b>本轮状态</b><div>'+esc(research.status)+'</div><b>证据门禁</b><div>'+esc(String(q.accepted||0))+' 条可接受 / '+esc(String(q.total||0))+' 条候选</div></div>'+(sources||'<div class="sub">本轮没有返回来源。</div>');
+  const coverage=research.coverage||{};
+  const coverageText=coverage.requested_angles
+   ?('调研角度 '+String(coverage.successful_angles||0)+'/'+String(coverage.requested_angles)+' 成功；'+String(coverage.distinct_sources||sources.length)+' 个去重来源'+(coverage.comprehensive?'':'；覆盖不完整'))
+   :'单一调研请求';
+  const queryErrors=research.query_errors||[];
+  researchOut.innerHTML='<div class="kv"><b>本轮状态</b><div>'+esc(research.status)+'</div><b>证据门禁</b><div>'+esc(String(q.accepted||0))+' 条可接受 / '+esc(String(q.total||0))+' 条候选</div><b>调研覆盖</b><div>'+esc(coverageText)+'</div></div>'+(queryErrors.length?'<div class="risk">部分调研角度失败：'+esc(queryErrors.map(e=>e.error||"provider error").join("、"))+'</div>':'')+(sources||'<div class="sub">本轮没有返回来源。</div>');
  }else{
   researchOut.textContent="本轮尚未进入调研阶段；点击「启动 JARVIS」后将自动执行。";
  }
@@ -458,6 +492,21 @@ document.getElementById("knowledgeSearch").onclick=async function(){
   out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
  }catch(e){out.textContent="知识库检索失败："+e.message;}
  finally{button.disabled=false;}
+};
+document.getElementById("llmSmokeTest").onclick=async function(){
+ const button=this, output=document.getElementById("llmSmokeResult");
+ button.disabled=true;output.textContent="正在发送一次最多 64 tokens 的连通性请求…";
+ try{
+  const response=await apiFetch("/api/llm/smoke-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+  const result=await response.json();
+  if(response.ok&&result.ok){
+   output.textContent="模型连接成功 · "+String(result.model||"configured")+" · "+String(result.elapsed_ms||0)+" ms · 输出上限 64 tokens";
+  }else{
+   output.textContent="模型连接未通过："+String(result.error||result.message||result.status||("HTTP "+response.status))+"。不会把失败标记为成功。";
+  }
+ }catch(error){
+  output.textContent="连接测试请求失败："+error.name;
+ }finally{button.disabled=false;}
 };
 document.getElementById("researchRun").onclick=async function(){
  const button=document.getElementById("researchRun");

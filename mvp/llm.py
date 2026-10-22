@@ -53,7 +53,7 @@ class OpenAICompatibleLLM:
         max_tokens = _bounded_env_int("JARVIS_LLM_MAX_TOKENS", 768, 64, 4096)
         return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens)
 
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, max_tokens: int | None = None) -> str:
         endpoint = self.base_url
         if not endpoint.endswith("/chat/completions"):
             endpoint += "/chat/completions"
@@ -64,7 +64,7 @@ class OpenAICompatibleLLM:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.2,
-            "max_tokens": self.max_tokens,
+            "max_tokens": min(self.max_tokens, max(64, int(max_tokens))) if max_tokens is not None else self.max_tokens,
         }).encode("utf-8")
         request = Request(endpoint, data=payload, method="POST", headers={
             "Authorization": "Bearer " + self.api_key,

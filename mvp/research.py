@@ -247,6 +247,126 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
         }
 
 
+
+def run_live_research_batch(queries: list[str], limit_per_query: int = 3) -> dict:
+    """Run a bounded multi-angle search, deduplicate sources, then synthesize once.
+
+    This is intended for feasibility work where a single broad query would miss
+    competitors, player needs, cost/technical risks, or counter-evidence. Search
+    failures are reported per angle; successful partial results are never
+    presented as comprehensive coverage.
+    """
+    import os
+    try:
+        from .quality import evaluate_evidence
+        from .synthesis import synthesize
+    except ImportError:
+        from quality import evaluate_evidence
+        from synthesis import synthesize
+
+    if not isinstance(queries, list):
+        return {"ok": False, "status": "invalid_request", "error": "queries must be a list."}
+    normalized = []
+    for query in queries[:8]:
+        if isinstance(query, str) and query.strip():
+            normalized.append(query.strip()[:500])
+    if not normalized:
+        return {"ok": False, "status": "invalid_request", "error": "At least one research query is required."}
+    try:
+        limit = max(1, min(int(limit_per_query), 5))
+    except (TypeError, ValueError):
+        limit = 3
+
+    joined_query = " | ".join(normalized)
+    endpoint = os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip()
+    if not endpoint:
+        return {
+            "ok": False, "status": "provider_unconfigured", "query": joined_query,
+            "queries": normalized, "query_errors": [],
+            "message": "No live search provider configured; no real research was performed.",
+            "sources": [], "evidence": [], "quality": evaluate_evidence([]),
+            "synthesis": synthesize(joined_query, []).to_dict(),
+            "llm_synthesis": _synthesize_with_llm(joined_query, []),
+        }
+
+    try:
+        provider = JsonHttpSearchProvider(
+            endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None
+        )
+    except Exception as exc:
+        return {
+            "ok": False, "status": "provider_error", "query": joined_query,
+            "queries": normalized, "query_errors": [{"query": "", "error": type(exc).__name__}],
+            "sources": [], "evidence": [], "quality": evaluate_evidence([]),
+            "synthesis": synthesize(joined_query, []).to_dict(),
+            "llm_synthesis": _synthesize_with_llm(joined_query, []),
+        }
+
+    source_rows: dict[str, dict] = {}
+    query_errors = []
+    empty_queries = []
+    successful_queries = set()
+    for query in normalized:
+        try:
+            found = provider.search(query, limit)
+        except Exception as exc:
+            query_errors.append({"query": query, "error": type(exc).__name__})
+            continue
+        if found:
+            successful_queries.add(query)
+        else:
+            empty_queries.append(query)
+        for source in found:
+            normalized_url = source.url.split("#", 1)[0].rstrip("/")
+            if not normalized_url:
+                continue
+            if normalized_url not in source_rows:
+                source_rows[normalized_url] = {
+                    **source.to_dict(),
+                    "research_queries": [query],
+                }
+            elif query not in source_rows[normalized_url]["research_queries"]:
+                source_rows[normalized_url]["research_queries"].append(query)
+
+    sources = list(source_rows.values())[:20]
+    evidence = [{
+        "worker": "Live Research Adapter",
+        "finding": source.get("snippet", ""),
+        "confidence": 0.75,
+        "simulated": False,
+        "source": {key: value for key, value in source.items() if key != "research_queries"},
+        "research_queries": source.get("research_queries", []),
+    } for source in sources]
+    quality = evaluate_evidence(evidence)
+    accepted = [item for item in quality["items"] if item.get("quality_accepted")]
+    deterministic = synthesize(joined_query, accepted)
+    llm_synthesis = _synthesize_with_llm(joined_query, accepted)
+    if sources:
+        status = "completed"
+        ok = True
+    elif query_errors:
+        status = "provider_error"
+        ok = False
+    else:
+        status = "no_results"
+        ok = False
+    return {
+        "ok": ok, "status": status, "query": joined_query, "queries": normalized,
+        "query_errors": query_errors, "sources": sources, "evidence": quality["items"],
+        "quality": quality, "synthesis": deterministic.to_dict(),
+        "llm_synthesis": llm_synthesis,
+        "coverage": {
+            "requested_angles": len(normalized),
+            "successful_angles": len(successful_queries),
+            "empty_angles": len(empty_queries),
+            "failed_angles": len(query_errors),
+            "distinct_sources": len(sources),
+            "accepted_evidence": quality.get("accepted", 0),
+            "comprehensive": bool(sources) and not query_errors and not empty_queries,
+        },
+    }
+
+
 def run_live_research(query: str, limit: int = 5) -> dict:
     """Search configured provider, deduplicate, quality-gate and optionally synthesize."""
     import os

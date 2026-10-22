@@ -4,12 +4,16 @@ import unittest
 try:
     from .commercial_feasibility import (
         build_feasibility_contract,
+        build_feasibility_draft,
+        apply_feasibility_gate,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
 except ImportError:
     from commercial_feasibility import (
         build_feasibility_contract,
+        build_feasibility_draft,
+        apply_feasibility_gate,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
@@ -24,8 +28,33 @@ def strong_report():
         "independent_source_count": 4,
         "prototype_evidence_refs": ["prototype-test-1"],
         "cost_model": {
-            "assumptions": ["AI cost per session"],
-            "scenarios": {"conservative": {}, "base": {}, "optimistic": {}},
+            "assumptions": ["Illustrative model price and usage assumptions; validate against provider invoices."],
+            "scenarios": {
+                "conservative": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+                "base": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+                "optimistic": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+            },
         },
         "counter_evidence_refs": ["counter-1"],
     }
@@ -38,6 +67,45 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertEqual(set(contract["dimensions"]), set(REQUIRED_DIMENSIONS))
         self.assertTrue(contract["questions"]["unit_economics"])
         self.assertEqual(contract["budget_limit"], 1000)
+
+    def test_automatic_draft_marks_unknowns_and_costs_incomplete(self):
+        draft = build_feasibility_draft(
+            "评估长期记忆 NPC RPG",
+            sources=[{
+                "title": "Market report",
+                "url": "https://example.org/report",
+                "provider": "test",
+                "research_queries": ["competitors", "counter evidence"],
+            }],
+        )
+        self.assertFalse(draft["completion"]["complete"])
+        self.assertEqual(draft["evaluation"]["decision"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(draft["report"]["independent_source_count"], 0)
+        self.assertEqual(len(draft["report"]["dimensions"]), len(REQUIRED_DIMENSIONS))
+        self.assertEqual(draft["report"]["candidate_counter_evidence_refs"], ["S1"])
+        self.assertEqual(draft["report"]["counter_evidence_refs"], [])
+        self.assertEqual(draft["report"]["cost_model"]["status"], "needs_inputs")
+        self.assertTrue(any("成本情景" in item for item in draft["completion"]["blockers"]))
+
+    def test_generic_go_is_blocked_until_feasibility_gate_is_complete(self):
+        draft = build_feasibility_draft("评估长期记忆 NPC RPG")
+        decision = apply_feasibility_gate(
+            {"recommendation": "GO_TO_PROTOTYPE", "confidence": 78, "risks": [], "next_step": "prototype"},
+            draft,
+        )
+        self.assertEqual(decision["recommendation"], "HOLD_FOR_EVIDENCE")
+        self.assertLessEqual(decision["confidence"], 50)
+        self.assertIn("成本情景", " ".join(draft["completion"]["blockers"]))
+
+    def test_demo_handoff_stays_explicitly_demo_only(self):
+        draft = build_feasibility_draft("Evaluate an AI-native game")
+        decision = apply_feasibility_gate(
+            {"recommendation": "DEMO_GO_TO_PROTOTYPE", "confidence": 50, "risks": [], "next_step": "demo"},
+            draft,
+        )
+        self.assertEqual(decision["recommendation"], "DEMO_GO_TO_PROTOTYPE")
+        self.assertIn("模拟演示", " ".join(decision["risks"]))
+        self.assertIn("仅限演示", decision["next_step"])
 
     def test_missing_evidence_never_passes(self):
         result = evaluate_commercial_feasibility({"dimensions": {}})
@@ -63,6 +131,17 @@ class CommercialFeasibilityTests(unittest.TestCase):
         report["critical_blockers"] = [{"reason": "Core mechanic cannot be delivered within legal constraints"}]
         result = evaluate_commercial_feasibility(report)
         self.assertEqual(result["decision"], "NO_GO")
+
+    def test_empty_cost_scenarios_do_not_pass_cost_gate(self):
+        report = strong_report()
+        report["cost_model"]["scenarios"] = {
+            "conservative": {}, "base": {}, "optimistic": {}
+        }
+        result = evaluate_commercial_feasibility(report)
+        cost_check = next(c for c in result["checks"] if c["name"] == "cost_model")
+        self.assertFalse(cost_check["passed"])
+        self.assertTrue(cost_check["errors"])
+        self.assertNotEqual(result["decision"], "GO_TO_PROTOTYPE")
 
     def test_missing_cost_model_blocks_go(self):
         report = strong_report()

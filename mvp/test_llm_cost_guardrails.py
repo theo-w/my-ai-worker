@@ -76,6 +76,19 @@ def test_complete_sends_max_tokens_and_configured_timeout():
     assert mocked.call_args.kwargs["timeout"] == 12
 
 
+def test_complete_can_use_lower_per_call_token_cap_for_smoke_test():
+    client = OpenAICompatibleLLM(
+        "https://example.test/v1", "not-a-real-key", "test-model",
+        timeout=12, max_tokens=768,
+    )
+    with patch("mvp.llm.urlopen", return_value=FakeResponse()) as mocked:
+        assert client.complete("system", "user", max_tokens=64) == "ok"
+
+    request = mocked.call_args.args[0]
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload["max_tokens"] == 64
+
+
 def test_missing_required_environment_variables_fail_closed(monkeypatch):
     for name in ("JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"):
         monkeypatch.delenv(name, raising=False)

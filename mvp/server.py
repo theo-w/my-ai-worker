@@ -17,7 +17,7 @@ try:
     from .twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
-    from .research import run_live_research, research_environment_status
+    from .research import run_live_research, run_live_research_batch, research_environment_status
     from .planning import plan_project, replan_failed_tasks, validate_plan
     from .accuracy import classify_output
     from .experience_design import create_design_brief
@@ -25,7 +25,7 @@ try:
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
-    from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from .commercial_feasibility import build_feasibility_contract, build_feasibility_draft, apply_feasibility_gate, evaluate_commercial_feasibility
     from .game_knowledge import GameKnowledgeBase
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
@@ -33,7 +33,7 @@ except ImportError:  # Direct script execution from mvp/
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
-    from research import run_live_research, research_environment_status
+    from research import run_live_research, run_live_research_batch, research_environment_status
     from planning import plan_project, replan_failed_tasks, validate_plan
     from accuracy import classify_output
     from experience_design import create_design_brief
@@ -41,7 +41,7 @@ except ImportError:  # Direct script execution from mvp/
     from model_handoff import interpret_handoff_and_validate_action
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
-    from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from commercial_feasibility import build_feasibility_contract, build_feasibility_draft, evaluate_commercial_feasibility
     from game_knowledge import GameKnowledgeBase
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
@@ -96,6 +96,17 @@ def reset(goal: str):
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
+        game_goal = any(token in goal.casefold() for token in (
+            "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+            "ai native game", "game feasibility", "游戏可行性"
+        ))
+        prior_feasibility = STATE.get("feasibility") or {}
+        prior_contract = prior_feasibility.get("contract")
+        if game_goal:
+            contract = prior_contract if isinstance(prior_contract, dict) and prior_contract.get("goal") == goal else build_feasibility_contract(goal)
+            STATE["feasibility"] = {"status": "researching", "contract": contract, "report": None, "evaluation": None}
+        else:
+            STATE["feasibility"] = {"status": "not_started", "contract": None, "report": None, "evaluation": None}
         STATE["run_id"] = str(int(time.time() * 1000))
         STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
         STATE["agents"] = [
@@ -155,7 +166,22 @@ def execute(goal: str):
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
         STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
     try:
-        result = run_live_research(goal, 5)
+        is_game_feasibility = any(token in goal.casefold() for token in (
+            "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+            "ai native game", "game feasibility", "游戏可行性"
+        ))
+        if is_game_feasibility:
+            research_queries = [
+                goal + " competitors existing games market alternatives",
+                goal + " target players needs user feedback reviews",
+                goal + " AI inference costs latency production feasibility",
+                goal + " criticism failures negative reviews counter evidence risks",
+                goal + " 玩家需求 竞品 负面反馈 推理成本 延迟 风险",
+            ]
+            result = run_live_research_batch(research_queries, 3)
+        else:
+            research_queries = [goal]
+            result = run_live_research(goal, 5)
         quality = result.get("quality") or {}
         knowledge_ingest = GAME_KNOWLEDGE.ingest_sources(goal, result.get("sources", []), result.get("evidence", []))
         accepted = quality.get("accepted", 0)
@@ -164,6 +190,9 @@ def execute(goal: str):
             STATE["knowledge"]["status"] = "updated" if knowledge_ingest.get("inserted", 0) or knowledge_ingest.get("updated", 0) else "retrieved"
             STATE["research"] = {
                 "status": result.get("status", "unknown"), "query": goal,
+                "queries": result.get("queries", research_queries),
+                "coverage": result.get("coverage"),
+                "query_errors": result.get("query_errors", []),
                 "sources": result.get("sources", []), "quality": quality,
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
@@ -228,6 +257,25 @@ def execute(goal: str):
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
+
+    if any(token in goal.casefold() for token in (
+        "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+        "ai native game", "game feasibility", "游戏可行性"
+    )):
+        with LOCK:
+            research_state = dict(STATE.get("research") or {})
+            prior_feasibility = dict(STATE.get("feasibility") or {})
+        draft = build_feasibility_draft(
+            goal,
+            sources=research_state.get("sources") or [],
+            query_errors=research_state.get("query_errors") or [],
+        )
+        prior_contract = prior_feasibility.get("contract")
+        if isinstance(prior_contract, dict) and prior_contract.get("goal") == goal:
+            draft["contract"] = prior_contract
+        with LOCK:
+            STATE["decision"] = apply_feasibility_gate(STATE.get("decision") or {}, draft)
+            STATE["feasibility"] = draft
 
 def validate_autonomous_request(body: dict) -> dict:
     """Validate untrusted API fields before planning or execution."""
@@ -926,7 +974,7 @@ class Handler(BaseHTTPRequestHandler):
         protected_dashboard_routes = {
             "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
             "/api/experience-design", "/api/game-action", "/api/model-handoff",
-            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate", "/api/knowledge/search",
+            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate", "/api/knowledge/search", "/api/llm/smoke-test",
         }
         if self.path in protected_dashboard_routes:
             try:
@@ -934,6 +982,42 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
+        if self.path == "/api/llm/smoke-test":
+            body = self._read_json(max_bytes=1024)
+            if body is None:
+                return
+            client = getattr(WORKER_EXECUTOR, "client", None)
+            if client is None:
+                self._json({"ok": False, "status": "not_configured",
+                            "error": "LLM is not configured; no provider request was sent."}, 503)
+                return
+            started = time.monotonic()
+            try:
+                reply = client.complete(
+                    "You are running a connectivity check. Follow the user's instruction exactly.",
+                    "Reply with exactly this marker and no other text: JARVIS_LLM_OK",
+                    max_tokens=64,
+                )
+            except Exception as exc:
+                self._json({
+                    "ok": False, "status": "provider_error",
+                    "error_type": type(exc).__name__,
+                    "model": getattr(client, "model", "configured"),
+                    "elapsed_ms": round((time.monotonic() - started) * 1000),
+                    "max_tokens": 64,
+                }, 502)
+                return
+            matched = isinstance(reply, str) and "JARVIS_LLM_OK" in reply
+            self._json({
+                "ok": matched,
+                "status": "connected" if matched else "unexpected_response",
+                "model": getattr(client, "model", "configured"),
+                "elapsed_ms": round((time.monotonic() - started) * 1000),
+                "max_tokens": 64,
+                "marker_matched": matched,
+                "message": "LLM request succeeded." if matched else "The provider responded, but the smoke-test marker did not match.",
+            }, 200 if matched else 502)
+            return
         if self.path == "/api/knowledge/search":
             body = self._read_json(max_bytes=8192)
             if body is None:

@@ -6,7 +6,7 @@ Scores are decision aids, not empirical probabilities.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
 from typing import Any
 
 REQUIRED_DIMENSIONS = (
@@ -88,6 +88,134 @@ def build_feasibility_contract(goal: str, budget: float | None = None,
     }
 
 
+
+def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = None,
+                            query_errors: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Build a conservative assessment draft without fabricating scores or costs.
+
+    Retrieved URLs are candidates, not proof of independent sources or semantic
+    support. Dollar estimates remain unknown until model pricing, usage, labor,
+    and monetization assumptions are supplied.
+    """
+    if not isinstance(goal, str) or not goal.strip():
+        raise ValueError("goal must be a non-empty string")
+    source_rows = sources if isinstance(sources, list) else []
+    errors = query_errors if isinstance(query_errors, list) else []
+    registry = []
+    counter_candidates = []
+    for index, source in enumerate(source_rows, start=1):
+        if not isinstance(source, dict):
+            continue
+        queries = source.get("research_queries", [])
+        queries = queries if isinstance(queries, list) else []
+        row = {
+            "id": "S" + str(index),
+            "title": str(source.get("title", "")),
+            "url": str(source.get("url", "")),
+            "provider": str(source.get("provider", "unknown")),
+            "research_queries": queries,
+            "status": "retrieved_semantic_support_unverified",
+        }
+        registry.append(row)
+        if any("counter evidence" in str(query).casefold() or "负面反馈" in str(query) for query in queries):
+            counter_candidates.append(row["id"])
+
+    dimensions = {
+        name: {
+            "score": None,
+            "evidence_refs": [],
+            "rationale": "尚未完成独立评估；搜索摘要本身不能证明该维度成立。",
+            "status": "unknown",
+        }
+        for name in REQUIRED_DIMENSIONS
+    }
+    cost_fields = (
+        "prototype_cost_usd",
+        "model_cost_per_session_usd",
+        "monthly_cost_usd_at_1000_users",
+        "monthly_revenue_usd_at_1000_users",
+        "break_even_users",
+        "gross_margin_percent",
+    )
+    scenarios = {
+        scenario_name: {field: None for field in cost_fields}
+        for scenario_name in ("conservative", "base", "optimistic")
+    }
+    report = {
+        "goal": goal.strip(),
+        "dimensions": dimensions,
+        "evidence_registry": registry,
+        "independent_source_count": 0,
+        "source_independence_review": "not_run",
+        "prototype_evidence_refs": [],
+        "cost_model": {
+            "status": "needs_inputs",
+            "assumptions": [
+                "没有独立核验所选模型的实时输入/输出单价。",
+                "每次核心循环的调用次数与 token 用量尚未通过运行日志测量。",
+                "开发人力成本、目标用户量、留存、转化和定价尚未提供或验证。",
+            ],
+            "required_inputs": [
+                "模型输入/输出价格（按百万 token）",
+                "每次会话的模型调用数、输入/输出 token 数及重试比例",
+                "原型与垂直切片的人周、团队成本和时间盒",
+                "月活跃用户、会话频率、留存、转化与净收入假设",
+            ],
+            "scenarios": scenarios,
+        },
+        "counter_evidence_refs": [],
+        "candidate_counter_evidence_refs": counter_candidates,
+        "research_query_errors": errors,
+        "critical_blockers": [],
+    }
+    evaluation = evaluate_commercial_feasibility(report)
+    blockers = [
+        "8 个评估维度尚未有可追溯的评分与理由",
+        "来源独立性和关键主张的语义支持尚未独立核验",
+        "缺少可运行原型/玩家实验的证据",
+        "成本情景缺少已验证的价格、使用量和商业假设",
+        "反证仍是候选来源，尚未完成逐条审查",
+    ]
+    if errors:
+        blockers.append(f"{len(errors)} 个调研角度搜索失败，需要补查")
+    return {
+        "status": "incomplete",
+        "contract": build_feasibility_contract(goal),
+        "report": report,
+        "evaluation": evaluation,
+        "completion": {"complete": False, "blockers": blockers},
+    }
+
+
+
+def apply_feasibility_gate(decision: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    """Prevent a generic evidence heuristic from bypassing the commercial gate."""
+    result = dict(decision) if isinstance(decision, dict) else {}
+    evaluation = assessment.get("evaluation") if isinstance(assessment, dict) else None
+    completion = assessment.get("completion") if isinstance(assessment, dict) else None
+    complete = isinstance(completion, dict) and completion.get("complete") is True
+    gate_decision = evaluation.get("decision") if isinstance(evaluation, dict) else None
+    if result.get("recommendation") == "DEMO_GO_TO_PROTOTYPE":
+        risks = result.get("risks", [])
+        risks = list(risks) if isinstance(risks, list) else []
+        risks.append("仅为模拟演示建议，不是经证据支持的商业决策。")
+        result["risks"] = risks
+        result["next_step"] = "仅限演示；真实项目仍须补齐独立证据、反证、成本情景与原型验证。"
+        return result
+    if not complete or gate_decision != "GO_TO_PROTOTYPE":
+        result["recommendation"] = "HOLD_FOR_EVIDENCE"
+        try:
+            result["confidence"] = min(50, max(0, int(result.get("confidence", 0))))
+        except (TypeError, ValueError):
+            result["confidence"] = 0
+        risks = result.get("risks", [])
+        risks = list(risks) if isinstance(risks, list) else []
+        risks.append("商业可行性闸门未完成；不得将阶段性来源或通用启发式升级为 GO。")
+        result["risks"] = risks
+        result["next_step"] = "补齐独立证据、反证、成本情景与原型验证后重新评估。"
+    return result
+
+
 def evaluate_commercial_feasibility(report: dict[str, Any],
                                     thresholds: dict[str, Any] | None = None) -> dict[str, Any]:
     """Evaluate an evidence-backed report conservatively.
@@ -119,7 +247,7 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
         score = item.get("score")
         refs = item.get("evidence_refs", [])
         rationale = item.get("rationale")
-        if not isinstance(score, (int, float)) or isinstance(score, bool) or not 1 <= score <= 5:
+        if not isinstance(score, (int, float)) or isinstance(score, bool) or not math.isfinite(score) or not 1 <= score <= 5:
             missing.append(name)
             checks.append({"name": name, "status": "unknown", "passed": False,
                            "reason": "score must be between 1 and 5"})
@@ -137,7 +265,7 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
                        "passed": passed, "score": score, "evidence_refs": refs})
 
     source_count = report.get("independent_source_count")
-    source_ok = isinstance(source_count, int) and source_count >= policy["min_independent_sources"]
+    source_ok = isinstance(source_count, int) and not isinstance(source_count, bool) and source_count >= policy["min_independent_sources"]
     checks.append({"name": "independent_sources", "passed": source_ok,
                    "status": "pass" if source_ok else "fail",
                    "observed": source_count, "required": policy["min_independent_sources"]})
@@ -147,10 +275,46 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
         checks.append({"name": "prototype_evidence", "passed": prototype_ok,
                        "status": "pass" if prototype_ok else "fail"})
     cost_model = report.get("cost_model")
-    cost_ok = isinstance(cost_model, dict) and bool(cost_model.get("assumptions")) and bool(cost_model.get("scenarios"))
+    assumptions = cost_model.get("assumptions") if isinstance(cost_model, dict) else None
+    scenarios = cost_model.get("scenarios") if isinstance(cost_model, dict) else None
+    required_cost_fields = (
+        "prototype_cost_usd",
+        "model_cost_per_session_usd",
+        "monthly_cost_usd_at_1000_users",
+        "monthly_revenue_usd_at_1000_users",
+        "break_even_users",
+        "gross_margin_percent",
+    )
+    scenario_errors = []
+    if not isinstance(assumptions, list) or not assumptions or any(
+        not isinstance(item, (str, dict)) or (isinstance(item, str) and not item.strip())
+        for item in assumptions
+    ):
+        scenario_errors.append("cost assumptions must be a non-empty list")
+    if not isinstance(scenarios, dict):
+        scenario_errors.append("cost scenarios are missing")
+    else:
+        for scenario_name in ("conservative", "base", "optimistic"):
+            scenario = scenarios.get(scenario_name)
+            if not isinstance(scenario, dict):
+                scenario_errors.append(f"{scenario_name} scenario is missing")
+                continue
+            for field in required_cost_fields:
+                value = scenario.get(field)
+                valid_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+                if not valid_number:
+                    scenario_errors.append(f"{scenario_name}.{field} must be numeric")
+                    continue
+                if not math.isfinite(value):
+                    scenario_errors.append(f"{scenario_name}.{field} must be finite")
+                elif field == "gross_margin_percent" and not -100 <= value <= 100:
+                    scenario_errors.append(f"{scenario_name}.gross_margin_percent must be between -100 and 100")
+                elif field != "gross_margin_percent" and value < 0:
+                    scenario_errors.append(f"{scenario_name}.{field} must be non-negative")
+    cost_ok = not scenario_errors
     if policy["require_cost_model"]:
-        checks.append({"name": "cost_model", "passed": cost_ok,
-                       "status": "pass" if cost_ok else "fail"})
+        checks.append({"name": "cost_model", "passed": cost_ok, "status": "pass" if cost_ok else "fail",
+                       "errors": scenario_errors})
     counter_refs = report.get("counter_evidence_refs")
     counter_ok = isinstance(counter_refs, list) and bool(counter_refs)
     if policy["require_counter_evidence"]:
