@@ -84,7 +84,7 @@ def test_hybrid_executor_blocks_research_without_accepted_evidence(monkeypatch):
     import mvp.research as research
     from mvp.executor import HybridWorkerExecutor
     monkeypatch.setenv("JARVIS_SEARCH_ENDPOINT", "https://search.example/api")
-    monkeypatch.setattr(research, "run_live_research", lambda query, limit=5: {
+    monkeypatch.setattr(research, "run_live_research", lambda query, limit=5, include_llm_synthesis=True: {
         "status": "no_results", "sources": [],
         "quality": {"items": []}, "synthesis": None, "llm_synthesis": None,
     })
