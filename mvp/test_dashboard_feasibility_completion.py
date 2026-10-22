@@ -22,3 +22,9 @@ def test_dashboard_shows_automatic_feasibility_completion_blockers():
     assert 'feasibility.completion.blockers' in DASHBOARD
     assert 'feasibilityReportEl.value=JSON.stringify(feasibility.report||{},null,2)' in DASHBOARD
     assert "未知成本不会被当作通过" in DASHBOARD
+
+
+def test_dashboard_exposes_authenticated_low_cost_llm_smoke_test():
+    assert 'id="llmSmokeTest"' in DASHBOARD
+    assert 'apiFetch("/api/llm/smoke-test"' in DASHBOARD
+    assert "最多 64 tokens" in DASHBOARD
