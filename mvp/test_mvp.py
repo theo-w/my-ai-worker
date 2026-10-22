@@ -127,6 +127,10 @@ def test_dashboard_simulated_executor_is_explicit_demo_mode():
         server.execute("Evaluate an AI-native game")
         assert server.STATE["phase"] == "decision"
         assert server.STATE["decision"]["recommendation"] == "DEMO_GO_TO_PROTOTYPE"
-        assert all(a.get("execution", {}).get("simulated") is True for a in server.STATE["agents"])
+        research_agents = [a for a in server.STATE["agents"] if "research" in a["capability"]]
+        other_agents = [a for a in server.STATE["agents"] if "research" not in a["capability"]]
+        assert research_agents and all(a["status"] == "blocked" for a in research_agents)
+        assert other_agents and all(a.get("execution", {}).get("simulated") is True for a in other_agents)
+        assert server.STATE["feasibility"]["evaluation"]["decision"] == "INSUFFICIENT_EVIDENCE"
     finally:
         server.WORKER_EXECUTOR = original
