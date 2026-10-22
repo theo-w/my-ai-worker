@@ -394,11 +394,11 @@ function renderAutomaticFeasibility(data){
  const cost=report.cost_model||{}, scenarios=cost.scenarios||{}, base=scenarios.base||{};
  const effort=["optimistic","base","conservative"].map(k=>String((scenarios[k]||{}).prototype_person_weeks??"未知")+" 人周").join(" / ");
  const monthlyCost=base.monthly_model_cost_usd==null?"未知（未配置模型单价）":"USD "+Number(base.monthly_model_cost_usd).toFixed(2);
- const laborCost=base.prototype_labor_cost_usd==null?"未知（未配置人周费率）":"USD "+Number(base.prototype_labor_cost_usd).toFixed(2);
+ const laborCost=base.prototype_labor_cost_usd==null?"暂估 USD "+Number(base.prototype_labor_cost_assumption_usd||0).toFixed(2)+"（占位人周费率，需配置实际费率）":"USD "+Number(base.prototype_labor_cost_usd).toFixed(2);
  const sources=(report.source_registry||[]).map(row=>row.id+" · "+row.title+" · "+row.url).join("\n");
  document.getElementById("feasibilityResult").textContent=
   "自动评估："+evaluation.decision+"\n评估状态："+(f.status||report.assessment_status||"unknown")+
-  "\n成本模型："+(cost.status||"unknown")+"\n原型工作量（乐观/基准/保守）："+effort+
+  "\n成本模型："+(cost.status||"unknown")+"\n模型价格来源："+(((cost.pricing_inputs||{}).source)||"unknown")+"\n原型工作量（乐观/基准/保守）："+effort+
   "\n基准月模型成本："+monthlyCost+"\n基准原型人工成本："+laborCost+
   "\n未定价项目："+((cost.unpriced_items||[]).join("；")||"无")+
   "\n\n八个评估维度：\n"+dimensions+
