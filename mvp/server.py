@@ -506,11 +506,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/llm/status":
             llm_client = getattr(WORKER_EXECUTOR, "client", None)
             llm_configured = llm_client is not None
+            llm_env_keys = ("JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL")
+            missing_llm_variables = [key for key in llm_env_keys if not os.getenv(key, "").strip()]
             search_configured = bool(os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip())
             self._json({
                 "configured": llm_configured,
                 "llm_configured": llm_configured,
                 "search_configured": search_configured,
+                "missing_llm_variables": missing_llm_variables,
+                "llm_configuration_error": not llm_configured and not missing_llm_variables,
                 "mode": "hybrid" if llm_configured and search_configured else "llm" if llm_configured else "search_only" if search_configured else "simulated",
                 "model": getattr(llm_client, "model", None),
                 "message": "LLM configured; outputs and search snippets are not independently verified facts."
