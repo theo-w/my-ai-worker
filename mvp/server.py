@@ -17,7 +17,7 @@ try:
     from .twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from .executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from .llm import OpenAICompatibleLLM, LLMConfigurationError
-    from .research import run_live_research, research_environment_status
+    from .research import run_live_research, run_live_research_batch, research_environment_status
     from .planning import plan_project, replan_failed_tasks, validate_plan
     from .accuracy import classify_output
     from .experience_design import create_design_brief
@@ -33,7 +33,7 @@ except ImportError:  # Direct script execution from mvp/
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
     from executor import SimulatedWorkerExecutor, LLMWorkerExecutor, HybridWorkerExecutor
     from llm import OpenAICompatibleLLM, LLMConfigurationError
-    from research import run_live_research, research_environment_status
+    from research import run_live_research, run_live_research_batch, research_environment_status
     from planning import plan_project, replan_failed_tasks, validate_plan
     from accuracy import classify_output
     from experience_design import create_design_brief
@@ -155,7 +155,22 @@ def execute(goal: str):
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
         STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
     try:
-        result = run_live_research(goal, 5)
+        is_game_feasibility = any(token in goal.casefold() for token in (
+            "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+            "ai native game", "game feasibility", "游戏可行性"
+        ))
+        if is_game_feasibility:
+            research_queries = [
+                goal + " competitors existing games market alternatives",
+                goal + " target players needs user feedback reviews",
+                goal + " AI inference costs latency production feasibility",
+                goal + " criticism failures negative reviews counter evidence risks",
+                goal + " 玩家需求 竞品 负面反馈 推理成本 延迟 风险",
+            ]
+            result = run_live_research_batch(research_queries, 3)
+        else:
+            research_queries = [goal]
+            result = run_live_research(goal, 5)
         quality = result.get("quality") or {}
         knowledge_ingest = GAME_KNOWLEDGE.ingest_sources(goal, result.get("sources", []), result.get("evidence", []))
         accepted = quality.get("accepted", 0)
@@ -164,6 +179,9 @@ def execute(goal: str):
             STATE["knowledge"]["status"] = "updated" if knowledge_ingest.get("inserted", 0) or knowledge_ingest.get("updated", 0) else "retrieved"
             STATE["research"] = {
                 "status": result.get("status", "unknown"), "query": goal,
+                "queries": result.get("queries", research_queries),
+                "coverage": result.get("coverage"),
+                "query_errors": result.get("query_errors", []),
                 "sources": result.get("sources", []), "quality": quality,
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
