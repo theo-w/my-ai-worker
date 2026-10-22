@@ -195,6 +195,13 @@ def apply_feasibility_gate(decision: dict[str, Any], assessment: dict[str, Any])
     completion = assessment.get("completion") if isinstance(assessment, dict) else None
     complete = isinstance(completion, dict) and completion.get("complete") is True
     gate_decision = evaluation.get("decision") if isinstance(evaluation, dict) else None
+    if result.get("recommendation") == "DEMO_GO_TO_PROTOTYPE":
+        risks = result.get("risks", [])
+        risks = list(risks) if isinstance(risks, list) else []
+        risks.append("仅为模拟演示建议，不是经证据支持的商业决策。")
+        result["risks"] = risks
+        result["next_step"] = "仅限演示；真实项目仍须补齐独立证据、反证、成本情景与原型验证。"
+        return result
     if not complete or gate_decision != "GO_TO_PROTOTYPE":
         result["recommendation"] = "HOLD_FOR_EVIDENCE"
         try:
