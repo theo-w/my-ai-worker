@@ -26,6 +26,7 @@ try:
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
     from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from .feasibility_pipeline import build_automatic_feasibility_report
     from .game_knowledge import GameKnowledgeBase
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
@@ -42,6 +43,7 @@ except ImportError:  # Direct script execution from mvp/
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
     from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from feasibility_pipeline import build_automatic_feasibility_report
     from game_knowledge import GameKnowledgeBase
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
@@ -93,6 +95,10 @@ STATE = {
 def reset(goal: str):
     team = TWIN.form_team(goal, WORKERS)
     prior_knowledge = GAME_KNOWLEDGE.search(goal, 5)
+    prior_feasibility = STATE.get("feasibility") or {}
+    contract = prior_feasibility.get("contract")
+    if not isinstance(contract, dict) or contract.get("goal") != goal:
+        contract = build_feasibility_contract(goal)
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
@@ -109,6 +115,7 @@ def reset(goal: str):
         STATE["design"] = {"status": "blocked", "reason": "等待本轮真实调研与可接受证据", "brief": None}
         STATE["decision"] = None
         STATE["prototype"] = None
+        STATE["feasibility"] = {"status": "researching", "contract": contract, "report": None, "evaluation": None}
         STATE["twin"] = TWIN.snapshot(goal, team)
 
 def execute(goal: str):
@@ -123,6 +130,13 @@ def execute(goal: str):
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
 
     for idx, (worker, capability) in enumerate(planned):
+        if "research" in capability.lower():
+            # The central research stage owns live search; avoid duplicate queries and charges.
+            with LOCK:
+                STATE["agents"][idx].update({"status": "queued", "progress": 0,
+                    "output": "已交由统一真实调研阶段执行，避免重复检索和重复计费。",
+                    "execution": {"mode": "delegated_to_central_research", "simulated": False}})
+            continue
         with LOCK:
             STATE["agents"][idx]["status"] = "running"
             STATE["agents"][idx]["progress"] = 20
@@ -153,10 +167,20 @@ def execute(goal: str):
     with LOCK:
         STATE["phase"] = "research"
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
-        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
+        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研与反向检索：" + goal})
+        for agent in STATE["agents"]:
+            if "research" in str(agent.get("capability", "")).lower():
+                agent["status"] = "running"
+                agent["progress"] = 20
     try:
-        result = run_live_research(goal, 5)
+        result = run_live_research(goal, 5, include_llm_synthesis=False)
         quality = result.get("quality") or {}
+        counter_result = {"status": "provider_unconfigured", "sources": [], "quality": {"accepted": 0, "total": 0, "items": []}, "message": "No live search provider configured; counter-evidence search was not performed."}
+        if os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip():
+            try:
+                counter_result = run_live_research(goal + " criticism limitations failure risks 反例 局限性 风险", 5, include_llm_synthesis=False)
+            except Exception as counter_exc:
+                counter_result = {"status": "provider_error", "sources": [], "quality": {"accepted": 0, "total": 0, "items": []}, "error": type(counter_exc).__name__}
         knowledge_ingest = GAME_KNOWLEDGE.ingest_sources(goal, result.get("sources", []), result.get("evidence", []))
         accepted = quality.get("accepted", 0)
         with LOCK:
@@ -165,10 +189,23 @@ def execute(goal: str):
             STATE["research"] = {
                 "status": result.get("status", "unknown"), "query": goal,
                 "sources": result.get("sources", []), "quality": quality,
+                "counter_research": counter_result,
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
             }
             STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research-result", "at": time.time(), "kind": "reply" if result.get("ok") else "system", "from": "Live Research Adapter", "to": "Digital Twin", "worker": "Live Research Adapter", "text": "调研返回 " + str(len(result.get("sources", []))) + " 个来源，" + str(accepted) + " 条证据通过门禁。" if result.get("ok") else "调研未成功：" + str(result.get("error") or result.get("message") or result.get("status")), "simulated": False})
+            research_agent_rows = [agent for agent in STATE["agents"] if "research" in str(agent.get("capability", "")).lower()]
+            for agent in research_agent_rows:
+                agent["progress"] = 100
+                agent["status"] = "completed" if result.get("ok") and accepted else "blocked"
+                agent["output"] = ("统一调研返回 " + str(len(result.get("sources", [])) + len(counter_result.get("sources", []))) +
+                    " 个来源候选；主检索接受 " + str(accepted) + " 条，反向检索接受 " +
+                    str((counter_result.get("quality") or {}).get("accepted", 0)) +
+                    " 条。来源语义支持和独立性仍需核验。")
+                agent["execution"] = {"mode": "live_search", "simulated": False,
+                    "primary_source_count": len(result.get("sources", [])),
+                    "counter_source_count": len(counter_result.get("sources", [])),
+                    "quality_accepted_count": accepted, "verified_truth": False}
             if result.get("ok") and accepted:
                 for item in result.get("evidence", []):
                     source = item.get("source")
@@ -184,7 +221,8 @@ def execute(goal: str):
     except Exception as exc:
         with LOCK:
             STATE["research"] = {"status": "failed", "query": goal, "sources": [],
-                                  "quality": None, "error": type(exc).__name__}
+                                  "quality": None, "counter_research": {"status": "not_run", "sources": [], "quality": {"items": []}},
+                                  "error": type(exc).__name__}
             STATE["design"] = {"status": "blocked", "reason": "真实调研失败，不能生成本轮创意。", "brief": None}
 
     with LOCK:
@@ -223,8 +261,36 @@ def execute(goal: str):
 
     with LOCK:
         STATE["phase"] = "evaluation"
+        research_snapshot = dict(STATE.get("research") or {})
+        design_snapshot = dict(STATE.get("design") or {})
+        prior_contract = (STATE.get("feasibility") or {}).get("contract")
+    feasibility_report = build_automatic_feasibility_report(
+        goal, research_snapshot, research_snapshot.get("counter_research"), design_snapshot.get("brief")
+    )
+    feasibility_evaluation = evaluate_commercial_feasibility(feasibility_report)
+    with LOCK:
+        STATE["feasibility"] = {
+            "status": "completed_with_gaps" if feasibility_evaluation.get("decision") == "INSUFFICIENT_EVIDENCE" else "evaluated",
+            "contract": prior_contract, "report": feasibility_report, "evaluation": feasibility_evaluation,
+        }
     evidence = [type("E", (), item) for item in STATE["evidence"]]
     decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
+    gate_decision = feasibility_evaluation.get("decision", "INSUFFICIENT_EVIDENCE")
+    if gate_decision == "GO_TO_PROTOTYPE":
+        decision.recommendation = "GO_TO_PROTOTYPE"
+        decision.next_step = "进入有明确成功门槛的最小原型实验；不代表批准完整生产。"
+    elif gate_decision == "NO_GO":
+        decision.recommendation = "NO_GO"
+        decision.next_step = "记录证据支持的关键阻塞原因，停止当前方案或更换核心假设。"
+    elif gate_decision == "ITERATE":
+        decision.recommendation = "ITERATE"
+        decision.next_step = "先针对薄弱维度补充证据或实验，再重新评估。"
+    else:
+        decision.recommendation = "HOLD_FOR_EVIDENCE"
+        decision.next_step = "可行性评估已记录，但关键维度、反证、价格或原型证据不足；补齐后再决定是否进入 Prototype。"
+    if gate_decision != "GO_TO_PROTOTYPE":
+        decision.confidence = min(int(decision.confidence), 42)
+        decision.risks.append("商业可行性闸门：" + gate_decision + "；不得仅凭员工完成或模型意见批准原型。")
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
