@@ -31,12 +31,14 @@ class OpenAICompatibleLLM:
         model: str,
         timeout: float = 45.0,
         max_tokens: int = 768,
+        hard_max_tokens: int = 4096,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout = min(120.0, max(1.0, float(timeout)))
-        self.max_tokens = min(4096, max(64, int(max_tokens)))
+        self.hard_max_tokens = min(4096, max(64, int(hard_max_tokens)))
+        self.max_tokens = min(self.hard_max_tokens, max(64, int(max_tokens)))
         if not self.base_url.startswith("https://"):
             raise ValueError("LLM base URL must use HTTPS.")
 
@@ -50,8 +52,10 @@ class OpenAICompatibleLLM:
                 "Configure JARVIS_LLM_BASE_URL, JARVIS_LLM_API_KEY and JARVIS_LLM_MODEL."
             )
         timeout = _bounded_env_int("JARVIS_LLM_TIMEOUT_SECONDS", 45, 1, 120)
-        max_tokens = _bounded_env_int("JARVIS_LLM_MAX_TOKENS", 768, 64, 4096)
-        return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens)
+        hard_max_tokens = _bounded_env_int("JARVIS_LLM_HARD_MAX_TOKENS", 4096, 64, 4096)
+        max_tokens = _bounded_env_int("JARVIS_LLM_MAX_TOKENS", 768, 64, hard_max_tokens)
+        return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens,
+                   hard_max_tokens=hard_max_tokens)
 
     def complete(self, system_prompt: str, user_prompt: str, max_tokens: int | None = None) -> str:
         endpoint = self.base_url
@@ -64,7 +68,7 @@ class OpenAICompatibleLLM:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.2,
-            "max_tokens": min(self.max_tokens, max(64, int(max_tokens))) if max_tokens is not None else self.max_tokens,
+            "max_tokens": min(self.hard_max_tokens, max(64, int(max_tokens))) if max_tokens is not None else self.max_tokens,
         }).encode("utf-8")
         request = Request(endpoint, data=payload, method="POST", headers={
             "Authorization": "Bearer " + self.api_key,
