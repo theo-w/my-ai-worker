@@ -24,8 +24,12 @@ def strong_report():
         "independent_source_count": 4,
         "prototype_evidence_refs": ["prototype-test-1"],
         "cost_model": {
-            "assumptions": ["AI cost per session"],
-            "scenarios": {"conservative": {}, "base": {}, "optimistic": {}},
+            "assumptions": ["AI cost per session", "prototype effort"],
+            "scenarios": {
+                "optimistic": {"prototype_person_weeks": 2, "vertical_slice_person_weeks": 6, "monthly_active_users": 100, "sessions_per_user_month": 20, "input_tokens_per_session": 2500, "output_tokens_per_session": 400, "monthly_model_cost_usd": 1, "prototype_labor_cost_usd": 3000},
+                "base": {"prototype_person_weeks": 4, "vertical_slice_person_weeks": 12, "monthly_active_users": 1000, "sessions_per_user_month": 40, "input_tokens_per_session": 5000, "output_tokens_per_session": 800, "monthly_model_cost_usd": 100, "prototype_labor_cost_usd": 6000},
+                "conservative": {"prototype_person_weeks": 8, "vertical_slice_person_weeks": 24, "monthly_active_users": 10000, "sessions_per_user_month": 80, "input_tokens_per_session": 10000, "output_tokens_per_session": 1800, "monthly_model_cost_usd": 10000, "prototype_labor_cost_usd": 12000},
+            },
         },
         "counter_evidence_refs": ["counter-1"],
     }
