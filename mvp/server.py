@@ -558,7 +558,7 @@ class Handler(BaseHTTPRequestHandler):
             llm_host = (urlsplit(os.getenv("JARVIS_LLM_BASE_URL", "").strip()).hostname or "").lower()
             model_warning = None
             if llm_host == "api.deepseek.com" and llm_model in {"deepseek-chat", "deepseek-reasoner"}:
-                model_warning = "Deprecated DeepSeek model alias; use deepseek-flash or deepseek-v4-pro."
+                model_warning = "Retired DeepSeek model alias; use deepseek-flash or deepseek-v4-pro."
             elif llm_host == "api.deepseek.com" and llm_model not in {
                 None, "deepseek-flash", "deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"
             }:
