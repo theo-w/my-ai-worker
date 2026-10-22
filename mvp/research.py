@@ -304,12 +304,18 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3) -> dic
 
     source_rows: dict[str, dict] = {}
     query_errors = []
+    empty_queries = []
+    successful_queries = set()
     for query in normalized:
         try:
             found = provider.search(query, limit)
         except Exception as exc:
             query_errors.append({"query": query, "error": type(exc).__name__})
             continue
+        if found:
+            successful_queries.add(query)
+        else:
+            empty_queries.append(query)
         for source in found:
             normalized_url = source.url.split("#", 1)[0].rstrip("/")
             if not normalized_url:
@@ -351,11 +357,12 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3) -> dic
         "llm_synthesis": llm_synthesis,
         "coverage": {
             "requested_angles": len(normalized),
-            "successful_angles": len(normalized) - len(query_errors),
+            "successful_angles": len(successful_queries),
+            "empty_angles": len(empty_queries),
             "failed_angles": len(query_errors),
             "distinct_sources": len(sources),
             "accepted_evidence": quality.get("accepted", 0),
-            "comprehensive": bool(sources) and not query_errors,
+            "comprehensive": bool(sources) and not query_errors and not empty_queries,
         },
     }
 
