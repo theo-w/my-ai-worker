@@ -25,7 +25,7 @@ try:
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
-    from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from .commercial_feasibility import build_feasibility_contract, build_feasibility_draft, evaluate_commercial_feasibility
     from .game_knowledge import GameKnowledgeBase
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
@@ -41,7 +41,7 @@ except ImportError:  # Direct script execution from mvp/
     from model_handoff import interpret_handoff_and_validate_action
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
-    from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from commercial_feasibility import build_feasibility_contract, build_feasibility_draft, evaluate_commercial_feasibility
     from game_knowledge import GameKnowledgeBase
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
@@ -246,6 +246,24 @@ def execute(goal: str):
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
+
+    if any(token in goal.casefold() for token in (
+        "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
+        "ai native game", "game feasibility", "游戏可行性"
+    )):
+        with LOCK:
+            research_state = dict(STATE.get("research") or {})
+            prior_feasibility = dict(STATE.get("feasibility") or {})
+        draft = build_feasibility_draft(
+            goal,
+            sources=research_state.get("sources") or [],
+            query_errors=research_state.get("query_errors") or [],
+        )
+        prior_contract = prior_feasibility.get("contract")
+        if isinstance(prior_contract, dict) and prior_contract.get("goal") == goal:
+            draft["contract"] = prior_contract
+        with LOCK:
+            STATE["feasibility"] = draft
 
 def validate_autonomous_request(body: dict) -> dict:
     """Validate untrusted API fields before planning or execution."""
