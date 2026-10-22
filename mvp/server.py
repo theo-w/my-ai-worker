@@ -504,14 +504,18 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         if self.path == "/api/llm/status":
-            configured = isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor))
+            llm_client = getattr(WORKER_EXECUTOR, "client", None)
+            llm_configured = llm_client is not None
+            search_configured = bool(os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip())
             self._json({
-                "configured": configured,
-                "mode": ("hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor) else "llm") if configured else "simulated",
-                "model": getattr(getattr(WORKER_EXECUTOR, "client", None), "model", None),
-                "message": "Live worker routing configured; LLM outputs and search snippets are not independently verified facts."
-                    if configured else
-                    "LLM not configured; autonomous tasks use simulated execution.",
+                "configured": llm_configured,
+                "llm_configured": llm_configured,
+                "search_configured": search_configured,
+                "mode": "hybrid" if llm_configured and search_configured else "llm" if llm_configured else "search_only" if search_configured else "simulated",
+                "model": getattr(llm_client, "model", None),
+                "message": "LLM configured; outputs and search snippets are not independently verified facts."
+                    if llm_configured else
+                    "Search is configured, but LLM is not configured; chat summaries may work, while LLM analysis and design generation are unavailable.",
             })
             return
         if self.path in ("/", "/index.html", "/playtest", "/trace"):
