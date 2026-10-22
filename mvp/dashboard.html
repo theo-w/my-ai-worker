@@ -337,6 +337,20 @@ async function refreshProviderStatus(){
    (search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
  }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
 }
+async function refreshKnowledgeStatus(){
+ try{
+  const response=await apiFetch("/api/knowledge");
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const k=data.knowledge||{},backend=k.storage_backend||"json";
+  document.getElementById("knowledgeSummary").textContent=
+   (backend==="supabase"?"SUPABASE":"JSON FALLBACK") + " · " + (k.record_count||0) + " RECORDS" +
+   (k.storage_error?" · SYNC ERROR":"");
+  if(k.storage_error)document.getElementById("knowledgeResult").textContent=
+   "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
+ }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
+}
+refreshKnowledgeStatus();
 document.getElementById("knowledgeSearch").onclick=async function(){
  const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
  const query=document.getElementById("knowledgeQuery").value.trim();
@@ -345,7 +359,7 @@ document.getElementById("knowledgeSearch").onclick=async function(){
   const response=await apiFetch("/api/knowledge/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,limit:8})});
   const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
   const result=data.knowledge||{},matches=result.matches||[];
-  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · SEARCHED";
+  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · "+(document.getElementById("knowledgeSummary").textContent.split(" · ").slice(0,1)[0]||"KNOWLEDGE")+" · SEARCHED";
   out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
  }catch(e){out.textContent="知识库检索失败："+e.message;}
  finally{button.disabled=false;}
