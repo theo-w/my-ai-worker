@@ -145,6 +145,7 @@
 <div class="panel wide workflow-panel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
  <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
+ <div class="input"><button id="llmSmokeTest" class="btn" type="button">验证模型连接（最多 64 tokens）</button><span id="llmSmokeResult" class="sub">需要管理员认证；测试只发出一条短请求，不展示或记录密钥。</span></div>
  <div class="input"><input id="researchQuery" value="AI-native game market opportunities and persistent NPC memory" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
  <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
 </div>
@@ -491,6 +492,21 @@ document.getElementById("knowledgeSearch").onclick=async function(){
   out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
  }catch(e){out.textContent="知识库检索失败："+e.message;}
  finally{button.disabled=false;}
+};
+document.getElementById("llmSmokeTest").onclick=async function(){
+ const button=this, output=document.getElementById("llmSmokeResult");
+ button.disabled=true;output.textContent="正在发送一次最多 64 tokens 的连通性请求…";
+ try{
+  const response=await apiFetch("/api/llm/smoke-test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+  const result=await response.json();
+  if(response.ok&&result.ok){
+   output.textContent="模型连接成功 · "+String(result.model||"configured")+" · "+String(result.elapsed_ms||0)+" ms · 输出上限 64 tokens";
+  }else{
+   output.textContent="模型连接未通过："+String(result.error||result.message||result.status||("HTTP "+response.status))+"。不会把失败标记为成功。";
+  }
+ }catch(error){
+  output.textContent="连接测试请求失败："+error.name;
+ }finally{button.disabled=false;}
 };
 document.getElementById("researchRun").onclick=async function(){
  const button=document.getElementById("researchRun");
