@@ -302,15 +302,34 @@ function renderRunOutputs(data){
  knowledgeResult.innerHTML='<div class="kv"><b>复用旧知识</b><div>'+records.length+' 条匹配记录</div><b>本轮收录</b><div>'+esc(ingest)+'</div></div>'+(cards||'<div class="sub">目前没有匹配的旧知识；首次分析会在获得真实来源后建立知识记录。</div>');
  const design=data.design||{};
  const designButton=document.getElementById("designRun");
+ const researchStatus=research.status||"idle";
+ const accepted=Number((research.quality||{}).accepted||0);
+ const sources=research.sources||[];
+ const hasCurrentEvidence=researchStatus==="completed"&&accepted>0&&sources.length>0;
+ // Keep the button synchronized with the research evidence, not only the auto-design status.
+ // This lets the user retry generation after a blocked/failed automatic attempt.
+ currentRunResearchReady=hasCurrentEvidence;
+ if(design.status==="running"){
+  designButton.disabled=true;
+  designButton.textContent="创意生成中…";
+ }else if(hasCurrentEvidence){
+  designButton.disabled=false;
+  designButton.textContent=design.status==="completed"?"基于当前证据重新生成":"基于调研证据生成创意";
+ }else{
+  designButton.disabled=true;
+  if(researchStatus==="running"||researchStatus==="queued") designButton.textContent="调研进行中，等待有效证据";
+  else if(researchStatus==="failed"||researchStatus==="provider_error"||researchStatus==="provider_unconfigured") designButton.textContent="调研未成功，暂不可生成";
+  else if(researchStatus==="completed") designButton.textContent="证据不足，暂不可生成";
+  else designButton.textContent="等待本轮有效调研证据";
+ }
  if(design.status==="completed"&&design.brief){
-  currentRunResearchReady=true;
-  designButton.disabled=false;designButton.textContent="基于当前证据重新生成";
   const b=design.brief, concept=b.original_concept||{};
   document.getElementById("designResult").innerHTML='<div class="outcome"><div class="kicker">本轮生成 · '+esc(design.status)+'</div><div class="big">'+esc(concept.title||"本轮原创概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="sub">'+esc(design.reason||"")+" · 市场可行性尚未验证</div></div>";
+ }else if(researchStatus==="completed"&&!hasCurrentEvidence){
+  document.getElementById("designResult").textContent="调研已返回，但没有足够的可接受来源证据（当前接受 "+accepted+" 条）；请补充调研或检查证据门禁。";
+ }else if(researchStatus==="failed"||researchStatus==="provider_error"||researchStatus==="provider_unconfigured"){
+  document.getElementById("designResult").textContent="本轮调研未成功："+(research.error||design.reason||"请检查搜索服务配置后重试。");
  }else{
-  currentRunResearchReady=false;
-  designButton.disabled=true;
-  designButton.textContent=design.status==="running"?"正在生成…":"等待调研完成";
   document.getElementById("designResult").textContent=design.reason||"等待本轮真实调研与有效证据；不会提前展示旧版创意作为本轮结果。";
  }
 }
