@@ -147,10 +147,45 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
         checks.append({"name": "prototype_evidence", "passed": prototype_ok,
                        "status": "pass" if prototype_ok else "fail"})
     cost_model = report.get("cost_model")
-    cost_ok = isinstance(cost_model, dict) and bool(cost_model.get("assumptions")) and bool(cost_model.get("scenarios"))
+    assumptions = cost_model.get("assumptions") if isinstance(cost_model, dict) else None
+    scenarios = cost_model.get("scenarios") if isinstance(cost_model, dict) else None
+    required_cost_fields = (
+        "prototype_cost_usd",
+        "model_cost_per_session_usd",
+        "monthly_cost_usd_at_1000_users",
+        "monthly_revenue_usd_at_1000_users",
+        "break_even_users",
+        "gross_margin_percent",
+    )
+    scenario_errors = []
+    if not isinstance(assumptions, list) or not assumptions or any(
+        not isinstance(item, (str, dict)) or (isinstance(item, str) and not item.strip())
+        for item in assumptions
+    ):
+        scenario_errors.append("cost assumptions must be a non-empty list")
+    if not isinstance(scenarios, dict):
+        scenario_errors.append("cost scenarios are missing")
+    else:
+        for scenario_name in ("conservative", "base", "optimistic"):
+            scenario = scenarios.get(scenario_name)
+            if not isinstance(scenario, dict):
+                scenario_errors.append(f"{scenario_name} scenario is missing")
+                continue
+            for field in required_cost_fields:
+                value = scenario.get(field)
+                valid_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+                if not valid_number:
+                    scenario_errors.append(f"{scenario_name}.{field} must be numeric")
+                    continue
+                if not math.isfinite(value) or value < 0:
+                    scenario_errors.append(f"{scenario_name}.{field} must be finite and non-negative")
+            margin = scenario.get("gross_margin_percent")
+            if isinstance(margin, (int, float)) and not isinstance(margin, bool) and margin > 100:
+                scenario_errors.append(f"{scenario_name}.gross_margin_percent must not exceed 100")
+    cost_ok = not scenario_errors
     if policy["require_cost_model"]:
-        checks.append({"name": "cost_model", "passed": cost_ok,
-                       "status": "pass" if cost_ok else "fail"})
+        checks.append({"name": "cost_model", "passed": cost_ok, "status": "pass" if cost_ok else "fail",
+                       "errors": scenario_errors})
     counter_refs = report.get("counter_evidence_refs")
     counter_ok = isinstance(counter_refs, list) and bool(counter_refs)
     if policy["require_counter_evidence"]:
