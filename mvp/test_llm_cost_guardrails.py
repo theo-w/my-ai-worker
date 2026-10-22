@@ -82,3 +82,29 @@ def test_missing_required_environment_variables_fail_closed(monkeypatch):
 
     with pytest.raises(LLMConfigurationError):
         OpenAICompatibleLLM.from_environment()
+
+
+
+def test_structured_output_can_use_separate_bounded_token_cap():
+    client = OpenAICompatibleLLM(
+        "https://example.test/v1", "not-a-real-key", "test-model",
+        timeout=12, max_tokens=768,
+    )
+    with patch("mvp.llm.urlopen", return_value=FakeResponse()) as mocked:
+        assert client.complete_with_options("system", "user", max_tokens=3000) == "ok"
+    request = mocked.call_args.args[0]
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload["max_tokens"] == 3000
+    assert mocked.call_args.kwargs["timeout"] == 12
+
+
+def test_structured_output_token_cap_is_clamped_to_global_safe_maximum():
+    client = OpenAICompatibleLLM(
+        "https://example.test/v1", "not-a-real-key", "test-model",
+        max_tokens=768,
+    )
+    with patch("mvp.llm.urlopen", return_value=FakeResponse()) as mocked:
+        client.complete_with_options("system", "user", max_tokens=99999)
+    request = mocked.call_args.args[0]
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload["max_tokens"] == 4096
