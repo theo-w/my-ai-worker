@@ -10,7 +10,7 @@ User goal -> Strategy Team -> parallel Workers -> Evidence -> Decision -> Protot
 python3 mvp/run.py "做一款玩家可以和有长期记忆 NPC 建立关系的 AI 原生 RPG"
 ```
 
-The current workers are deliberately simulated. They validate orchestration and decision flow, not real market research.
+The standalone `mvp/run.py` CLI uses deterministic simulated findings. The Dashboard server is a separate runtime: when a live search provider is configured, game-feasibility runs execute bounded multi-angle searches; missing providers fail closed instead of inventing research.
 
 ## Example output
 
@@ -44,7 +44,7 @@ The dashboard demonstrates:
 2. Digital Twin intent + policy layer
 3. Dynamic Digital Workforce team formation
 4. Worker execution and live status
-5. Evidence stream (explicitly simulated in this MVP)
+5. Evidence stream (each item labels simulated vs source-backed; source-backed does not imply semantic verification)
 6. Evidence-first GO / NO-GO decision
 7. One-click handoff to an AI Game Prototype Sprint
 
@@ -66,7 +66,7 @@ Decision
 Prototype Sprint
 ```
 
-This is a showcase MVP: the orchestration is real, while research outputs are simulated. The next implementation replaces individual simulated Workers with real Web Research + LLM Synthesis without changing the product-level workflow.
+The dashboard orchestration is real. Research can be live when configured, while worker simulation remains an explicit fallback/demo mode. The live-research path deduplicates source URLs, records which research angles returned results, and audits citation structure; it does not claim semantic truth or source independence.
 
 
 ## Configurable live research provider
@@ -87,9 +87,7 @@ as either a list or `{"results": [...]}`. Each usable result needs `title`,
 an HTTPS `url`, and `snippet` (or `description`). The optional key is sent
 as a Bearer token. Never commit API keys to the repository.
 
-This is the provider adapter and its test contract, not a claim that live
-research is already enabled in the dashboard. Without a configured provider,
-the adapter reports that live research is unavailable and returns no sources.
+The adapter is wired into the Dashboard and the automatic JARVIS run. Without a configured provider, it reports that live research is unavailable and returns no sources. Configuration status is not a successful live-call test; run a research request to validate the provider.
 
 
 ## Live research API
@@ -101,9 +99,7 @@ The response includes source records, evidence-quality decisions, and a
 deterministic synthesis. Provider failures and unconfigured state are returned
 explicitly; they are not treated as successful research.
 
-These endpoints are an API integration, not yet a dedicated Dashboard research
-panel. The default autonomous task executor remains simulated until a real
-worker adapter is deliberately configured.
+The Dashboard has a research panel and the JARVIS start flow automatically runs research. For game-feasibility goals it searches several angles (competitors, target players, AI costs/latency, counter-evidence, and Chinese-language signals), deduplicates URLs, and reports empty or failed angles. LLM synthesis is a separate optional call and remains review-required.
 
 
 ## Demo handoff versus evidence-backed decisions
