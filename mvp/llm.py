@@ -54,6 +54,17 @@ class OpenAICompatibleLLM:
         return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens)
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
+        """Use the conservative default token cap for ordinary worker/chat calls."""
+        return self._complete_with_token_limit(system_prompt, user_prompt, self.max_tokens)
+
+    def complete_with_options(self, system_prompt: str, user_prompt: str,
+                              max_tokens: int | None = None) -> str:
+        """Allow a bounded per-operation cap for structured outputs such as design briefs."""
+        limit = self.max_tokens if max_tokens is None else min(4096, max(64, int(max_tokens)))
+        return self._complete_with_token_limit(system_prompt, user_prompt, limit)
+
+    def _complete_with_token_limit(self, system_prompt: str, user_prompt: str,
+                                   token_limit: int) -> str:
         endpoint = self.base_url
         if not endpoint.endswith("/chat/completions"):
             endpoint += "/chat/completions"
@@ -64,7 +75,7 @@ class OpenAICompatibleLLM:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.2,
-            "max_tokens": self.max_tokens,
+            "max_tokens": token_limit,
         }).encode("utf-8")
         request = Request(endpoint, data=payload, method="POST", headers={
             "Authorization": "Bearer " + self.api_key,
