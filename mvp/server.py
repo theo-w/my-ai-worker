@@ -26,6 +26,7 @@ try:
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
     from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from .game_knowledge import GameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -40,11 +41,13 @@ except ImportError:  # Direct script execution from mvp/
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
     from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
+    from game_knowledge import GameKnowledgeBase
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
+GAME_KNOWLEDGE = GameKnowledgeBase()
 PROJECT_LOOP = AutonomousProjectLoop()
 WORKFORCE = WorkforceRegistry(path=os.getenv("JARVIS_WORKFORCE_STORE", "data/workforce.json"))
 def _build_worker_executor():
@@ -77,10 +80,12 @@ STATE = {
     "twin": TWIN.snapshot("评估一个 AI 原生游戏机会", WORKERS),
     "prototype": None,
     "feasibility": {"status": "not_started", "contract": None, "report": None, "evaluation": None},
+    "knowledge": {"status": "not_started", "retrieved": [], "ingest": None},
 }
 
 def reset(goal: str):
     team = TWIN.form_team(goal, WORKERS)
+    prior_knowledge = GAME_KNOWLEDGE.search(goal, 5)
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
@@ -92,6 +97,7 @@ def reset(goal: str):
             for i, (w, cap) in enumerate(team)
         ]
         STATE["evidence"] = []
+        STATE["knowledge"] = {"status": "retrieved", "query": goal, "retrieved": prior_knowledge.get("matches", []), "total_records": prior_knowledge.get("total_records", 0), "ingest": None}
         STATE["research"] = {"status": "queued", "query": goal, "sources": [], "quality": None, "error": None}
         STATE["design"] = {"status": "blocked", "reason": "等待本轮真实调研与可接受证据", "brief": None}
         STATE["decision"] = None
@@ -144,8 +150,11 @@ def execute(goal: str):
     try:
         result = run_live_research(goal, 5)
         quality = result.get("quality") or {}
+        knowledge_ingest = GAME_KNOWLEDGE.ingest_sources(goal, result.get("sources", []), result.get("evidence", []))
         accepted = quality.get("accepted", 0)
         with LOCK:
+            STATE["knowledge"]["ingest"] = knowledge_ingest
+            STATE["knowledge"]["status"] = "updated" if knowledge_ingest.get("inserted", 0) or knowledge_ingest.get("updated", 0) else "retrieved"
             STATE["research"] = {
                 "status": result.get("status", "unknown"), "query": goal,
                 "sources": result.get("sources", []), "quality": quality,
@@ -184,10 +193,17 @@ def execute(goal: str):
             else:
                 with LOCK:
                     source_rows = list((STATE.get("research") or {}).get("sources") or [])
-                context = "\\n".join(
+                current_context = "\\n".join(
                     f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
                     for row in source_rows
-                )[:5000]
+                )
+                with LOCK:
+                    prior_rows = list((STATE.get("knowledge") or {}).get("retrieved") or [])
+                prior_context = "\\n".join(
+                    f"- [Prior knowledge; unverified excerpt] {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
+                    for row in prior_rows
+                )
+                context = ("Prior knowledge for comparison only; verify freshness and claims.\\n" + prior_context + "\\nCurrent research:\\n" + current_context)[:7000]
                 source_game = (goal[:160] or "AI 原生游戏机会")
                 brief = create_design_brief(source_game, "本轮原创游戏概念", llm_client, research_context=context)
                 with LOCK:
@@ -434,6 +450,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             with LOCK:
                 self._json(dict(STATE))
+            return
+        if self.path == "/api/knowledge":
+            try:
+                authenticate_dashboard(self.headers)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            self._json({"ok": True, "knowledge": GAME_KNOWLEDGE.summary()})
             return
         if self.path == "/api/feasibility":
             try:
@@ -887,7 +911,7 @@ class Handler(BaseHTTPRequestHandler):
         protected_dashboard_routes = {
             "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
             "/api/experience-design", "/api/game-action", "/api/model-handoff",
-            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate",
+            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate", "/api/knowledge/search",
         }
         if self.path in protected_dashboard_routes:
             try:
@@ -895,6 +919,20 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
+        if self.path == "/api/knowledge/search":
+            body = self._read_json(max_bytes=8192)
+            if body is None:
+                return
+            query = body.get("query", "")
+            if not isinstance(query, str) or len(query) > 2000:
+                self._json({"ok": False, "error": "query must be a string up to 2000 characters."}, 400)
+                return
+            try:
+                limit = max(1, min(int(body.get("limit", 8)), 20))
+            except (TypeError, ValueError):
+                limit = 8
+            self._json({"ok": True, "knowledge": GAME_KNOWLEDGE.search(query, limit)})
+            return
         if self.path == "/api/feasibility/contract":
             body = self._read_json(max_bytes=8192)
             if body is None:
