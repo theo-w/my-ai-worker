@@ -187,6 +187,28 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
     }
 
 
+
+def apply_feasibility_gate(decision: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
+    """Prevent a generic evidence heuristic from bypassing the commercial gate."""
+    result = dict(decision) if isinstance(decision, dict) else {}
+    evaluation = assessment.get("evaluation") if isinstance(assessment, dict) else None
+    completion = assessment.get("completion") if isinstance(assessment, dict) else None
+    complete = isinstance(completion, dict) and completion.get("complete") is True
+    gate_decision = evaluation.get("decision") if isinstance(evaluation, dict) else None
+    if not complete or gate_decision != "GO_TO_PROTOTYPE":
+        result["recommendation"] = "HOLD_FOR_EVIDENCE"
+        try:
+            result["confidence"] = min(50, max(0, int(result.get("confidence", 0))))
+        except (TypeError, ValueError):
+            result["confidence"] = 0
+        risks = result.get("risks", [])
+        risks = list(risks) if isinstance(risks, list) else []
+        risks.append("商业可行性闸门未完成；不得将阶段性来源或通用启发式升级为 GO。")
+        result["risks"] = risks
+        result["next_step"] = "补齐独立证据、反证、成本情景与原型验证后重新评估。"
+    return result
+
+
 def evaluate_commercial_feasibility(report: dict[str, Any],
                                     thresholds: dict[str, Any] | None = None) -> dict[str, Any]:
     """Evaluate an evidence-backed report conservatively.
