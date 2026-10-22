@@ -88,6 +88,105 @@ def build_feasibility_contract(goal: str, budget: float | None = None,
     }
 
 
+
+def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = None,
+                            query_errors: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Build a conservative assessment draft without fabricating scores or costs.
+
+    Retrieved URLs are candidates, not proof of independent sources or semantic
+    support. Dollar estimates remain unknown until model pricing, usage, labor,
+    and monetization assumptions are supplied.
+    """
+    if not isinstance(goal, str) or not goal.strip():
+        raise ValueError("goal must be a non-empty string")
+    source_rows = sources if isinstance(sources, list) else []
+    errors = query_errors if isinstance(query_errors, list) else []
+    registry = []
+    counter_candidates = []
+    for index, source in enumerate(source_rows, start=1):
+        if not isinstance(source, dict):
+            continue
+        queries = source.get("research_queries", [])
+        queries = queries if isinstance(queries, list) else []
+        row = {
+            "id": "S" + str(index),
+            "title": str(source.get("title", "")),
+            "url": str(source.get("url", "")),
+            "provider": str(source.get("provider", "unknown")),
+            "research_queries": queries,
+            "status": "retrieved_semantic_support_unverified",
+        }
+        registry.append(row)
+        if any("counter evidence" in str(query).casefold() or "负面反馈" in str(query) for query in queries):
+            counter_candidates.append(row["id"])
+
+    dimensions = {
+        name: {
+            "score": None,
+            "evidence_refs": [],
+            "rationale": "尚未完成独立评估；搜索摘要本身不能证明该维度成立。",
+            "status": "unknown",
+        }
+        for name in REQUIRED_DIMENSIONS
+    }
+    cost_fields = (
+        "prototype_cost_usd",
+        "model_cost_per_session_usd",
+        "monthly_cost_usd_at_1000_users",
+        "monthly_revenue_usd_at_1000_users",
+        "break_even_users",
+        "gross_margin_percent",
+    )
+    scenarios = {
+        scenario_name: {field: None for field in cost_fields}
+        for scenario_name in ("conservative", "base", "optimistic")
+    }
+    report = {
+        "goal": goal.strip(),
+        "dimensions": dimensions,
+        "evidence_registry": registry,
+        "independent_source_count": 0,
+        "source_independence_review": "not_run",
+        "prototype_evidence_refs": [],
+        "cost_model": {
+            "status": "needs_inputs",
+            "assumptions": [
+                "没有独立核验所选模型的实时输入/输出单价。",
+                "每次核心循环的调用次数与 token 用量尚未通过运行日志测量。",
+                "开发人力成本、目标用户量、留存、转化和定价尚未提供或验证。",
+            ],
+            "required_inputs": [
+                "模型输入/输出价格（按百万 token）",
+                "每次会话的模型调用数、输入/输出 token 数及重试比例",
+                "原型与垂直切片的人周、团队成本和时间盒",
+                "月活跃用户、会话频率、留存、转化与净收入假设",
+            ],
+            "scenarios": scenarios,
+        },
+        "counter_evidence_refs": [],
+        "candidate_counter_evidence_refs": counter_candidates,
+        "research_query_errors": errors,
+        "critical_blockers": [],
+    }
+    evaluation = evaluate_commercial_feasibility(report)
+    blockers = [
+        "8 个评估维度尚未有可追溯的评分与理由",
+        "来源独立性和关键主张的语义支持尚未独立核验",
+        "缺少可运行原型/玩家实验的证据",
+        "成本情景缺少已验证的价格、使用量和商业假设",
+        "反证仍是候选来源，尚未完成逐条审查",
+    ]
+    if errors:
+        blockers.append(f"{len(errors)} 个调研角度搜索失败，需要补查")
+    return {
+        "status": "incomplete",
+        "contract": build_feasibility_contract(goal),
+        "report": report,
+        "evaluation": evaluation,
+        "completion": {"complete": False, "blockers": blockers},
+    }
+
+
 def evaluate_commercial_feasibility(report: dict[str, Any],
                                     thresholds: dict[str, Any] | None = None) -> dict[str, Any]:
     """Evaluate an evidence-backed report conservatively.
