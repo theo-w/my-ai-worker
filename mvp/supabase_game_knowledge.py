@@ -61,6 +61,7 @@ class SupabaseGameKnowledgeBase(GameKnowledgeBase):
                     local_records = [row for row in payload.get("records", []) if isinstance(row, dict) and row.get("id")]
         except (OSError, ValueError, TypeError):
             local_records = []
+        merged = {str(row["id"]): row for row in local_records}
         try:
             remote = self._request("GET", "select=*&order=last_seen_at.desc&limit=10000") or []
             if not isinstance(remote, list):
@@ -76,7 +77,7 @@ class SupabaseGameKnowledgeBase(GameKnowledgeBase):
             # Continue in JSON mode during setup/outage, while making the status
             # visible so the dashboard does not imply durable cloud storage.
             self.backend_error = str(exc)
-            self._records = local_records
+            self._records = list(merged.values())
 
     def _sync_remote(self, rows):
         for start in range(0, len(rows), 200):
