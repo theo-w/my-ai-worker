@@ -421,9 +421,15 @@ async function refreshProviderStatus(){
    fetch("/api/research/status").then(r=>r.json())
   ]);
   const llm=results[0], search=results[1];
+  const llmLabel=llm.configured
+   ?"LLM: "+(llm.model||"CONFIGURED")
+   :llm.missing_llm_variables?.length
+    ?"LLM: MISSING "+llm.missing_llm_variables.join(", ")
+    :llm.llm_configuration_error
+     ?"LLM: CONFIG ERROR · check HTTPS base URL/provider compatibility"
+     :"LLM: NOT CONFIGURED";
   document.getElementById("researchMode").textContent=
-   (llm.configured?"LLM: "+(llm.model||"CONFIGURED"):"LLM: NOT CONFIGURED")+" · "+
-   (search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+   llmLabel+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
  }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
 }
 async function refreshKnowledgeStatus(){
