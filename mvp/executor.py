@@ -161,7 +161,7 @@ class HybridWorkerExecutor:
             except ImportError:
                 from research import run_live_research
                 from accuracy import classify_output
-            report = run_live_research(goal, limit=5)
+            report = run_live_research(goal, limit=5, include_llm_synthesis=False)
             quality = report.get("quality") or {}
             accepted = [
                 item for item in quality.get("items", [])
