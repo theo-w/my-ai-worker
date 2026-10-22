@@ -276,7 +276,13 @@ def execute(goal: str):
     evidence = [type("E", (), item) for item in STATE["evidence"]]
     decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
     gate_decision = feasibility_evaluation.get("decision", "INSUFFICIENT_EVIDENCE")
-    if gate_decision == "GO_TO_PROTOTYPE":
+    demo_only = isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor)
+    if demo_only:
+        # Explicit simulation may demonstrate the handoff, never a business approval.
+        decision.recommendation = "DEMO_GO_TO_PROTOTYPE"
+        decision.confidence = 50
+        decision.next_step = "仅演示 Prototype 交接流程；真实商业可行性仍为 " + gate_decision + "，不得据此投入生产。"
+    elif gate_decision == "GO_TO_PROTOTYPE":
         decision.recommendation = "GO_TO_PROTOTYPE"
         decision.next_step = "进入有明确成功门槛的最小原型实验；不代表批准完整生产。"
     elif gate_decision == "NO_GO":
@@ -289,7 +295,8 @@ def execute(goal: str):
         decision.recommendation = "HOLD_FOR_EVIDENCE"
         decision.next_step = "可行性评估已记录，但关键维度、反证、价格或原型证据不足；补齐后再决定是否进入 Prototype。"
     if gate_decision != "GO_TO_PROTOTYPE":
-        decision.confidence = min(int(decision.confidence), 42)
+        if not demo_only:
+            decision.confidence = min(int(decision.confidence), 42)
         decision.risks.append("商业可行性闸门：" + gate_decision + "；不得仅凭员工完成或模型意见批准原型。")
     with LOCK:
         STATE["decision"] = decision.__dict__
