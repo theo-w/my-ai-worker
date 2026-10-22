@@ -381,6 +381,390 @@ function renderRunOutputs(data){
  }else{
   document.getElementById("designResult").textContent=design.reason||"等待本轮真实调研与有效证据；不会提前展示旧版创意作为本轮结果。";
  }
+ const feasibility=data.feasibility||{}, report=feasibility.report||{}, evaluation=feasibility.evaluation||{};
+ const feasibilityStatus=document.getElementById("feasibilityStatus");
+ const feasibilityResult=document.getElementById("feasibilityResult");
+ const feasibilityEvaluation=document.getElementById("feasibilityEvaluation");
+ if(report.dimensions&&evaluation.decision){
+  feasibilityStatus.textContent=String(evaluation.decision);
+  const dimensions=Object.entries(report.dimensions).map(([name,item])=>{
+   const status=item.status==="unknown"?"未知":(item.score==null?"待核验":String(item.score)+"/5");
+   return '<div class="ev"><b>'+esc(name)+' · '+esc(status)+'</b><div class="sub">'+esc(item.rationale||"尚无说明")+'</div></div>';
+  }).join("");
+  const cost=report.cost_model||{}, scenarios=cost.scenarios||{}, base=scenarios.base||{};
+  const costSummary='成本情景：原型工作量 乐观/基准/保守 '+['optimistic','base','conservative'].map(k=>String((scenarios[k]||{}).prototype_person_weeks??"未知")+' 人周').join(' / ')+
+   '；基准月模型成本 '+(base.monthly_model_cost_usd==null?'未知（未配置模型单价）':' const b=document.getElementById("run");b.disabled=true;
+ const goal=document.getElementById("goal").value.trim();
+ const feasibilityStatus=document.getElementById("feasibilityStatus");
+ const feasibilityResult=document.getElementById("feasibilityResult");
+ const gameGoal=/(游戏|玩法|RPG|gameplay|video game|AI.?原生游戏|AI.?native game|prototype)/i.test(goal);
+ try{
+  if(gameGoal){
+   feasibilityStatus.textContent="CREATING CONTRACT";
+   try{
+    const payload={goal};
+    const budget=document.getElementById("feasibilityBudget").value;
+    const days=document.getElementById("feasibilityDays").value;
+    if(budget!=="")payload.budget=Number(budget);
+    if(days!=="")payload.timebox_days=Number(days);
+    const contractResponse=await apiFetch("/api/feasibility/contract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const contractData=await contractResponse.json();
+    if(!contractResponse.ok||!contractData.ok)throw new Error(contractData.error||("HTTP "+contractResponse.status));
+    const contract=contractData.feasibility&&contractData.feasibility.contract||{};
+    feasibilityStatus.textContent="CONTRACT READY · RESEARCH RUNNING";
+    feasibilityResult.textContent="已随本轮启动建立可行性评估契约。\n目标："+(contract.goal||goal)+"\n必须覆盖："+(contract.dimensions||[]).join("、")+"\n\nJARVIS 将继续执行现有调研流程。契约不等于结论；成本情景、反证与真实原型证据仍须补齐，不能自动判为 GO。";
+   }catch(contractError){
+    feasibilityStatus.textContent="CONTRACT ERROR";
+    feasibilityResult.textContent="自动建立评估契约失败："+contractError.message+"。JARVIS 主任务仍会继续启动。";
+   }
+  }
+  const response=await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal})});
+  if(!response.ok){const result=await response.json();document.getElementById("status").textContent="启动失败："+response.status+" · "+(result.error||"访问受限");}
+  else{document.getElementById("status").textContent="已提交执行请求";}
+ }catch(e){document.getElementById("status").textContent="请求失败："+e.name;}
+ finally{b.disabled=false;}
+};
+async function refreshProviderStatus(){
+ try{
+  const results=await Promise.all([
+   fetch("/api/llm/status").then(r=>r.json()),
+   fetch("/api/research/status").then(r=>r.json())
+  ]);
+  const llm=results[0], search=results[1];
+  const llmLabel=llm.configured
+   ?"LLM: "+(llm.model||"CONFIGURED")
+   :llm.missing_llm_variables?.length
+    ?"LLM: MISSING "+llm.missing_llm_variables.join(", ")
+    :llm.llm_configuration_error
+     ?"LLM: CONFIG ERROR · check HTTPS base URL/provider compatibility"
+     :"LLM: NOT CONFIGURED";
+  document.getElementById("researchMode").textContent=
+   llmLabel+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+ }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
+}
+async function refreshKnowledgeStatus(){
+ try{
+  const response=await apiFetch("/api/knowledge");
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const k=data.knowledge||{},backend=k.storage_backend||"json";
+  document.getElementById("knowledgeSummary").textContent=
+   (backend==="supabase"?"SUPABASE":"JSON FALLBACK") + " · " + (k.record_count||0) + " RECORDS" +
+   (k.storage_error?" · SYNC ERROR":"");
+  if(k.storage_error)document.getElementById("knowledgeResult").textContent=
+   "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
+ }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
+}
+refreshKnowledgeStatus();
+document.getElementById("knowledgeSearch").onclick=async function(){
+ const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
+ const query=document.getElementById("knowledgeQuery").value.trim();
+ button.disabled=true;out.textContent="正在检索已有知识…";
+ try{
+  const response=await apiFetch("/api/knowledge/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,limit:8})});
+  const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const result=data.knowledge||{},matches=result.matches||[];
+  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · "+(document.getElementById("knowledgeSummary").textContent.split(" · ").slice(0,1)[0]||"KNOWLEDGE")+" · SEARCHED";
+  out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
+ }catch(e){out.textContent="知识库检索失败："+e.message;}
+ finally{button.disabled=false;}
+};
+document.getElementById("researchRun").onclick=async function(){
+ const button=document.getElementById("researchRun");
+ const out=document.getElementById("researchResult");
+ button.disabled=true;out.textContent="正在执行研究请求…";
+ try{
+  const response=await apiFetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
+  const result=await response.json();
+  if(!response.ok||!result.ok){currentRunResearchReady=false;document.getElementById("designRun").disabled=true;document.getElementById("designRun").textContent="等待有效调研证据";out.textContent="研究请求未执行："+(result.error||result.message||response.status);return;}
+  currentRunResearchReady=(result.sources||[]).length>0 && (result.quality||{}).accepted>0;
+  const designButton=document.getElementById("designRun");
+  designButton.disabled=!currentRunResearchReady;
+  designButton.textContent=currentRunResearchReady?"进入创意生成阶段":"证据不足，暂不可生成创意";
+  const quality=result.quality||{}, det=result.synthesis||{}, llm=result.llm_synthesis||{};
+  const sources=(result.sources||[]).map(function(s){
+   return '<div class="ev"><b>'+esc(s.title)+'</b><div class="sub">'+esc(s.snippet)+'</div><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.url)+'</a></div>';
+  }).join("");
+  out.innerHTML='<div class="kv"><b>Status</b><div>'+esc(result.status||"unknown")+'</div><b>Evidence</b><div>'+esc(String(quality.accepted||0))+' accepted / '+esc(String(quality.total||0))+' total</div><b>Baseline</b><div>'+esc(det.conclusion||result.message||"No conclusion")+'</div><b>LLM synthesis</b><div>'+esc(llm.status||"not returned")+' '+esc(llm.message||"")+'</div></div>'+
+   (llm.text?'<div class="outcome" style="margin-top:10px;white-space:pre-wrap">'+esc(llm.text)+'</div>':"")+
+   (sources||'<div class="sub">No source results returned. Check provider configuration and API response.</div>');
+ }catch(e){out.textContent="Research request failed: "+e.name;}
+ finally{button.disabled=false;}
+};
+document.getElementById("designRun").onclick=async function(){
+ if(!currentRunResearchReady){document.getElementById("designResult").textContent="尚未完成本轮调研，不能生成本轮创意。请先完成真实调研并确认来源证据。";return;}
+ const button=document.getElementById("designRun");
+ const out=document.getElementById("designResult");
+ button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
+ try{
+  const response=await apiFetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
+  const result=await response.json();
+  if(!response.ok||!result.ok){out.textContent="生成失败："+(result.error||response.status);return;}
+  const b=result.brief||{}, concept=b.original_concept||{}, trust=result.trust||{};
+  const list=(items,fn)=>'<ul>'+((items||[]).map(fn).join(""))+'</ul>';
+  const perspectives=list(b.player_perspectives,p=>'<li><b>'+esc(p.segment||"玩家视角")+'</b>：可能吸引 '+esc(p.likely_attraction||"未说明")+'；潜在排斥 '+esc(p.possible_rejection||"未说明")+'。<div class="sub">验证问题：'+esc(p.validation_question||"待定义")+'</div></li>');
+  const hypotheses=list(b.falsifiable_hypotheses,h=>'<li><b>'+esc(h.hypothesis||"假设")+'</b><div class="sub">失败信号：'+esc(h.failure_signal||"待定义")+'；指标：'+esc(h.metric||"待定义")+'</div></li>');
+  const systems=list(concept.core_systems,s=>'<li>'+esc(s)+'</li>');
+  const loop=list(concept.core_loop,s=>'<li>'+esc(s)+'</li>');
+  const principles=list(b.transferable_principles,s=>'<li>'+esc(s)+'</li>');
+  const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
+  const plan=concept.prototype_plan||b.prototype_plan||{};
+  out.innerHTML='<div class="outcome"><div class="kicker">NEW CONCEPT</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"")+'</div><b>生成模式</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div>'+
+  '<h3>从参考游戏提炼的机制</h3>'+mechanisms+
+  '<h3>可迁移原则</h3>'+principles+
+  '<h3>新游戏核心系统</h3>'+systems+
+  '<h3>核心循环</h3>'+loop+
+  '<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+
+  '<h3>可证伪假设</h3>'+hypotheses+
+  '<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+
+  '<div class="sub">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div>';
+ }catch(e){out.textContent="生成请求失败："+e.name;}
+ finally{button.disabled=false;}
+};
+async function createFeasibilityContract(){
+ const button=document.getElementById("feasibilityCreate"),out=document.getElementById("feasibilityResult"),status=document.getElementById("feasibilityStatus");
+ const payload={goal:document.getElementById("goal").value.trim()};
+ const budget=document.getElementById("feasibilityBudget").value;
+ const days=document.getElementById("feasibilityDays").value;
+ if(budget!=="")payload.budget=Number(budget);
+ if(days!=="")payload.timebox_days=Number(days);
+ if(!payload.goal){out.textContent="请先填写业务目标。";return;}
+ button.disabled=true;status.textContent="CREATING";
+ try{
+  const response=await apiFetch("/api/feasibility/contract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},c=f.contract||{};
+  status.textContent=String(f.status||"READY").toUpperCase();
+  out.textContent="评估目标："+(c.goal||payload.goal)+"\\n必须覆盖维度："+(c.dimensions||[]).join("、")+"\\n预算上限："+(c.budget_limit==null?"未设置":c.budget_limit)+"\\n时间盒："+(c.timebox_days==null?"未设置":c.timebox_days+" 天")+"\\n\\n下一步：调研支持证据与反证、估算保守/基准/乐观成本，并运行可证伪的最小原型。契约已建立，但尚未形成可行性结论。";
+ }catch(e){status.textContent="ERROR";out.textContent="建立失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityCreate").addEventListener("click",createFeasibilityContract);
+const feasibilityReportInput=document.getElementById("feasibilityReport");
+feasibilityReportInput.value=JSON.stringify({
+ dimensions:Object.fromEntries(["player_value","differentiation","technical_feasibility","market_evidence","unit_economics","production_cost","retention_and_replayability","risk_and_compliance"].map(name=>[name,{score:3,evidence_refs:[],rationale:"请替换为真实证据支持的判断"}])),
+ independent_source_count:0,
+ prototype_evidence_refs:[],
+ cost_model:{assumptions:[],scenarios:{conservative:{},base:{},optimistic:{}}},
+ counter_evidence_refs:[],
+ critical_blockers:[]
+},null,2);
+async function evaluateFeasibilityReport(){
+ const button=document.getElementById("feasibilityEvaluate"),out=document.getElementById("feasibilityEvaluation");
+ button.disabled=true;out.textContent="正在评估…";
+ try{
+  let report;try{report=JSON.parse(feasibilityReportInput.value);}catch(_){throw new Error("JSON 格式无效，请检查括号、逗号和引号。");}
+  const response=await apiFetch("/api/feasibility/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report})});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},e=f.evaluation||{};
+  document.getElementById("feasibilityStatus").textContent=String(e.decision||f.status||"EVALUATED");
+  out.textContent="决策："+(e.decision||"UNKNOWN")+"\\n维度平均分："+(e.average_dimension_score==null?"未知":e.average_dimension_score)+"\\n已评分维度："+(e.dimension_count_scored||0)+"/8\\n缺失维度："+((e.missing_dimensions||[]).join("、")||"无")+"\\n薄弱维度："+((e.weak_dimensions||[]).join("、")||"无")+"\\n\\n检查项：\\n"+(e.checks||[]).map(x=>(x.passed?"✓ ":"✗ ")+x.name+(x.reason?" — "+x.reason:"")).join("\\n")+"\\n\\n限制：评分与引用尚未由系统独立核验；GO 仅允许进入有边界的原型实验，不等于批准完整开发。";
+ }catch(e){out.textContent="评估失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityEvaluate").addEventListener("click",evaluateFeasibilityReport);
+async function startPrototype(){const r=await apiFetch("/api/prototype",{method:"POST"});if(r.ok)poll();else document.getElementById("status").textContent="Prototype API "+r.status}
+const tokenInput=document.getElementById("adminToken");
+const rememberToken=document.getElementById("rememberToken");
+try{const savedToken=localStorage.getItem("jarvis_admin_token");if(savedToken){tokenInput.value=savedToken;rememberToken.checked=true;}}catch(_){}
+rememberToken.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(!rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}});
+tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}poll();refreshKnowledgeStatus()});
+tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
+tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
+setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+</script></body></html>+Number(base.monthly_model_cost_usd).toFixed(2))+
+   '；基准原型人工成本 '+(base.prototype_labor_cost_usd==null?'未知（未配置人周费率）':' const b=document.getElementById("run");b.disabled=true;
+ const goal=document.getElementById("goal").value.trim();
+ const feasibilityStatus=document.getElementById("feasibilityStatus");
+ const feasibilityResult=document.getElementById("feasibilityResult");
+ const gameGoal=/(游戏|玩法|RPG|gameplay|video game|AI.?原生游戏|AI.?native game|prototype)/i.test(goal);
+ try{
+  if(gameGoal){
+   feasibilityStatus.textContent="CREATING CONTRACT";
+   try{
+    const payload={goal};
+    const budget=document.getElementById("feasibilityBudget").value;
+    const days=document.getElementById("feasibilityDays").value;
+    if(budget!=="")payload.budget=Number(budget);
+    if(days!=="")payload.timebox_days=Number(days);
+    const contractResponse=await apiFetch("/api/feasibility/contract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const contractData=await contractResponse.json();
+    if(!contractResponse.ok||!contractData.ok)throw new Error(contractData.error||("HTTP "+contractResponse.status));
+    const contract=contractData.feasibility&&contractData.feasibility.contract||{};
+    feasibilityStatus.textContent="CONTRACT READY · RESEARCH RUNNING";
+    feasibilityResult.textContent="已随本轮启动建立可行性评估契约。\n目标："+(contract.goal||goal)+"\n必须覆盖："+(contract.dimensions||[]).join("、")+"\n\nJARVIS 将继续执行现有调研流程。契约不等于结论；成本情景、反证与真实原型证据仍须补齐，不能自动判为 GO。";
+   }catch(contractError){
+    feasibilityStatus.textContent="CONTRACT ERROR";
+    feasibilityResult.textContent="自动建立评估契约失败："+contractError.message+"。JARVIS 主任务仍会继续启动。";
+   }
+  }
+  const response=await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal})});
+  if(!response.ok){const result=await response.json();document.getElementById("status").textContent="启动失败："+response.status+" · "+(result.error||"访问受限");}
+  else{document.getElementById("status").textContent="已提交执行请求";}
+ }catch(e){document.getElementById("status").textContent="请求失败："+e.name;}
+ finally{b.disabled=false;}
+};
+async function refreshProviderStatus(){
+ try{
+  const results=await Promise.all([
+   fetch("/api/llm/status").then(r=>r.json()),
+   fetch("/api/research/status").then(r=>r.json())
+  ]);
+  const llm=results[0], search=results[1];
+  const llmLabel=llm.configured
+   ?"LLM: "+(llm.model||"CONFIGURED")
+   :llm.missing_llm_variables?.length
+    ?"LLM: MISSING "+llm.missing_llm_variables.join(", ")
+    :llm.llm_configuration_error
+     ?"LLM: CONFIG ERROR · check HTTPS base URL/provider compatibility"
+     :"LLM: NOT CONFIGURED";
+  document.getElementById("researchMode").textContent=
+   llmLabel+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+ }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
+}
+async function refreshKnowledgeStatus(){
+ try{
+  const response=await apiFetch("/api/knowledge");
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const k=data.knowledge||{},backend=k.storage_backend||"json";
+  document.getElementById("knowledgeSummary").textContent=
+   (backend==="supabase"?"SUPABASE":"JSON FALLBACK") + " · " + (k.record_count||0) + " RECORDS" +
+   (k.storage_error?" · SYNC ERROR":"");
+  if(k.storage_error)document.getElementById("knowledgeResult").textContent=
+   "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
+ }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
+}
+refreshKnowledgeStatus();
+document.getElementById("knowledgeSearch").onclick=async function(){
+ const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
+ const query=document.getElementById("knowledgeQuery").value.trim();
+ button.disabled=true;out.textContent="正在检索已有知识…";
+ try{
+  const response=await apiFetch("/api/knowledge/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,limit:8})});
+  const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const result=data.knowledge||{},matches=result.matches||[];
+  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · "+(document.getElementById("knowledgeSummary").textContent.split(" · ").slice(0,1)[0]||"KNOWLEDGE")+" · SEARCHED";
+  out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
+ }catch(e){out.textContent="知识库检索失败："+e.message;}
+ finally{button.disabled=false;}
+};
+document.getElementById("researchRun").onclick=async function(){
+ const button=document.getElementById("researchRun");
+ const out=document.getElementById("researchResult");
+ button.disabled=true;out.textContent="正在执行研究请求…";
+ try{
+  const response=await apiFetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:document.getElementById("researchQuery").value,limit:5})});
+  const result=await response.json();
+  if(!response.ok||!result.ok){currentRunResearchReady=false;document.getElementById("designRun").disabled=true;document.getElementById("designRun").textContent="等待有效调研证据";out.textContent="研究请求未执行："+(result.error||result.message||response.status);return;}
+  currentRunResearchReady=(result.sources||[]).length>0 && (result.quality||{}).accepted>0;
+  const designButton=document.getElementById("designRun");
+  designButton.disabled=!currentRunResearchReady;
+  designButton.textContent=currentRunResearchReady?"进入创意生成阶段":"证据不足，暂不可生成创意";
+  const quality=result.quality||{}, det=result.synthesis||{}, llm=result.llm_synthesis||{};
+  const sources=(result.sources||[]).map(function(s){
+   return '<div class="ev"><b>'+esc(s.title)+'</b><div class="sub">'+esc(s.snippet)+'</div><a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.url)+'</a></div>';
+  }).join("");
+  out.innerHTML='<div class="kv"><b>Status</b><div>'+esc(result.status||"unknown")+'</div><b>Evidence</b><div>'+esc(String(quality.accepted||0))+' accepted / '+esc(String(quality.total||0))+' total</div><b>Baseline</b><div>'+esc(det.conclusion||result.message||"No conclusion")+'</div><b>LLM synthesis</b><div>'+esc(llm.status||"not returned")+' '+esc(llm.message||"")+'</div></div>'+
+   (llm.text?'<div class="outcome" style="margin-top:10px;white-space:pre-wrap">'+esc(llm.text)+'</div>':"")+
+   (sources||'<div class="sub">No source results returned. Check provider configuration and API response.</div>');
+ }catch(e){out.textContent="Research request failed: "+e.name;}
+ finally{button.disabled=false;}
+};
+document.getElementById("designRun").onclick=async function(){
+ if(!currentRunResearchReady){document.getElementById("designResult").textContent="尚未完成本轮调研，不能生成本轮创意。请先完成真实调研并确认来源证据。";return;}
+ const button=document.getElementById("designRun");
+ const out=document.getElementById("designResult");
+ button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
+ try{
+  const response=await apiFetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
+  const result=await response.json();
+  if(!response.ok||!result.ok){out.textContent="生成失败："+(result.error||response.status);return;}
+  const b=result.brief||{}, concept=b.original_concept||{}, trust=result.trust||{};
+  const list=(items,fn)=>'<ul>'+((items||[]).map(fn).join(""))+'</ul>';
+  const perspectives=list(b.player_perspectives,p=>'<li><b>'+esc(p.segment||"玩家视角")+'</b>：可能吸引 '+esc(p.likely_attraction||"未说明")+'；潜在排斥 '+esc(p.possible_rejection||"未说明")+'。<div class="sub">验证问题：'+esc(p.validation_question||"待定义")+'</div></li>');
+  const hypotheses=list(b.falsifiable_hypotheses,h=>'<li><b>'+esc(h.hypothesis||"假设")+'</b><div class="sub">失败信号：'+esc(h.failure_signal||"待定义")+'；指标：'+esc(h.metric||"待定义")+'</div></li>');
+  const systems=list(concept.core_systems,s=>'<li>'+esc(s)+'</li>');
+  const loop=list(concept.core_loop,s=>'<li>'+esc(s)+'</li>');
+  const principles=list(b.transferable_principles,s=>'<li>'+esc(s)+'</li>');
+  const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
+  const plan=concept.prototype_plan||b.prototype_plan||{};
+  out.innerHTML='<div class="outcome"><div class="kicker">NEW CONCEPT</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"")+'</div><b>生成模式</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div>'+
+  '<h3>从参考游戏提炼的机制</h3>'+mechanisms+
+  '<h3>可迁移原则</h3>'+principles+
+  '<h3>新游戏核心系统</h3>'+systems+
+  '<h3>核心循环</h3>'+loop+
+  '<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+
+  '<h3>可证伪假设</h3>'+hypotheses+
+  '<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+
+  '<div class="sub">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div>';
+ }catch(e){out.textContent="生成请求失败："+e.name;}
+ finally{button.disabled=false;}
+};
+async function createFeasibilityContract(){
+ const button=document.getElementById("feasibilityCreate"),out=document.getElementById("feasibilityResult"),status=document.getElementById("feasibilityStatus");
+ const payload={goal:document.getElementById("goal").value.trim()};
+ const budget=document.getElementById("feasibilityBudget").value;
+ const days=document.getElementById("feasibilityDays").value;
+ if(budget!=="")payload.budget=Number(budget);
+ if(days!=="")payload.timebox_days=Number(days);
+ if(!payload.goal){out.textContent="请先填写业务目标。";return;}
+ button.disabled=true;status.textContent="CREATING";
+ try{
+  const response=await apiFetch("/api/feasibility/contract",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},c=f.contract||{};
+  status.textContent=String(f.status||"READY").toUpperCase();
+  out.textContent="评估目标："+(c.goal||payload.goal)+"\\n必须覆盖维度："+(c.dimensions||[]).join("、")+"\\n预算上限："+(c.budget_limit==null?"未设置":c.budget_limit)+"\\n时间盒："+(c.timebox_days==null?"未设置":c.timebox_days+" 天")+"\\n\\n下一步：调研支持证据与反证、估算保守/基准/乐观成本，并运行可证伪的最小原型。契约已建立，但尚未形成可行性结论。";
+ }catch(e){status.textContent="ERROR";out.textContent="建立失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityCreate").addEventListener("click",createFeasibilityContract);
+const feasibilityReportInput=document.getElementById("feasibilityReport");
+feasibilityReportInput.value=JSON.stringify({
+ dimensions:Object.fromEntries(["player_value","differentiation","technical_feasibility","market_evidence","unit_economics","production_cost","retention_and_replayability","risk_and_compliance"].map(name=>[name,{score:3,evidence_refs:[],rationale:"请替换为真实证据支持的判断"}])),
+ independent_source_count:0,
+ prototype_evidence_refs:[],
+ cost_model:{assumptions:[],scenarios:{conservative:{},base:{},optimistic:{}}},
+ counter_evidence_refs:[],
+ critical_blockers:[]
+},null,2);
+async function evaluateFeasibilityReport(){
+ const button=document.getElementById("feasibilityEvaluate"),out=document.getElementById("feasibilityEvaluation");
+ button.disabled=true;out.textContent="正在评估…";
+ try{
+  let report;try{report=JSON.parse(feasibilityReportInput.value);}catch(_){throw new Error("JSON 格式无效，请检查括号、逗号和引号。");}
+  const response=await apiFetch("/api/feasibility/evaluate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({report})});
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const f=data.feasibility||{},e=f.evaluation||{};
+  document.getElementById("feasibilityStatus").textContent=String(e.decision||f.status||"EVALUATED");
+  out.textContent="决策："+(e.decision||"UNKNOWN")+"\\n维度平均分："+(e.average_dimension_score==null?"未知":e.average_dimension_score)+"\\n已评分维度："+(e.dimension_count_scored||0)+"/8\\n缺失维度："+((e.missing_dimensions||[]).join("、")||"无")+"\\n薄弱维度："+((e.weak_dimensions||[]).join("、")||"无")+"\\n\\n检查项：\\n"+(e.checks||[]).map(x=>(x.passed?"✓ ":"✗ ")+x.name+(x.reason?" — "+x.reason:"")).join("\\n")+"\\n\\n限制：评分与引用尚未由系统独立核验；GO 仅允许进入有边界的原型实验，不等于批准完整开发。";
+ }catch(e){out.textContent="评估失败："+e.message;}
+ finally{button.disabled=false;}
+}
+document.getElementById("feasibilityEvaluate").addEventListener("click",evaluateFeasibilityReport);
+async function startPrototype(){const r=await apiFetch("/api/prototype",{method:"POST"});if(r.ok)poll();else document.getElementById("status").textContent="Prototype API "+r.status}
+const tokenInput=document.getElementById("adminToken");
+const rememberToken=document.getElementById("rememberToken");
+try{const savedToken=localStorage.getItem("jarvis_admin_token");if(savedToken){tokenInput.value=savedToken;rememberToken.checked=true;}}catch(_){}
+rememberToken.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(!rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}});
+tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}poll();refreshKnowledgeStatus()});
+tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
+tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
+setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+</script></body></html>+Number(base.prototype_labor_cost_usd).toFixed(2))+'.';
+  const sourceRows=(report.source_registry||[]).map(row=>'<div class="ev"><b>'+esc(row.id+' · '+row.title)+'</b><div class="sub">'+esc(row.role||"来源候选")+' · 语义支持未独立核验</div><a href="'+esc(row.url)+'" target="_blank" rel="noopener noreferrer">'+esc(row.url)+'</a></div>').join("");
+  feasibilityResult.innerHTML='<div class="outcome"><b>自动评估：'+esc(evaluation.decision)+'</b><div class="sub">评估状态：'+esc(feasibility.status||report.assessment_status||"unknown")+'。未知维度不会被自动打分，也不会因为员工完成就放行。</div><div class="sub">'+esc(costSummary)+'</div><div class="sub">成本模型状态：'+esc(cost.status||"unknown")+'。'+esc((cost.unpriced_items||[]).join("；"))+'</div></div><h4>八个评估维度</h4>'+dimensions+'<h4>来源与反证候选</h4>'+(sourceRows||'<div class="sub">本轮没有可接受的来源候选；不能声称完成了真实研究。</div>');
+  feasibilityEvaluation.textContent='决策：'+evaluation.decision+'\n已评分维度：'+String(evaluation.dimension_count_scored||0)+'/8\n缺失/未知维度：'+((evaluation.missing_dimensions||[]).join('、')||'无')+'\n薄弱维度：'+((evaluation.weak_dimensions||[]).join('、')||'无')+'\n\n检查项：\n'+(evaluation.checks||[]).map(x=>(x.passed?'✓ ':'✗ ')+x.name+(x.reason?' — '+x.reason:'')).join('\n')+'\n\n边界：搜索质量门禁不等于事实核验；成本情景中的人周/用量是可编辑假设，缺失的美元成本保持未知。';
+  if(typeof feasibilityReportInput!=="undefined"&&document.activeElement!==feasibilityReportInput)feasibilityReportInput.value=JSON.stringify(report,null,2);
+ }else if(feasibility.contract&&feasibility.status==="researching"){
+  feasibilityStatus.textContent="RESEARCHING";
+  feasibilityResult.textContent="已建立本轮评估契约；正在收集主检索与反向检索结果。";
+ }
 }
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run");b.disabled=true;
