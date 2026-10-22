@@ -5,6 +5,7 @@ try:
     from .commercial_feasibility import (
         build_feasibility_contract,
         build_feasibility_draft,
+        apply_feasibility_gate,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
@@ -84,6 +85,16 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertEqual(draft["report"]["counter_evidence_refs"], [])
         self.assertEqual(draft["report"]["cost_model"]["status"], "needs_inputs")
         self.assertTrue(any("成本情景" in item for item in draft["completion"]["blockers"]))
+
+    def test_generic_go_is_blocked_until_feasibility_gate_is_complete(self):
+        draft = build_feasibility_draft("评估长期记忆 NPC RPG")
+        decision = apply_feasibility_gate(
+            {"recommendation": "GO_TO_PROTOTYPE", "confidence": 78, "risks": [], "next_step": "prototype"},
+            draft,
+        )
+        self.assertEqual(decision["recommendation"], "HOLD_FOR_EVIDENCE")
+        self.assertLessEqual(decision["confidence"], 50)
+        self.assertIn("成本情景", " ".join(draft["completion"]["blockers"]))
 
     def test_missing_evidence_never_passes(self):
         result = evaluate_commercial_feasibility({"dimensions": {}})
