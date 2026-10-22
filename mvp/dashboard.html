@@ -334,7 +334,12 @@ function renderRunOutputs(data){
  if(feasibility.status==="incomplete"&&feasibility.completion){
   const verdict=feasibility.evaluation&&feasibility.evaluation.decision||"INSUFFICIENT_EVIDENCE";
   feasibilityStatusEl.textContent="INCOMPLETE · "+verdict;
-  feasibilityResultEl.textContent="本轮评估尚未达到完成标准。\n决策："+verdict+"\n\n阻塞项：\n- "+(feasibility.completion.blockers||[]).join("\n- ")+"\n\n自动填入的 JSON 是待补充草稿；未核验的来源、未实测的原型和未知成本不会被当作通过。";
+  const estimate=feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.pricing_estimate;
+  const money=value=>Number.isFinite(Number(value))?"$"+Number(value).toFixed(4):"未知";
+  const costSummary=estimate&&estimate.status==="estimated"
+   ?"\n\nAI 推理成本粗估（不含搜索、托管、人力、内容、审核；使用量为假设）：\n保守："+money(estimate.scenarios.conservative.model_cost_per_session_usd)+"/会话，"+money(estimate.scenarios.conservative.monthly_ai_inference_cost_usd_at_1000_users)+"/月（1000 活跃用户）\n基准："+money(estimate.scenarios.base.model_cost_per_session_usd)+"/会话，"+money(estimate.scenarios.base.monthly_ai_inference_cost_usd_at_1000_users)+"/月\n乐观："+money(estimate.scenarios.optimistic.model_cost_per_session_usd)+"/会话，"+money(estimate.scenarios.optimistic.monthly_ai_inference_cost_usd_at_1000_users)+"/月\n价格依据："+String(estimate.pricing_source||"未提供")+"；需以实际用量与账单复核。"
+   :"\n\nAI 推理美元成本暂不可估： "+String(estimate&&estimate.message||"当前模型没有已知价格；可配置输入/输出每百万 token 价格。");
+  feasibilityResultEl.textContent="本轮评估尚未达到完成标准。\n决策："+verdict+costSummary+"\n\n阻塞项：\n- "+(feasibility.completion.blockers||[]).join("\n- ")+"\n\n自动填入的 JSON 是待补充草稿；未核验的来源、未实测的原型和未知成本不会被当作通过。";
   const currentRun=String(data.run_id||"");
   if(feasibilityReportEl&&currentRun&&feasibilityReportEl.dataset.runId!==currentRun){
    feasibilityReportEl.value=JSON.stringify(feasibility.report||{},null,2);
@@ -462,8 +467,9 @@ async function refreshProviderStatus(){
     :llm.llm_configuration_error
      ?"LLM: CONFIG ERROR · check HTTPS base URL/provider compatibility"
      :"LLM: NOT CONFIGURED";
+  const modelWarning=llm.model_warning?" · WARNING: "+llm.model_warning:"";
   document.getElementById("researchMode").textContent=
-   llmLabel+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+   llmLabel+modelWarning+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
  }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
 }
 async function refreshKnowledgeStatus(){
