@@ -101,6 +101,13 @@
 </div>
 
 <div class="panel wide workflow-panel" style="margin-top:14px">
+ <div class="section-title"><span>游戏玩法知识库 · Prior Research Memory</span><span id="knowledgeSummary" class="status">LOADING KNOWLEDGE…</span></div>
+ <div class="workflow-hint">每轮启动先检索过往来源，再执行本轮新搜索；本轮新来源会去重后收录。知识库中的搜索摘要默认标记为“来源可追溯、内容未独立核验”，过期或矛盾信息不会自动当成事实。</div>
+ <div class="input"><input id="knowledgeQuery" value="AI 原生游戏 NPC 记忆 留存 成本" aria-label="知识库搜索"><button id="knowledgeSearch" class="btn">检索知识库</button></div>
+ <div id="knowledgeResult" class="sub" style="margin-top:12px">启动研究后，这里会显示本轮复用的旧知识与收录情况。</div>
+</div>
+
+<div class="panel wide workflow-panel" style="margin-top:14px">
  <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
  <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
  <div class="input">
@@ -264,6 +271,14 @@ function renderRunOutputs(data){
  }else{
   researchOut.textContent="本轮尚未进入调研阶段；点击「启动 JARVIS」后将自动执行。";
  }
+ const knowledge=data.knowledge||{};
+ const knowledgeSummary=document.getElementById("knowledgeSummary");
+ const knowledgeResult=document.getElementById("knowledgeResult");
+ const records=knowledge.retrieved||[];
+ knowledgeSummary.textContent=(knowledge.total_records||0)+" RECORDS · "+(knowledge.status||"idle").toUpperCase();
+ const cards=records.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("");
+ const ingest=knowledge.ingest?("本轮收录：新增 "+String(knowledge.ingest.inserted||0)+" 条，更新 "+String(knowledge.ingest.updated||0)+" 条。"):"本轮调研后会自动去重收录来源。";
+ knowledgeResult.innerHTML='<div class="kv"><b>复用旧知识</b><div>'+records.length+' 条匹配记录</div><b>本轮收录</b><div>'+esc(ingest)+'</div></div>'+(cards||'<div class="sub">目前没有匹配的旧知识；首次分析会在获得真实来源后建立知识记录。</div>');
  const design=data.design||{};
  const designButton=document.getElementById("designRun");
  if(design.status==="completed"&&design.brief){
@@ -322,6 +337,19 @@ async function refreshProviderStatus(){
    (search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
  }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
 }
+document.getElementById("knowledgeSearch").onclick=async function(){
+ const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
+ const query=document.getElementById("knowledgeQuery").value.trim();
+ button.disabled=true;out.textContent="正在检索已有知识…";
+ try{
+  const response=await apiFetch("/api/knowledge/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,limit:8})});
+  const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  const result=data.knowledge||{},matches=result.matches||[];
+  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · SEARCHED";
+  out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>'<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b><div class="sub">'+esc(row.snippet||"")+'</div><a href="'+esc(row.url||"#")+'" target="_blank" rel="noopener noreferrer">'+esc(row.url||"")+'</a><div class="sub">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>').join("")||'<div class="sub">没有找到匹配记录。</div>');
+ }catch(e){out.textContent="知识库检索失败："+e.message;}
+ finally{button.disabled=false;}
+};
 document.getElementById("researchRun").onclick=async function(){
  const button=document.getElementById("researchRun");
  const out=document.getElementById("researchResult");
