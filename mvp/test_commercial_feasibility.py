@@ -4,6 +4,7 @@ import unittest
 try:
     from .commercial_feasibility import (
         build_feasibility_contract,
+        build_feasibility_draft,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
@@ -63,6 +64,25 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertEqual(set(contract["dimensions"]), set(REQUIRED_DIMENSIONS))
         self.assertTrue(contract["questions"]["unit_economics"])
         self.assertEqual(contract["budget_limit"], 1000)
+
+    def test_automatic_draft_marks_unknowns_and_costs_incomplete(self):
+        draft = build_feasibility_draft(
+            "评估长期记忆 NPC RPG",
+            sources=[{
+                "title": "Market report",
+                "url": "https://example.org/report",
+                "provider": "test",
+                "research_queries": ["competitors", "counter evidence"],
+            }],
+        )
+        self.assertFalse(draft["completion"]["complete"])
+        self.assertEqual(draft["evaluation"]["decision"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(draft["report"]["independent_source_count"], 0)
+        self.assertEqual(len(draft["report"]["dimensions"]), len(REQUIRED_DIMENSIONS))
+        self.assertEqual(draft["report"]["candidate_counter_evidence_refs"], ["S1"])
+        self.assertEqual(draft["report"]["counter_evidence_refs"], [])
+        self.assertEqual(draft["report"]["cost_model"]["status"], "needs_inputs")
+        self.assertTrue(any("成本情景" in item for item in draft["completion"]["blockers"]))
 
     def test_missing_evidence_never_passes(self):
         result = evaluate_commercial_feasibility({"dimensions": {}})
