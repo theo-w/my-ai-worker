@@ -4,7 +4,9 @@ Model output is treated as a design hypothesis, never as verified player researc
 """
 from __future__ import annotations
 
+import inspect
 import json
+import os
 
 SYSTEM_PROMPT = """You are JARVIS, an experienced game-design partner. Analyze design mechanisms, not surface features.
 Do not copy protected characters, story, world, maps, art, names, or signature mechanics from the reference game.
@@ -124,7 +126,19 @@ def create_design_brief(source_game: str = "塞尔达传说：王国之泪",
         "请按系统约定的 JSON schema 生成完整的机制分析和原创游戏 MVP brief。"
         "请避免复制参考游戏的具体表达。所有玩家心理与市场判断都标注为假设。"
     )
-    raw = llm_client.complete(SYSTEM_PROMPT, prompt)
+    try:
+        design_token_limit = int(os.getenv("JARVIS_LLM_DESIGN_MAX_TOKENS", "2048"))
+    except (TypeError, ValueError):
+        design_token_limit = 2048
+    design_token_limit = min(4096, max(64, design_token_limit))
+    try:
+        supports_token_override = "max_tokens" in inspect.signature(llm_client.complete).parameters
+    except (TypeError, ValueError):
+        supports_token_override = False
+    if supports_token_override:
+        raw = llm_client.complete(SYSTEM_PROMPT, prompt, max_tokens=design_token_limit)
+    else:
+        raw = llm_client.complete(SYSTEM_PROMPT, prompt)
     try:
         brief = json.loads(raw)
     except json.JSONDecodeError as exc:
