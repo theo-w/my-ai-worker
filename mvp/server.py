@@ -27,6 +27,7 @@ try:
     from .improvement import build_improvement_report
     from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
     from .game_knowledge import GameKnowledgeBase
+    from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
     from run import WORKERS, evaluate, run_worker
     from twin import DigitalTwin, AutonomousProjectLoop, PersistentTwinMemory
@@ -42,12 +43,18 @@ except ImportError:  # Direct script execution from mvp/
     from improvement import build_improvement_report
     from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
     from game_knowledge import GameKnowledgeBase
+    from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
 ROOT = Path(__file__).parent
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
-GAME_KNOWLEDGE = GameKnowledgeBase()
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+if SUPABASE_URL and SUPABASE_SECRET_KEY:
+    GAME_KNOWLEDGE = SupabaseGameKnowledgeBase(SUPABASE_URL, SUPABASE_SECRET_KEY)
+else:
+    GAME_KNOWLEDGE = GameKnowledgeBase()
 PROJECT_LOOP = AutonomousProjectLoop()
 WORKFORCE = WorkforceRegistry(path=os.getenv("JARVIS_WORKFORCE_STORE", "data/workforce.json"))
 def _build_worker_executor():
