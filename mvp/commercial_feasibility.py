@@ -231,10 +231,38 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "break_even_users",
         "gross_margin_percent",
     )
+    usage_estimate = estimate_model_usage_costs()
     scenarios = {
         scenario_name: {field: None for field in cost_fields}
         for scenario_name in ("conservative", "base", "optimistic")
     }
+    if usage_estimate.get("status") == "estimated":
+        for scenario_name, estimate in usage_estimate["scenarios"].items():
+            scenarios[scenario_name]["model_cost_per_session_usd"] = estimate["model_cost_per_session_usd"]
+            scenarios[scenario_name]["monthly_ai_inference_cost_usd_at_1000_users"] = estimate["monthly_ai_inference_cost_usd_at_1000_users"]
+            scenarios[scenario_name]["usage_assumptions"] = {
+                key: estimate[key] for key in (
+                    "calls_per_session", "input_tokens_per_call", "output_tokens_per_call",
+                    "sessions_per_user_month", "active_users"
+                )
+            }
+    cost_assumptions = [
+        "每次会话的调用数与 token 数是可编辑的情景假设，不是线上测量结果。",
+        "AI 推理成本不包括搜索、存储、托管、审核、人力与内容制作。",
+        "制作成本、月度总成本、收入、盈亏平衡点和毛利率仍需要实际输入。",
+    ]
+    if usage_estimate.get("status") == "estimated":
+        cost_assumptions.append("推理价格来源：" + str(usage_estimate.get("pricing_source")) +
+                                "；按峰时未缓存输入价格与输出价格估算，未计缓存折扣。")
+    else:
+        cost_assumptions.append(usage_estimate.get("message", "模型价格未知，尚不能估算美元推理成本。"))
+    required_inputs = [
+        "原型与垂直切片的人周、团队成本和时间盒",
+        "月活跃用户、会话频率、留存、转化与净收入假设",
+    ]
+    if usage_estimate.get("status") != "estimated":
+        required_inputs.insert(0, "模型输入/输出价格（按百万 token）")
+        required_inputs.insert(1, "每次会话的模型调用数、输入/输出 token 数及重试比例")
     report = {
         "goal": goal.strip(),
         "dimensions": dimensions,
@@ -243,18 +271,10 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "source_independence_review": "not_run",
         "prototype_evidence_refs": [],
         "cost_model": {
-            "status": "needs_inputs",
-            "assumptions": [
-                "没有独立核验所选模型的实时输入/输出单价。",
-                "每次核心循环的调用次数与 token 用量尚未通过运行日志测量。",
-                "开发人力成本、目标用户量、留存、转化和定价尚未提供或验证。",
-            ],
-            "required_inputs": [
-                "模型输入/输出价格（按百万 token）",
-                "每次会话的模型调用数、输入/输出 token 数及重试比例",
-                "原型与垂直切片的人周、团队成本和时间盒",
-                "月活跃用户、会话频率、留存、转化与净收入假设",
-            ],
+            "status": "partial_estimate" if usage_estimate.get("status") == "estimated" else "needs_inputs",
+            "assumptions": cost_assumptions,
+            "required_inputs": required_inputs,
+            "pricing_estimate": usage_estimate,
             "scenarios": scenarios,
         },
         "counter_evidence_refs": [],
@@ -267,7 +287,9 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "8 个评估维度尚未有可追溯的评分与理由",
         "来源独立性和关键主张的语义支持尚未独立核验",
         "缺少可运行原型/玩家实验的证据",
-        "成本情景缺少已验证的价格、使用量和商业假设",
+        ("AI 推理成本仅为透明假设下的粗估；制作成本、月度总成本、收入与盈亏平衡仍未验证"
+         if usage_estimate.get("status") == "estimated"
+         else "成本情景缺少可用模型价格与已验证的使用量、商业假设"),
         "反证仍是候选来源，尚未完成逐条审查",
     ]
     if errors:
