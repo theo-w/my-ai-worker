@@ -124,6 +124,8 @@ The adapter expects `POST {JARVIS_LLM_BASE_URL}/chat/completions` (or a base URL
 
 Check `GET /api/llm/status` to see whether the server started in `llm` or `simulated` mode. If the required variables are absent or configuration is invalid, the server stays in explicitly reported simulated mode. The LLM executor returns auditable task outputs, but it does not browse the web, verify claims, or create source-backed evidence. Do not treat a model response as a verified research finding or a business approval.
 
+LLM calls are bounded by `JARVIS_LLM_MAX_TOKENS` (default 768, allowed 64–4096) and `JARVIS_LLM_TIMEOUT_SECONDS` (default 45, allowed 1–120). The authenticated Dashboard button “验证模型连接” calls `POST /api/llm/smoke-test` once with a per-call 64-token cap. It reports only a safe status/model/latency summary and does not echo the provider response or exception detail. This validates a real provider round trip only when the button is clicked with valid admin authentication.
+
 The default Dashboard research pipeline remains separate: configure `JARVIS_SEARCH_ENDPOINT` to use the JSON search adapter. LLM execution and live search are distinct integrations and must both be configured to provide a real research-and-synthesis workflow.
 
 
