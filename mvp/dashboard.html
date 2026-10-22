@@ -222,7 +222,7 @@ document.getElementById("twinChatMic").addEventListener("click",()=>{
  };
  recognition.onerror=e=>{
   if(session!==twinRecognitionSession)return;
-  const errors={no-speech:"没有检测到语音",audio-capture:"无法访问麦克风",not-allowed:"麦克风权限被拒绝",network:"语音服务网络错误",aborted:"识别已中断"};
+  const errors={"no-speech":"没有检测到语音","audio-capture":"无法访问麦克风","not-allowed":"麦克风权限被拒绝","network":"语音服务网络错误","aborted":"识别已中断"};
   note.textContent="语音识别："+(errors[e.error]||e.error||"未成功")+"。已识别的文字会保留，可以再次点击继续或直接编辑。";
  };
  recognition.onend=()=>{
