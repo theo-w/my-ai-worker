@@ -247,7 +247,7 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
         }
 
 
-def run_live_research(query: str, limit: int = 5) -> dict:
+def run_live_research(query: str, limit: int = 5, include_llm_synthesis: bool = True) -> dict:
     """Search configured provider, deduplicate, quality-gate and optionally synthesize."""
     import os
     try:
@@ -267,7 +267,7 @@ def run_live_research(query: str, limit: int = 5) -> dict:
             "message": "No live search provider configured; no real research was performed.",
             "sources": [], "evidence": [], "quality": evaluate_evidence([]),
             "synthesis": synthesize(query, []).to_dict(),
-            "llm_synthesis": _synthesize_with_llm(query, []),
+            "llm_synthesis": _synthesize_with_llm(query, []) if include_llm_synthesis else {"status": "skipped_by_orchestrator", "text": None, "source_urls": [], "message": "LLM synthesis skipped to avoid duplicate model calls in the orchestrated workflow."},
         }
     try:
         provider = JsonHttpSearchProvider(
@@ -293,7 +293,10 @@ def run_live_research(query: str, limit: int = 5) -> dict:
         deterministic = synthesize(query, quality["items"])
         llm_synthesis = _synthesize_with_llm(
             query, [item for item in quality["items"] if item.get("quality_accepted")]
-        )
+        ) if include_llm_synthesis else {
+            "status": "skipped_by_orchestrator", "text": None, "source_urls": [],
+            "message": "LLM synthesis skipped to avoid duplicate model calls in the orchestrated workflow.",
+        }
         return {
             "ok": bool(sources),
             "status": "completed" if sources else "no_results",
