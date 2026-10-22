@@ -147,10 +147,40 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
         checks.append({"name": "prototype_evidence", "passed": prototype_ok,
                        "status": "pass" if prototype_ok else "fail"})
     cost_model = report.get("cost_model")
-    cost_ok = isinstance(cost_model, dict) and bool(cost_model.get("assumptions")) and bool(cost_model.get("scenarios"))
+    cost_model = cost_model if isinstance(cost_model, dict) else {}
+    scenarios = cost_model.get("scenarios")
+    scenarios = scenarios if isinstance(scenarios, dict) else {}
+    scenario_names = ("optimistic", "base", "conservative")
+    scenario_inputs_ok = bool(cost_model.get("assumptions")) and all(
+        isinstance(scenarios.get(name), dict)
+        and all(
+            isinstance(scenarios[name].get(key), (int, float))
+            and not isinstance(scenarios[name].get(key), bool)
+            and scenarios[name][key] > 0
+            for key in (
+                "prototype_person_weeks", "vertical_slice_person_weeks",
+                "monthly_active_users", "sessions_per_user_month",
+                "input_tokens_per_session", "output_tokens_per_session",
+            )
+        )
+        for name in scenario_names
+    )
+    pricing_ok = scenario_inputs_ok and all(
+        isinstance(scenarios[name].get("monthly_model_cost_usd"), (int, float))
+        and not isinstance(scenarios[name].get("monthly_model_cost_usd"), bool)
+        and scenarios[name]["monthly_model_cost_usd"] >= 0
+        and isinstance(scenarios[name].get("prototype_labor_cost_usd"), (int, float))
+        and not isinstance(scenarios[name].get("prototype_labor_cost_usd"), bool)
+        and scenarios[name]["prototype_labor_cost_usd"] >= 0
+        for name in scenario_names
+    )
     if policy["require_cost_model"]:
-        checks.append({"name": "cost_model", "passed": cost_ok,
-                       "status": "pass" if cost_ok else "fail"})
+        checks.append({"name": "cost_model_scenario_assumptions", "passed": scenario_inputs_ok,
+                       "status": "pass" if scenario_inputs_ok else "fail",
+                       "reason": None if scenario_inputs_ok else "all three scenarios need quantified usage and effort assumptions"})
+        checks.append({"name": "cost_model_pricing", "passed": pricing_ok,
+                       "status": "pass" if pricing_ok else "fail",
+                       "reason": None if pricing_ok else "provider token prices and developer cost rate must be configured; null is not zero"})
     counter_refs = report.get("counter_evidence_refs")
     counter_ok = isinstance(counter_refs, list) and bool(counter_refs)
     if policy["require_counter_evidence"]:
