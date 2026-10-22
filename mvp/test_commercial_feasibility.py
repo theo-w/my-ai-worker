@@ -1,5 +1,6 @@
 """Tests for the conservative commercial-feasibility decision gate."""
 import unittest
+from unittest.mock import patch
 
 try:
     from .commercial_feasibility import (
@@ -109,10 +110,12 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertIn("模拟演示", " ".join(decision["risks"]))
         self.assertIn("仅限演示", decision["next_step"])
 
-    def test_deepseek_flash_usage_cost_estimate_uses_official_peak_rates(self, monkeypatch):
-        monkeypatch.setenv("JARVIS_LLM_BASE_URL", "https://api.deepseek.com/v1")
-        monkeypatch.setenv("JARVIS_LLM_MODEL", "deepseek-flash")
-        estimate = estimate_model_usage_costs()
+    def test_deepseek_flash_usage_cost_estimate_uses_official_peak_rates(self):
+        with patch.dict("os.environ", {
+            "JARVIS_LLM_BASE_URL": "https://api.deepseek.com/v1",
+            "JARVIS_LLM_MODEL": "deepseek-flash",
+        }, clear=True):
+            estimate = estimate_model_usage_costs()
         self.assertEqual(estimate["status"], "estimated")
         self.assertEqual(estimate["scenarios"]["conservative"]["input_rate_usd_per_million_tokens"], 0.30)
         self.assertEqual(estimate["scenarios"]["conservative"]["output_rate_usd_per_million_tokens"], 1.20)
@@ -131,10 +134,12 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertEqual(estimate["status"], "deprecated_model_alias")
         self.assertIn("deepseek-flash", estimate["message"])
 
-    def test_configured_rates_support_other_llm_providers(self, monkeypatch):
-        monkeypatch.setenv("JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS", "0.5")
-        monkeypatch.setenv("JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS", "1.5")
-        estimate = estimate_model_usage_costs("custom-model", "https://llm.example/v1")
+    def test_configured_rates_support_other_llm_providers(self):
+        with patch.dict("os.environ", {
+            "JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS": "0.5",
+            "JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS": "1.5",
+        }, clear=True):
+            estimate = estimate_model_usage_costs("custom-model", "https://llm.example/v1")
         self.assertEqual(estimate["status"], "estimated")
         self.assertEqual(estimate["pricing_mode"], "configured_flat_rates")
 
