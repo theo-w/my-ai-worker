@@ -13,6 +13,7 @@ except ImportError:
     from commercial_feasibility import (
         build_feasibility_contract,
         build_feasibility_draft,
+        apply_feasibility_gate,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
