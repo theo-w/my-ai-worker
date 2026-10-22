@@ -11,6 +11,7 @@ try:
 except ImportError:
     from commercial_feasibility import (
         build_feasibility_contract,
+        build_feasibility_draft,
         evaluate_commercial_feasibility,
         REQUIRED_DIMENSIONS,
     )
