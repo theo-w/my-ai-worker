@@ -97,6 +97,16 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertLessEqual(decision["confidence"], 50)
         self.assertIn("成本情景", " ".join(draft["completion"]["blockers"]))
 
+    def test_demo_handoff_stays_explicitly_demo_only(self):
+        draft = build_feasibility_draft("Evaluate an AI-native game")
+        decision = apply_feasibility_gate(
+            {"recommendation": "DEMO_GO_TO_PROTOTYPE", "confidence": 50, "risks": [], "next_step": "demo"},
+            draft,
+        )
+        self.assertEqual(decision["recommendation"], "DEMO_GO_TO_PROTOTYPE")
+        self.assertIn("模拟演示", " ".join(decision["risks"]))
+        self.assertIn("仅限演示", decision["next_step"])
+
     def test_missing_evidence_never_passes(self):
         result = evaluate_commercial_feasibility({"dimensions": {}})
         self.assertEqual(result["decision"], "INSUFFICIENT_EVIDENCE")
