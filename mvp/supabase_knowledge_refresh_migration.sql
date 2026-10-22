@@ -1,5 +1,11 @@
 -- Run in Supabase SQL Editor before deploying the topic-aware refresh code.
--- Isolated additive migration: leaves existing knowledge rows intact.
+-- Additive migration: leaves existing knowledge rows intact.
+-- The application now tracks recrawl metadata on source rows; add these columns
+-- before deploying the updated application so Supabase REST upserts keep working.
+alter table public.jarvis_game_knowledge
+  add column if not exists last_checked_query text not null default '',
+  add column if not exists last_check_status text not null default '';
+
 create table if not exists public.jarvis_knowledge_changes (
   id text primary key,
   source_id text not null,
