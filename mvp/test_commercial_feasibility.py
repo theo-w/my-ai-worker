@@ -24,8 +24,33 @@ def strong_report():
         "independent_source_count": 4,
         "prototype_evidence_refs": ["prototype-test-1"],
         "cost_model": {
-            "assumptions": ["AI cost per session"],
-            "scenarios": {"conservative": {}, "base": {}, "optimistic": {}},
+            "assumptions": ["Illustrative model price and usage assumptions; validate against provider invoices."],
+            "scenarios": {
+                "conservative": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+                "base": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+                "optimistic": {
+                "prototype_cost_usd": 5000,
+                "model_cost_per_session_usd": 0.02,
+                "monthly_cost_usd_at_1000_users": 600,
+                "monthly_revenue_usd_at_1000_users": 1500,
+                "break_even_users": 400,
+                "gross_margin_percent": 60,
+            },
+            },
         },
         "counter_evidence_refs": ["counter-1"],
     }
@@ -63,6 +88,17 @@ class CommercialFeasibilityTests(unittest.TestCase):
         report["critical_blockers"] = [{"reason": "Core mechanic cannot be delivered within legal constraints"}]
         result = evaluate_commercial_feasibility(report)
         self.assertEqual(result["decision"], "NO_GO")
+
+    def test_empty_cost_scenarios_do_not_pass_cost_gate(self):
+        report = strong_report()
+        report["cost_model"]["scenarios"] = {
+            "conservative": {}, "base": {}, "optimistic": {}
+        }
+        result = evaluate_commercial_feasibility(report)
+        cost_check = next(c for c in result["checks"] if c["name"] == "cost_model")
+        self.assertFalse(cost_check["passed"])
+        self.assertTrue(cost_check["errors"])
+        self.assertNotEqual(result["decision"], "GO_TO_PROTOTYPE")
 
     def test_missing_cost_model_blocks_go(self):
         report = strong_report()
