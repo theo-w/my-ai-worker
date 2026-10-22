@@ -68,4 +68,19 @@ A completed *assessment* may conclude NO_GO or INSUFFICIENT_EVIDENCE. Completion
 
 ## Current implementation boundary
 
-The server exposes authenticated `POST /api/feasibility/contract` and `POST /api/feasibility/evaluate` routes, plus `GET /api/feasibility` for the current in-memory assessment state. The evaluator creates the discovery contract and applies conservative structural gates. Its evaluator checks that a report contains dimension scores, evidence references, source-count metadata, counter-evidence, prototype evidence and a cost model. It cannot independently prove that cited sources are genuinely independent, that estimates are accurate, or that a prototype actually ran. Those need server-side evidence resolution, real experiment records and independent verification before this gate can be treated as production-grade.
+The server exposes authenticated `POST /api/feasibility/contract` and `POST /api/feasibility/evaluate` routes, plus `GET /api/feasibility` for the current in-memory assessment state. 
+## Automatic run integration and cost inputs
+
+The main JARVIS run now creates a feasibility assessment automatically after its primary research, a separate counter-search, and any current-run concept generation. The report records source candidates with stable IDs and marks unsupported dimensions as `unknown`; it does not require the user to hand-author JSON just to see the result. The dashboard shows the decision, all eight dimensions, source/counter-source candidates, and the cost assumptions.
+
+The cost model deliberately separates **quantified planning assumptions** from **priced USD estimates**. It includes optimistic/base/conservative prototype and vertical-slice effort, active-user/session assumptions, and token-use assumptions. It computes dollar costs only when provider-specific prices and a developer cost rate are explicitly configured:
+
+- `JARVIS_LLM_INPUT_COST_PER_MILLION_USD`
+- `JARVIS_LLM_OUTPUT_COST_PER_MILLION_USD`
+- `JARVIS_GAME_DEV_COST_PER_PERSON_WEEK_USD`
+
+These variables must be set to current values appropriate for the configured model and your cost basis. They are intentionally not populated automatically from a model name because provider pricing can change and model aliases may have different rates. If a value is absent or invalid, the relevant dollar cost stays `null`, never zero. A missing price, unknown assessment dimension, absent counter-evidence, or missing measurable prototype plan blocks `GO_TO_PROTOTYPE`.
+
+The orchestration runs primary and counter-search separately but skips duplicate LLM research synthesis in those calls. Model output is still not source evidence. The current automatic assessment is a conservative baseline: it can conclude `INSUFFICIENT_EVIDENCE` and list exactly what remains unknown; it does not yet independently verify URL contents, source ownership/independence, real player behavior, or prototype telemetry.
+
+The evaluator creates the discovery contract and applies conservative structural gates. Its evaluator checks that a report contains dimension scores, evidence references, source-count metadata, counter-evidence, prototype evidence and a cost model. It cannot independently prove that cited sources are genuinely independent, that estimates are accurate, or that a prototype actually ran. Those need server-side evidence resolution, real experiment records and independent verification before this gate can be treated as production-grade.
