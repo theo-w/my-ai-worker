@@ -92,12 +92,22 @@ STATE = {
     "knowledge": {"status": "not_started", "retrieved": [], "ingest": None},
 }
 
+def _is_game_feasibility_goal(goal: str) -> bool:
+    value = str(goal or "").lower()
+    return any(term in value for term in (
+        "游戏", "玩法", "rpg", "npc", "gameplay", "video game",
+        "ai-native game", "ai native game", "ai 原生游戏", "prototype",
+    ))
+
+
 def reset(goal: str):
     team = TWIN.form_team(goal, WORKERS)
     prior_knowledge = GAME_KNOWLEDGE.search(goal, 5)
     prior_feasibility = STATE.get("feasibility") or {}
     contract = prior_feasibility.get("contract")
-    if not isinstance(contract, dict) or contract.get("goal") != goal:
+    if not _is_game_feasibility_goal(goal):
+        contract = None
+    elif not isinstance(contract, dict) or contract.get("goal") != goal:
         contract = build_feasibility_contract(goal)
     with LOCK:
         STATE["goal"] = goal
@@ -115,7 +125,7 @@ def reset(goal: str):
         STATE["design"] = {"status": "blocked", "reason": "等待本轮真实调研与可接受证据", "brief": None}
         STATE["decision"] = None
         STATE["prototype"] = None
-        STATE["feasibility"] = {"status": "researching", "contract": contract, "report": None, "evaluation": None}
+        STATE["feasibility"] = {"status": "researching" if contract else "not_applicable", "contract": contract, "report": None, "evaluation": None}
         STATE["twin"] = TWIN.snapshot(goal, team)
 
 def execute(goal: str):
@@ -264,31 +274,40 @@ def execute(goal: str):
         research_snapshot = dict(STATE.get("research") or {})
         design_snapshot = dict(STATE.get("design") or {})
         prior_contract = (STATE.get("feasibility") or {}).get("contract")
-    feasibility_analysis = None
-    llm_client = getattr(WORKER_EXECUTOR, "client", None)
-    if llm_client is not None and int((research_snapshot.get("quality") or {}).get("accepted", 0) or 0) > 0:
-        try:
-            feasibility_analysis = analyze_feasibility_with_llm(
-                goal, research_snapshot, research_snapshot.get("counter_research"),
-                design_snapshot.get("brief"), llm_client,
-            )
-        except Exception as analysis_exc:
-            feasibility_analysis = {"status": "model_analysis_failed", "error_type": type(analysis_exc).__name__}
-    feasibility_report = build_automatic_feasibility_report(
-        goal, research_snapshot, research_snapshot.get("counter_research"),
-        design_snapshot.get("brief"), analysis=feasibility_analysis,
-    )
-    feasibility_evaluation = evaluate_commercial_feasibility(feasibility_report)
-    with LOCK:
-        STATE["feasibility"] = {
-            "status": "completed_with_gaps" if feasibility_evaluation.get("decision") == "INSUFFICIENT_EVIDENCE" else "evaluated",
-            "contract": prior_contract, "report": feasibility_report, "evaluation": feasibility_evaluation,
-        }
+    feasibility_evaluation = None
+    if prior_contract:
+        feasibility_analysis = None
+        llm_client = getattr(WORKER_EXECUTOR, "client", None)
+        if llm_client is not None and int((research_snapshot.get("quality") or {}).get("accepted", 0) or 0) > 0:
+            try:
+                feasibility_analysis = analyze_feasibility_with_llm(
+                    goal, research_snapshot, research_snapshot.get("counter_research"),
+                    design_snapshot.get("brief"), llm_client,
+                )
+            except Exception as analysis_exc:
+                feasibility_analysis = {"status": "model_analysis_failed", "error_type": type(analysis_exc).__name__}
+        feasibility_report = build_automatic_feasibility_report(
+            goal, research_snapshot, research_snapshot.get("counter_research"),
+            design_snapshot.get("brief"), analysis=feasibility_analysis,
+        )
+        feasibility_evaluation = evaluate_commercial_feasibility(feasibility_report)
+        with LOCK:
+            STATE["feasibility"] = {
+                "status": "completed_with_gaps" if feasibility_evaluation.get("decision") == "INSUFFICIENT_EVIDENCE" else "evaluated",
+                "contract": prior_contract, "report": feasibility_report, "evaluation": feasibility_evaluation,
+            }
+        gate_decision = feasibility_evaluation.get("decision", "INSUFFICIENT_EVIDENCE")
+    else:
+        gate_decision = None
+        with LOCK:
+            STATE["feasibility"] = {"status": "not_applicable", "contract": None, "report": None, "evaluation": None}
     evidence = [type("E", (), item) for item in STATE["evidence"]]
     decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
-    gate_decision = feasibility_evaluation.get("decision", "INSUFFICIENT_EVIDENCE")
     demo_only = isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor) and not os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip() and not all(os.getenv(key, "").strip() for key in ("JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"))
-    if demo_only:
+    if gate_decision is None:
+        # The game-specific feasibility gate is not applied to unrelated employee tasks.
+        pass
+    elif demo_only:
         # Explicit simulation may demonstrate the handoff, never a business approval.
         decision.recommendation = "DEMO_GO_TO_PROTOTYPE"
         decision.confidence = 50
@@ -305,7 +324,7 @@ def execute(goal: str):
     else:
         decision.recommendation = "HOLD_FOR_EVIDENCE"
         decision.next_step = "可行性评估已记录，但关键维度、反证、价格或原型证据不足；补齐后再决定是否进入 Prototype。"
-    if gate_decision != "GO_TO_PROTOTYPE":
+    if gate_decision is not None and gate_decision != "GO_TO_PROTOTYPE":
         if not demo_only:
             decision.confidence = min(int(decision.confidence), 42)
         decision.risks.append("商业可行性闸门：" + gate_decision + "；不得仅凭员工完成或模型意见批准原型。")
