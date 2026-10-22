@@ -93,6 +93,34 @@ class SupabaseGameKnowledgeBase(GameKnowledgeBase):
         except RuntimeError as exc:
             self.backend_error = str(exc)
 
+    def ingest_sources(self, query: str, sources: list[dict], evidence: list[dict] | None = None) -> dict:
+        result = super().ingest_sources(query, sources, evidence)
+        changes = result.get("changes") or []
+        if changes:
+            try:
+                endpoint = f"{self.supabase_url}/rest/v1/jarvis_knowledge_changes?on_conflict=id"
+                body = json.dumps(changes, ensure_ascii=False).encode("utf-8")
+                request = Request(endpoint, data=body, method="POST", headers={
+                    "apikey": self.secret_key,
+                    "Authorization": f"Bearer {self.secret_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Prefer": "resolution=merge-duplicates,return=minimal",
+                })
+                with urlopen(request, timeout=8) as response:
+                    response.read()
+            except HTTPError as exc:
+                self.backend_error = (
+                    "Knowledge rows saved, but change history table is unavailable "
+                    f"(HTTP {exc.code}); run mvp/supabase_knowledge_refresh_migration.sql"
+                )
+            except (URLError, TimeoutError, OSError):
+                self.backend_error = (
+                    "Knowledge rows saved, but change history could not be synced; "
+                    "check Supabase connectivity and run the migration SQL"
+                )
+        return result
+
     def summary(self) -> dict:
         result = super().summary()
         result.update({

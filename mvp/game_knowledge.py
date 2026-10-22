@@ -66,7 +66,7 @@ class GameKnowledgeBase:
             temporary.replace(target)
 
     def ingest_sources(self, query: str, sources: list[dict], evidence: list[dict] | None = None) -> dict:
-        """Store traceable source records; a search excerpt is not independently verified."""
+        """Deduplicate by source URL; retain stable text and emit history for material changes."""
         accepted_urls = {
             str((item.get("source") or {}).get("url", "")).split("#", 1)[0].rstrip("/")
             for item in (evidence or [])
@@ -74,6 +74,12 @@ class GameKnowledgeBase:
         }
         inserted = 0
         updated = 0
+        unchanged = 0
+        changes = []
+        now = _now()
+        query_text = str(query or "")[:2000]
+        query_tokens = sorted(_tokens(query_text))
+        topic_key = hashlib.sha256(" ".join(query_tokens).encode("utf-8")).hexdigest()[:24]
         with self._lock:
             by_url = {str(row.get("url", "")).split("#", 1)[0].rstrip("/"): row for row in self._records if row.get("url")}
             for source in sources or []:
@@ -87,30 +93,66 @@ class GameKnowledgeBase:
                 normalized = url.split("#", 1)[0].rstrip("/")
                 quality_accepted = normalized in accepted_urls
                 existing = by_url.get(normalized)
-                record = {
-                    "id": hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16],
-                    "title": title[:500],
-                    "url": normalized,
-                    "snippet": snippet[:4000],
-                    "query": str(query or "")[:2000],
-                    "provider": str(source.get("provider", "unknown"))[:100],
-                    "published_at": source.get("published_at"),
-                    "first_seen_at": (existing or {}).get("first_seen_at", _now()),
-                    "last_seen_at": _now(),
-                    "seen_count": int((existing or {}).get("seen_count", 0)) + 1,
-                    "quality_accepted_at_capture": quality_accepted,
-                    "knowledge_status": "source_backed_unverified",
-                    "verification_note": "Search excerpt retained for retrieval; page truth, source independence and semantic support are not independently verified.",
-                }
-                if existing:
-                    existing.update(record)
-                    updated += 1
-                else:
+                if not existing:
+                    record = {
+                        "id": hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16],
+                        "title": title[:500], "url": normalized, "snippet": snippet[:4000],
+                        "query": query_text, "provider": str(source.get("provider", "unknown"))[:100],
+                        "published_at": source.get("published_at"), "first_seen_at": now,
+                        "last_seen_at": now, "seen_count": 1,
+                        "quality_accepted_at_capture": quality_accepted,
+                        "knowledge_status": "source_backed_unverified",
+                        "verification_note": "Search excerpt retained for retrieval; page truth, source independence and semantic support are not independently verified.",
+                    }
                     self._records.append(record)
                     by_url[normalized] = record
                     inserted += 1
+                    continue
+
+                old_title = str(existing.get("title", ""))
+                old_snippet = str(existing.get("snippet", ""))
+                old_tokens = _tokens(old_title + " " + old_snippet)
+                new_tokens = _tokens(title + " " + snippet)
+                similarity = len(old_tokens & new_tokens) / max(1, len(old_tokens | new_tokens))
+                materially_changed = similarity < 0.72 or (
+                    bool(existing.get("published_at")) and bool(source.get("published_at"))
+                    and str(existing.get("published_at")) != str(source.get("published_at"))
+                    and similarity < 0.88
+                )
+                existing["last_seen_at"] = now
+                existing["seen_count"] = int(existing.get("seen_count", 0)) + 1
+                existing["last_checked_query"] = query_text
+                existing["last_check_status"] = "material_change" if materially_changed else "no_material_change"
+                # Preserve the original topic/query association and stable content on routine recrawls.
+                if materially_changed:
+                    changes.append({
+                        "id": hashlib.sha256((existing["id"] + now + old_snippet + snippet).encode("utf-8")).hexdigest()[:32],
+                        "source_id": existing["id"], "topic_key": topic_key, "query": query_text,
+                        "change_type": "material_source_update", "old_title": old_title,
+                        "new_title": title[:500], "old_snippet": old_snippet,
+                        "new_snippet": snippet[:4000], "source_url": normalized,
+                        "detected_at": now,
+                        "reason": "Title/snippet token overlap fell below the material-change threshold; review evidence before changing any synthesized conclusion.",
+                    })
+                    existing.update({
+                        "title": title[:500], "snippet": snippet[:4000],
+                        "provider": str(source.get("provider", "unknown"))[:100],
+                        "published_at": source.get("published_at"),
+                        "query": query_text,
+                        "quality_accepted_at_capture": quality_accepted,
+                        "knowledge_status": "source_backed_unverified",
+                        "verification_note": "Material source change detected; the new excerpt is still unverified and must not alone be treated as a confirmed fact.",
+                    })
+                    updated += 1
+                else:
+                    # Refresh metadata only; don't rewrite stable knowledge with equivalent snippets.
+                    existing["quality_accepted_at_capture"] = bool(existing.get("quality_accepted_at_capture") or quality_accepted)
+                    unchanged += 1
             self.save()
-        return {"inserted": inserted, "updated": updated, "total": self.count()}
+        return {
+            "inserted": inserted, "updated": updated, "unchanged": unchanged,
+            "changes": changes, "topic_key": topic_key, "total": self.count(),
+        }
 
     def search(self, query: str, limit: int = 8) -> dict:
         query = str(query or "").strip()
