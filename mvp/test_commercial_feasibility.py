@@ -54,7 +54,7 @@ class CommercialFeasibilityTests(unittest.TestCase):
         result = evaluate_commercial_feasibility(strong_report())
         self.assertEqual(result["decision"], "GO_TO_PROTOTYPE")
         self.assertFalse(result["verified_truth"])
-        self.assertTrue(any(c["name"] == "cost_model" and c["passed"] for c in result["checks"]))
+        self.assertTrue(any(c["name"] == "cost_model_pricing" and c["passed"] for c in result["checks"]))
 
     def test_weak_dimension_requests_iteration_not_automatic_no_go(self):
         report = strong_report()
