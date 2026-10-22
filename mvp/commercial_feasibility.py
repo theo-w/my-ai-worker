@@ -7,6 +7,8 @@ Scores are decision aids, not empirical probabilities.
 from __future__ import annotations
 
 import math
+import os
+from urllib.parse import urlsplit
 from typing import Any
 
 REQUIRED_DIMENSIONS = (
@@ -87,6 +89,98 @@ def build_feasibility_contract(goal: str, budget: float | None = None,
         "note": "The contract defines what must be investigated; it is not itself evidence of feasibility.",
     }
 
+
+
+
+def estimate_model_usage_costs(model: str | None = None, base_url: str | None = None) -> dict[str, Any]:
+    """Estimate inference-only cost under explicit usage assumptions.
+
+    Official DeepSeek peak cache-miss prices are used only for recognized model
+    IDs on api.deepseek.com. Other providers require explicit per-million-token
+    rates via environment variables. This is a scenario estimate, not measured
+    production usage; provider pricing may change.
+    """
+    model_name = (model if model is not None else os.getenv("JARVIS_LLM_MODEL", "")).strip()
+    endpoint = (base_url if base_url is not None else os.getenv("JARVIS_LLM_BASE_URL", "")).strip()
+    host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
+    if host == "api.deepseek.com":
+        if model_name in {"deepseek-chat", "deepseek-reasoner"}:
+            return {
+                "status": "deprecated_model_alias",
+                "model": model_name,
+                "message": "This DeepSeek model alias was retired; switch to deepseek-flash or deepseek-v4-pro before estimating or calling the provider.",
+                "pricing_source": "https://api-docs.deepseek.com/updates/",
+                "pricing_checked_at": "2026-10-22",
+            }
+        rates = {
+            "deepseek-flash": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-flash": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-flash-vision-exp": {"input_peak": 0.30, "input_off_peak": 0.15, "output_peak": 1.20, "output_off_peak": 0.60},
+            "deepseek-v4-pro": {"input_peak": 1.32, "input_off_peak": 0.66, "output_peak": 3.96, "output_off_peak": 1.98},
+        }
+        rate = rates.get(model_name)
+        source = "https://api-docs.deepseek.com/quick_start/pricing/"
+        pricing_mode = "official_peak_cache_miss_rates"
+    else:
+        try:
+            input_rate = float(os.getenv("JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS", ""))
+            output_rate = float(os.getenv("JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS", ""))
+            if not math.isfinite(input_rate) or not math.isfinite(output_rate) or input_rate < 0 or output_rate < 0:
+                raise ValueError
+            rate = {"input_peak": input_rate, "input_off_peak": input_rate,
+                    "output_peak": output_rate, "output_off_peak": output_rate}
+            source = "operator_configured_rates"
+            pricing_mode = "configured_flat_rates"
+        except (TypeError, ValueError):
+            rate = None
+            source = None
+            pricing_mode = None
+
+    if rate is None:
+        return {
+            "status": "pricing_unavailable",
+            "model": model_name or None,
+            "message": "No recognized official price schedule or configured input/output rates are available.",
+            "required_env": [
+                "JARVIS_LLM_INPUT_USD_PER_MILLION_TOKENS",
+                "JARVIS_LLM_OUTPUT_USD_PER_MILLION_TOKENS",
+            ],
+        }
+
+    usage = {
+        "conservative": {"calls_per_session": 12, "input_tokens_per_call": 6000, "output_tokens_per_call": 768, "sessions_per_user_month": 60},
+        "base": {"calls_per_session": 6, "input_tokens_per_call": 3000, "output_tokens_per_call": 512, "sessions_per_user_month": 20},
+        "optimistic": {"calls_per_session": 3, "input_tokens_per_call": 1500, "output_tokens_per_call": 256, "sessions_per_user_month": 10},
+    }
+    scenarios = {}
+    for name, assumptions in usage.items():
+        input_cost = assumptions["input_tokens_per_call"] * rate["input_peak"] / 1_000_000
+        output_cost = assumptions["output_tokens_per_call"] * rate["output_peak"] / 1_000_000
+        per_session = round((input_cost + output_cost) * assumptions["calls_per_session"], 8)
+        monthly_sessions = assumptions["sessions_per_user_month"] * 1000
+        scenarios[name] = {
+            **assumptions,
+            "active_users": 1000,
+            "input_rate_usd_per_million_tokens": rate["input_peak"],
+            "output_rate_usd_per_million_tokens": rate["output_peak"],
+            "model_cost_per_session_usd": per_session,
+            "monthly_ai_inference_cost_usd_at_1000_users": round(per_session * monthly_sessions, 2),
+        }
+    return {
+        "status": "estimated",
+        "model": model_name,
+        "currency": "USD",
+        "pricing_mode": pricing_mode,
+        "price_basis": "peak input cache-miss and output rates; cache savings excluded",
+        "pricing_source": source,
+        "pricing_checked_at": "2026-10-22" if source != "operator_configured_rates" else None,
+        "scenarios": scenarios,
+        "limitations": [
+            "Inference-only; excludes search, storage, hosting, moderation, human labor, and content production.",
+            "Token and session counts are illustrative assumptions, not measured usage.",
+            "Peak cache-miss pricing is used to avoid relying on cache savings or off-peak scheduling.",
+        ],
+    }
 
 
 def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = None,
