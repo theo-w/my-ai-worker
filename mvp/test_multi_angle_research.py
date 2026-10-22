@@ -17,6 +17,8 @@ def test_batch_research_covers_multiple_angles_and_deduplicates_sources():
             return [first, duplicate]
         if "target players" in query:
             return [player]
+        if "cost" in query:
+            return [first]
         return []
 
     queries = [
@@ -36,7 +38,7 @@ def test_batch_research_covers_multiple_angles_and_deduplicates_sources():
     assert result["coverage"]["requested_angles"] == 3
     assert result["coverage"]["successful_angles"] == 3
     assert result["coverage"]["comprehensive"] is True
-    assert len(result["sources"][0]["research_queries"]) == 1
+    assert len(result["sources"][0]["research_queries"]) == 2
 
 
 def test_batch_research_surfaces_partial_provider_failures():
