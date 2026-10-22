@@ -276,7 +276,7 @@ def execute(goal: str):
     evidence = [type("E", (), item) for item in STATE["evidence"]]
     decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
     gate_decision = feasibility_evaluation.get("decision", "INSUFFICIENT_EVIDENCE")
-    demo_only = isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor)
+    demo_only = isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor) and not os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip() and not all(os.getenv(key, "").strip() for key in ("JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"))
     if demo_only:
         # Explicit simulation may demonstrate the handoff, never a business approval.
         decision.recommendation = "DEMO_GO_TO_PROTOTYPE"
