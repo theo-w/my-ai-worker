@@ -104,9 +104,13 @@ def test_dashboard_executor_does_not_turn_llm_output_into_evidence():
         server.reset("Test an AI-native game")
         server.execute("Test an AI-native game")
         assert server.STATE["phase"] == "decision"
-        assert all(a["status"] == "completed" for a in server.STATE["agents"])
-        assert all("LLM analysis artifact" in a["output"] for a in server.STATE["agents"])
+        research_agents = [a for a in server.STATE["agents"] if "research" in a["capability"]]
+        analysis_agents = [a for a in server.STATE["agents"] if "research" not in a["capability"]]
+        assert research_agents and all(a["status"] == "blocked" for a in research_agents)
+        assert analysis_agents and all(a["status"] == "completed" for a in analysis_agents)
+        assert all("LLM analysis artifact" in a["output"] for a in analysis_agents)
         assert server.STATE["evidence"] == []
+        assert server.STATE["feasibility"]["evaluation"]["decision"] == "INSUFFICIENT_EVIDENCE"
         assert server.STATE["decision"]["recommendation"] == "HOLD_FOR_EVIDENCE"
     finally:
         server.WORKER_EXECUTOR = original
