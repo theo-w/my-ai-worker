@@ -119,7 +119,7 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
         score = item.get("score")
         refs = item.get("evidence_refs", [])
         rationale = item.get("rationale")
-        if not isinstance(score, (int, float)) or isinstance(score, bool) or not 1 <= score <= 5:
+        if not isinstance(score, (int, float)) or isinstance(score, bool) or not math.isfinite(score) or not 1 <= score <= 5:
             missing.append(name)
             checks.append({"name": name, "status": "unknown", "passed": False,
                            "reason": "score must be between 1 and 5"})
@@ -137,7 +137,7 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
                        "passed": passed, "score": score, "evidence_refs": refs})
 
     source_count = report.get("independent_source_count")
-    source_ok = isinstance(source_count, int) and source_count >= policy["min_independent_sources"]
+    source_ok = isinstance(source_count, int) and not isinstance(source_count, bool) and source_count >= policy["min_independent_sources"]
     checks.append({"name": "independent_sources", "passed": source_ok,
                    "status": "pass" if source_ok else "fail",
                    "observed": source_count, "required": policy["min_independent_sources"]})
@@ -177,11 +177,12 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
                 if not valid_number:
                     scenario_errors.append(f"{scenario_name}.{field} must be numeric")
                     continue
-                if not math.isfinite(value) or value < 0:
-                    scenario_errors.append(f"{scenario_name}.{field} must be finite and non-negative")
-            margin = scenario.get("gross_margin_percent")
-            if isinstance(margin, (int, float)) and not isinstance(margin, bool) and margin > 100:
-                scenario_errors.append(f"{scenario_name}.gross_margin_percent must not exceed 100")
+                if not math.isfinite(value):
+                    scenario_errors.append(f"{scenario_name}.{field} must be finite")
+                elif field == "gross_margin_percent" and not -100 <= value <= 100:
+                    scenario_errors.append(f"{scenario_name}.gross_margin_percent must be between -100 and 100")
+                elif field != "gross_margin_percent" and value < 0:
+                    scenario_errors.append(f"{scenario_name}.{field} must be non-negative")
     cost_ok = not scenario_errors
     if policy["require_cost_model"]:
         checks.append({"name": "cost_model", "passed": cost_ok, "status": "pass" if cost_ok else "fail",
