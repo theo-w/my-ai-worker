@@ -141,11 +141,94 @@ def _accepted_sources(research: dict | None, prefix: str) -> list[dict]:
     return rows
 
 
+def analyze_feasibility_with_llm(
+    goal: str, research: dict | None, counter_research: dict | None,
+    design_brief: dict | None, llm_client,
+) -> dict:
+    """Ask the configured model for a concise, source-ID-bound assessment.
+
+    This is a judgment aid, not an independent truth verifier. Unknowns remain
+    explicit, and any citation not in the accepted source registry is rejected.
+    """
+    primary = _accepted_sources(research, "S")
+    counter = _accepted_sources(counter_research, "C")
+    primary_urls = {row["url"].split("#", 1)[0].rstrip("/") for row in primary}
+    counter = [row for row in counter if row["url"].split("#", 1)[0].rstrip("/") not in primary_urls]
+    for index, row in enumerate(counter, 1):
+        row["id"] = "C" + str(index)
+    registry = primary + counter
+    allowed_ids = {row["id"] for row in registry}
+    if not registry:
+        return {"dimensions": {}, "critical_blockers": [], "unresolved_questions": [], "status": "skipped_no_sources"}
+    source_context = "\n".join(
+        f'[{row["id"]}] {row["title"]} | {row["url"]} | {row["snippet"][:260]}'
+        for row in registry
+    )[:4500]
+    brief = design_brief if isinstance(design_brief, dict) else {}
+    concept = brief.get("original_concept") or {}
+    concept_context = json.dumps({
+        "title": concept.get("title"),
+        "one_line": concept.get("one_line"),
+        "core_loop": concept.get("core_loop"),
+        "differentiation_hypothesis": concept.get("differentiation"),
+        "prototype_plan": brief.get("prototype_plan") or concept.get("prototype_plan"),
+    }, ensure_ascii=False)[:1200]
+    system = (
+        "You are a skeptical commercial feasibility reviewer. Return only valid compact JSON with keys "
+        "dimensions, unresolved_questions. For each of these dimension keys: " + ", ".join(REQUIRED_DIMENSIONS) +
+        ', return {"score":1..5 or null,"evidence_refs":["S1" or "C1"],"rationale":"short","confidence":"low|medium|high"}. '
+        "Use only the supplied source IDs. If the supplied sources do not directly support a dimension, use score null and empty evidence_refs. "
+        "Do not treat search snippets as verified facts. Never invent user interviews, paid behavior, retention data, prototype measurements, "
+        "provider prices, or development quotes. player_value and retention_and_replayability require direct player/behavior evidence; "
+        "technical_feasibility requires measurements from the target prototype; unit_economics and production_cost require actual pricing/rate inputs. "
+        "For those dimensions, return unknown unless that specific evidence is present in the input. Scores are provisional judgments, not probabilities."
+    )
+    prompt = (
+        "Goal: " + goal[:1000] + "\nConcept summary JSON: " + concept_context +
+        "\nAccepted source candidates (semantic support not independently verified):\n" + source_context +
+        "\nCounter-search sources are labeled C IDs and are counter-evidence candidates, not proven contradictions. "
+        "Keep each rationale under 180 characters. Output JSON only."
+    )
+    raw = llm_client.complete(system, prompt)
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("dimensions"), dict):
+        raise ValueError("Feasibility analysis response must contain a dimensions object.")
+    validated = {}
+    for name in REQUIRED_DIMENSIONS:
+        item = parsed["dimensions"].get(name)
+        if not isinstance(item, dict):
+            continue
+        rationale = item.get("rationale")
+        refs = item.get("evidence_refs", [])
+        if not isinstance(rationale, str) or not rationale.strip():
+            continue
+        if not isinstance(refs, list):
+            refs = []
+        refs = [ref for ref in refs if isinstance(ref, str) and ref in allowed_ids]
+        score = item.get("score")
+        if isinstance(score, bool) or not isinstance(score, (int, float)) or not 1 <= score <= 5 or not refs:
+            score = None
+            refs = []
+        validated[name] = {
+            "status": "assessed" if score is not None else "unknown",
+            "score": score,
+            "evidence_refs": refs,
+            "rationale": rationale.strip()[:500],
+            "confidence": item.get("confidence") if item.get("confidence") in {"low", "medium", "high"} else "low",
+        }
+    questions = parsed.get("unresolved_questions", [])
+    if not isinstance(questions, list):
+        questions = []
+    questions = [q.strip()[:300] for q in questions if isinstance(q, str) and q.strip()][:20]
+    return {"dimensions": validated, "critical_blockers": [], "unresolved_questions": questions, "status": "model_assisted_review"}
+
+
 def build_automatic_feasibility_report(
     goal: str,
     research: dict | None,
     counter_research: dict | None = None,
     design_brief: dict | None = None,
+    analysis: dict | None = None,
 ) -> dict:
     """Create a complete assessment record with explicit unknowns and traceable candidates."""
     primary = _accepted_sources(research, "S")
@@ -158,16 +241,28 @@ def build_automatic_feasibility_report(
 
     all_urls = [row["url"] for row in primary + counter]
     domains = {((urlsplit(url).hostname or "").lower().removeprefix("www.")) for url in all_urls}
+    analysis_dimensions = analysis.get("dimensions", {}) if isinstance(analysis, dict) else {}
     dimensions = {
-        name: {
-            "status": "unknown",
-            "score": None,
-            "evidence_refs": [],
+        name: (
+            dict(analysis_dimensions[name])
+            if isinstance(analysis_dimensions, dict) and isinstance(analysis_dimensions.get(name), dict)
+            else {
+                "status": "unknown",
+                "score": None,
+                "evidence_refs": [],
+                "rationale": DIMENSION_UNKNOWN_REASONS[name],
+                "confidence": "low",
+            }
+        )
+        for name in REQUIRED_DIMENSIONS
+    }
+    # Search results cannot substitute for direct behavioral, prototype, or priced-cost evidence.
+    for name in ("player_value", "technical_feasibility", "unit_economics", "production_cost", "retention_and_replayability"):
+        dimensions[name] = {
+            "status": "unknown", "score": None, "evidence_refs": [],
             "rationale": DIMENSION_UNKNOWN_REASONS[name],
             "confidence": "low",
         }
-        for name in REQUIRED_DIMENSIONS
-    }
     if primary:
         dimensions["market_evidence"]["evidence_refs"] = [row["id"] for row in primary]
         dimensions["market_evidence"]["rationale"] = (
@@ -196,12 +291,16 @@ def build_automatic_feasibility_report(
         "prototype_plan": prototype_plan,
         "cost_model": build_cost_model(),
         "critical_blockers": [],
-        "unresolved_questions": [
-            "目标玩家是否真的有此需求，以及是否会持续游玩或付费？",
-            "竞品对比是否证明了可感知的差异化？",
-            "模型与服务价格、使用量、变现率和团队成本是多少？",
-            "最小原型是否已实际运行，并由目标玩家完成可观测测试？",
-        ],
+        "unresolved_questions": (
+            analysis.get("unresolved_questions", []) if isinstance(analysis, dict) and analysis.get("unresolved_questions")
+            else [
+                "目标玩家是否真的有此需求，以及是否会持续游玩或付费？",
+                "竞品对比是否证明了可感知的差异化？",
+                "模型与服务价格、使用量、变现率和团队成本是多少？",
+                "最小原型是否已实际运行，并由目标玩家完成可观测测试？",
+            ]
+        ),
+        "analysis_mode": analysis.get("status", "deterministic_unknowns_only") if isinstance(analysis, dict) else "deterministic_unknowns_only",
         "limitations": [
             "检索摘要通过机械质量门禁不等于来源事实或语义支持已经独立验证。",
             "反向搜索结果是反证候选，不自动等于有效反证。",
