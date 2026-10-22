@@ -26,7 +26,7 @@ try:
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
     from .commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
-    from .feasibility_pipeline import build_automatic_feasibility_report
+    from .feasibility_pipeline import build_automatic_feasibility_report, analyze_feasibility_with_llm
     from .game_knowledge import GameKnowledgeBase
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
@@ -43,7 +43,7 @@ except ImportError:  # Direct script execution from mvp/
     from workforce import WorkforceRegistry
     from improvement import build_improvement_report
     from commercial_feasibility import build_feasibility_contract, evaluate_commercial_feasibility
-    from feasibility_pipeline import build_automatic_feasibility_report
+    from feasibility_pipeline import build_automatic_feasibility_report, analyze_feasibility_with_llm
     from game_knowledge import GameKnowledgeBase
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
@@ -264,8 +264,19 @@ def execute(goal: str):
         research_snapshot = dict(STATE.get("research") or {})
         design_snapshot = dict(STATE.get("design") or {})
         prior_contract = (STATE.get("feasibility") or {}).get("contract")
+    feasibility_analysis = None
+    llm_client = getattr(WORKER_EXECUTOR, "client", None)
+    if llm_client is not None and int((research_snapshot.get("quality") or {}).get("accepted", 0) or 0) > 0:
+        try:
+            feasibility_analysis = analyze_feasibility_with_llm(
+                goal, research_snapshot, research_snapshot.get("counter_research"),
+                design_snapshot.get("brief"), llm_client,
+            )
+        except Exception as analysis_exc:
+            feasibility_analysis = {"status": "model_analysis_failed", "error_type": type(analysis_exc).__name__}
     feasibility_report = build_automatic_feasibility_report(
-        goal, research_snapshot, research_snapshot.get("counter_research"), design_snapshot.get("brief")
+        goal, research_snapshot, research_snapshot.get("counter_research"),
+        design_snapshot.get("brief"), analysis=feasibility_analysis,
     )
     feasibility_evaluation = evaluate_commercial_feasibility(feasibility_report)
     with LOCK:
