@@ -39,18 +39,39 @@ def _positive_float(name: str) -> float | None:
     return value if value >= 0 else None
 
 
+def _default_model_prices() -> tuple[float | None, float | None, str | None]:
+    """Return official peak/cache-miss rates only for recognized DeepSeek model IDs."""
+    host = (urlsplit(os.getenv("JARVIS_LLM_BASE_URL", "").strip()).hostname or "").lower()
+    model = os.getenv("JARVIS_LLM_MODEL", "").strip().lower()
+    if host not in {"api.deepseek.com", "www.api.deepseek.com"}:
+        return None, None, None
+    if model in {"deepseek-flash", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"}:
+        return 0.30, 1.20, "https://api-docs.deepseek.com/quick_start/pricing/"
+    if model == "deepseek-v4-pro":
+        return 1.32, 3.96, "https://api-docs.deepseek.com/quick_start/pricing/"
+    return None, None, None
+
+
 def build_cost_model() -> dict:
-    """Build transparent scenarios; cash costs remain unknown without configured rates."""
-    input_price = _positive_float("JARVIS_LLM_INPUT_COST_PER_MILLION_USD")
-    output_price = _positive_float("JARVIS_LLM_OUTPUT_COST_PER_MILLION_USD")
+    """Build transparent scenarios; use explicit prices or a known official model price snapshot."""
+    env_input_price = _positive_float("JARVIS_LLM_INPUT_COST_PER_MILLION_USD")
+    env_output_price = _positive_float("JARVIS_LLM_OUTPUT_COST_PER_MILLION_USD")
+    default_input_price, default_output_price, default_price_url = _default_model_prices()
+    input_price = env_input_price if env_input_price is not None else default_input_price
+    output_price = env_output_price if env_output_price is not None else default_output_price
+    price_source = (
+        "environment override" if env_input_price is not None or env_output_price is not None
+        else "official DeepSeek peak/cache-miss snapshot; verify before decisions" if default_price_url
+        else "not configured or not recognized"
+    )
     person_week_rate = _positive_float("JARVIS_GAME_DEV_COST_PER_PERSON_WEEK_USD")
 
     assumptions = [
         {"name": "prototype_person_weeks", "basis": "editable early planning assumption, not a quote"},
         {"name": "monthly active users and sessions", "basis": "scenario inputs only, not a forecast"},
         {"name": "tokens per session", "basis": "illustrative workload assumption; measure with telemetry"},
-        {"name": "model token prices", "basis": "configure provider-specific prices in Render environment variables"},
-        {"name": "developer person-week rate", "basis": "configure your own fully loaded rate; cash cost otherwise unknown"},
+        {"name": "model token prices", "basis": price_source},
+        {"name": "developer person-week rate", "basis": "configured rate is used for priced labor; otherwise scenario-specific illustrative rates are shown separately"},
     ]
     definitions = {
         "optimistic": {"prototype_person_weeks": 2, "vertical_slice_person_weeks": 6,
@@ -80,10 +101,16 @@ def build_cost_model() -> dict:
             + monthly_output_tokens * output_price / 1_000_000
             if input_price is not None and output_price is not None else None
         )
+        scenario_labor_rate = {"optimistic": 750, "base": 1500, "conservative": 3000}[name]
         row["prototype_labor_cost_usd"] = (
             values["prototype_person_weeks"] * person_week_rate
             if person_week_rate is not None else None
         )
+        row["prototype_labor_cost_assumption_usd"] = values["prototype_person_weeks"] * (
+            person_week_rate if person_week_rate is not None else scenario_labor_rate
+        )
+        row["assumed_person_week_rate_usd"] = person_week_rate if person_week_rate is not None else scenario_labor_rate
+        row["labor_cost_is_placeholder"] = person_week_rate is None
         row["pricing_configured"] = input_price is not None and output_price is not None
         row["labor_rate_configured"] = person_week_rate is not None
         scenarios[name] = row
@@ -96,6 +123,10 @@ def build_cost_model() -> dict:
             "input_cost_per_million_tokens_usd": input_price,
             "output_cost_per_million_tokens_usd": output_price,
             "developer_cost_per_person_week_usd": person_week_rate,
+            "source": price_source,
+            "source_url": default_price_url if default_price_url and env_input_price is None and env_output_price is None else None,
+            "pricing_basis": "peak rates and cache-miss input price for recognized DeepSeek models" if default_price_url and env_input_price is None and env_output_price is None else "environment configured" if env_input_price is not None or env_output_price is not None else "not available",
+            "snapshot_date": "2026-10-22" if default_price_url and env_input_price is None and env_output_price is None else None,
         },
         "scenarios": scenarios,
         "formula": "monthly model cost = active users × sessions/user/month × (input tokens/session × input price + output tokens/session × output price) / 1,000,000",
