@@ -72,15 +72,16 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertEqual(contract["budget_limit"], 1000)
 
     def test_automatic_draft_marks_unknowns_and_costs_incomplete(self):
-        draft = build_feasibility_draft(
-            "评估长期记忆 NPC RPG",
-            sources=[{
-                "title": "Market report",
-                "url": "https://example.org/report",
-                "provider": "test",
-                "research_queries": ["competitors", "counter evidence"],
-            }],
-        )
+        with patch.dict("os.environ", {}, clear=True):
+            draft = build_feasibility_draft(
+                "评估长期记忆 NPC RPG",
+                sources=[{
+                    "title": "Market report",
+                    "url": "https://example.org/report",
+                    "provider": "test",
+                    "research_queries": ["competitors", "counter evidence"],
+                }],
+            )
         self.assertFalse(draft["completion"]["complete"])
         self.assertEqual(draft["evaluation"]["decision"], "INSUFFICIENT_EVIDENCE")
         self.assertEqual(draft["report"]["independent_source_count"], 0)
@@ -91,7 +92,8 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertTrue(any("成本情景" in item for item in draft["completion"]["blockers"]))
 
     def test_generic_go_is_blocked_until_feasibility_gate_is_complete(self):
-        draft = build_feasibility_draft("评估长期记忆 NPC RPG")
+        with patch.dict("os.environ", {}, clear=True):
+            draft = build_feasibility_draft("评估长期记忆 NPC RPG")
         decision = apply_feasibility_gate(
             {"recommendation": "GO_TO_PROTOTYPE", "confidence": 78, "risks": [], "next_step": "prototype"},
             draft,
@@ -101,7 +103,8 @@ class CommercialFeasibilityTests(unittest.TestCase):
         self.assertIn("成本情景", " ".join(draft["completion"]["blockers"]))
 
     def test_demo_handoff_stays_explicitly_demo_only(self):
-        draft = build_feasibility_draft("Evaluate an AI-native game")
+        with patch.dict("os.environ", {}, clear=True):
+            draft = build_feasibility_draft("Evaluate an AI-native game")
         decision = apply_feasibility_gate(
             {"recommendation": "DEMO_GO_TO_PROTOTYPE", "confidence": 50, "risks": [], "next_step": "demo"},
             draft,
