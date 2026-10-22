@@ -22,7 +22,8 @@ def strong_report():
             for name in REQUIRED_DIMENSIONS
         },
         "independent_source_count": 4,
-        "prototype_evidence_refs": ["prototype-test-1"],
+        "prototype_evidence_refs": [],
+        "prototype_plan": {"scope": "One focused playable loop", "steps": ["Build", "Test"], "decision_gates": ["At least 3 of 5 players explain the loop"]},
         "cost_model": {
             "assumptions": ["AI cost per session", "prototype effort"],
             "scenarios": {
