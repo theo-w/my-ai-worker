@@ -25,7 +25,7 @@ try:
     from .model_handoff import interpret_handoff_and_validate_action
     from .workforce import WorkforceRegistry
     from .improvement import build_improvement_report
-    from .commercial_feasibility import build_feasibility_contract, build_feasibility_draft, evaluate_commercial_feasibility
+    from .commercial_feasibility import build_feasibility_contract, build_feasibility_draft, apply_feasibility_gate, evaluate_commercial_feasibility
     from .game_knowledge import GameKnowledgeBase
     from .supabase_game_knowledge import SupabaseGameKnowledgeBase
 except ImportError:  # Direct script execution from mvp/
@@ -274,6 +274,7 @@ def execute(goal: str):
         if isinstance(prior_contract, dict) and prior_contract.get("goal") == goal:
             draft["contract"] = prior_contract
         with LOCK:
+            STATE["decision"] = apply_feasibility_gate(STATE.get("decision") or {}, draft)
             STATE["feasibility"] = draft
 
 def validate_autonomous_request(body: dict) -> dict:
