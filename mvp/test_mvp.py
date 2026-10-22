@@ -134,3 +134,20 @@ def test_dashboard_simulated_executor_is_explicit_demo_mode():
         assert server.STATE["feasibility"]["evaluation"]["decision"] == "INSUFFICIENT_EVIDENCE"
     finally:
         server.WORKER_EXECUTOR = original
+
+
+
+def test_non_game_goal_does_not_apply_game_specific_feasibility_gate():
+    from mvp import server
+    from mvp.executor import SimulatedWorkerExecutor
+
+    original = server.WORKER_EXECUTOR
+    try:
+        server.WORKER_EXECUTOR = SimulatedWorkerExecutor()
+        server.execute("Summarize customer support trends")
+        assert server.STATE["phase"] == "decision"
+        assert server.STATE["feasibility"]["status"] == "not_applicable"
+        assert server.STATE["feasibility"]["report"] is None
+        assert server.STATE["decision"]["recommendation"] == "DEMO_GO_TO_PROTOTYPE"
+    finally:
+        server.WORKER_EXECUTOR = original
