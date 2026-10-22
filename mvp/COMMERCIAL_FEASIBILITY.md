@@ -40,6 +40,21 @@ Show conservative, base, and optimistic scenarios. Make assumptions visible and 
 
 If pricing, retention, conversion, or usage data is not known, use explicit ranges and label them as assumptions; never fabricate precision. A favorable base case is insufficient if a reasonable conservative case creates an unacceptable downside.
 
+### Machine-checkable cost scenarios
+
+The evaluator does not accept an assumptions list plus empty scenario objects as a cost model. Each of `conservative`, `base`, and `optimistic` must include numeric, finite values for:
+
+- `prototype_cost_usd`
+- `model_cost_per_session_usd`
+- `monthly_cost_usd_at_1000_users`
+- `monthly_revenue_usd_at_1000_users`
+- `break_even_users`
+- `gross_margin_percent` (may be negative, but must be between -100 and 100)
+
+Costs, revenue and break-even user counts must be non-negative. Assumptions must be explicit and non-empty. These checks validate report completeness, not whether an estimate is true.
+
+The automatic draft deliberately leaves prices and usage-dependent figures unknown when they have not been configured or measured. It can show candidate counter-evidence sources, but it does not promote them to reviewed counter-evidence or count retrieved domains as independent sources.
+
 ## Grill-Me discovery loop
 
 Ask the smallest number of high-impact questions that change the decision. Continue with research and analysis for questions that can be answered without the user. Ask the user only for decisions or constraints that materially change the answer (for example target platform, budget ceiling, team capacity, target audience, monetization constraints).
