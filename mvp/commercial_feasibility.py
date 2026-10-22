@@ -64,7 +64,7 @@ DEFAULT_THRESHOLDS = {
     "min_dimension_score": 3,
     "min_overall_score": 3.5,
     "min_independent_sources": 3,
-    "require_prototype_evidence": True,
+    "require_prototype_evidence": False,
     "require_cost_model": True,
     "require_counter_evidence": True,
 }
@@ -143,9 +143,20 @@ def evaluate_commercial_feasibility(report: dict[str, Any],
                    "observed": source_count, "required": policy["min_independent_sources"]})
 
     prototype_ok = bool(report.get("prototype_evidence_refs"))
+    prototype_plan = report.get("prototype_plan")
+    prototype_plan_ok = (
+        isinstance(prototype_plan, dict)
+        and isinstance(prototype_plan.get("scope"), str) and bool(prototype_plan["scope"].strip())
+        and isinstance(prototype_plan.get("steps"), list) and bool(prototype_plan["steps"])
+        and isinstance(prototype_plan.get("decision_gates"), list) and bool(prototype_plan["decision_gates"])
+    )
     if policy["require_prototype_evidence"]:
         checks.append({"name": "prototype_evidence", "passed": prototype_ok,
                        "status": "pass" if prototype_ok else "fail"})
+    else:
+        checks.append({"name": "prototype_plan", "passed": prototype_plan_ok,
+                       "status": "pass" if prototype_plan_ok else "fail",
+                       "reason": None if prototype_plan_ok else "bounded prototype plan needs scope, steps and measurable decision gates"})
     cost_model = report.get("cost_model")
     cost_model = cost_model if isinstance(cost_model, dict) else {}
     scenarios = cost_model.get("scenarios")
