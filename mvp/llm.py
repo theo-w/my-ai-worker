@@ -14,12 +14,29 @@ class LLMConfigurationError(RuntimeError):
     pass
 
 
+def _bounded_env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    """Read a bounded integer setting; invalid values fall back safely."""
+    try:
+        value = int(os.getenv(name, str(default)).strip())
+    except (TypeError, ValueError):
+        return default
+    return min(maximum, max(minimum, value))
+
+
 class OpenAICompatibleLLM:
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float = 45.0):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout: float = 45.0,
+        max_tokens: int = 768,
+    ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
-        self.timeout = max(1.0, float(timeout))
+        self.timeout = min(120.0, max(1.0, float(timeout)))
+        self.max_tokens = min(4096, max(64, int(max_tokens)))
         if not self.base_url.startswith("https://"):
             raise ValueError("LLM base URL must use HTTPS.")
 
@@ -32,7 +49,9 @@ class OpenAICompatibleLLM:
             raise LLMConfigurationError(
                 "Configure JARVIS_LLM_BASE_URL, JARVIS_LLM_API_KEY and JARVIS_LLM_MODEL."
             )
-        return cls(base_url, api_key, model)
+        timeout = _bounded_env_int("JARVIS_LLM_TIMEOUT_SECONDS", 45, 1, 120)
+        max_tokens = _bounded_env_int("JARVIS_LLM_MAX_TOKENS", 768, 64, 4096)
+        return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens)
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         endpoint = self.base_url
@@ -45,6 +64,7 @@ class OpenAICompatibleLLM:
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.2,
+            "max_tokens": self.max_tokens,
         }).encode("utf-8")
         request = Request(endpoint, data=payload, method="POST", headers={
             "Authorization": "Bearer " + self.api_key,
