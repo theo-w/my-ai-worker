@@ -974,7 +974,7 @@ class Handler(BaseHTTPRequestHandler):
         protected_dashboard_routes = {
             "/api/run", "/api/prototype", "/api/autonomous", "/api/research",
             "/api/experience-design", "/api/game-action", "/api/model-handoff",
-            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate", "/api/knowledge/search",
+            "/api/twin/chat", "/api/feasibility/contract", "/api/feasibility/evaluate", "/api/knowledge/search", "/api/llm/smoke-test",
         }
         if self.path in protected_dashboard_routes:
             try:
@@ -982,6 +982,42 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
+        if self.path == "/api/llm/smoke-test":
+            body = self._read_json(max_bytes=1024)
+            if body is None:
+                return
+            client = getattr(WORKER_EXECUTOR, "client", None)
+            if client is None:
+                self._json({"ok": False, "status": "not_configured",
+                            "error": "LLM is not configured; no provider request was sent."}, 503)
+                return
+            started = time.monotonic()
+            try:
+                reply = client.complete(
+                    "You are running a connectivity check. Follow the user's instruction exactly.",
+                    "Reply with exactly this marker and no other text: JARVIS_LLM_OK",
+                    max_tokens=64,
+                )
+            except Exception as exc:
+                self._json({
+                    "ok": False, "status": "provider_error",
+                    "error_type": type(exc).__name__,
+                    "model": getattr(client, "model", "configured"),
+                    "elapsed_ms": round((time.monotonic() - started) * 1000),
+                    "max_tokens": 64,
+                }, 502)
+                return
+            matched = isinstance(reply, str) and "JARVIS_LLM_OK" in reply
+            self._json({
+                "ok": matched,
+                "status": "connected" if matched else "unexpected_response",
+                "model": getattr(client, "model", "configured"),
+                "elapsed_ms": round((time.monotonic() - started) * 1000),
+                "max_tokens": 64,
+                "marker_matched": matched,
+                "message": "LLM request succeeded." if matched else "The provider responded, but the smoke-test marker did not match.",
+            }, 200 if matched else 502)
+            return
         if self.path == "/api/knowledge/search":
             body = self._read_json(max_bytes=8192)
             if body is None:
