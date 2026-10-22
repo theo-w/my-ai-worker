@@ -69,4 +69,5 @@ def test_batch_research_without_provider_fails_closed():
     assert result["ok"] is False
     assert result["status"] == "provider_unconfigured"
     assert result["sources"] == []
-    assert result["coverage"] if "coverage" in result else True
+    assert result["quality"]["accepted"] == 0
+    assert result["queries"] == ["AI native game market"]
