@@ -455,7 +455,10 @@ function renderRunOutputs(data){
 }
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run");b.disabled=true;
+ const status=document.getElementById("status");
+ status.textContent="正在启动 JARVIS…";
  const goal=document.getElementById("goal").value.trim();
+ if(!goal){status.textContent="请先输入业务目标";b.disabled=false;return;}
  const feasibilityStatus=document.getElementById("feasibilityStatus");
  const feasibilityResult=document.getElementById("feasibilityResult");
  const gameGoal=/(游戏|玩法|RPG|gameplay|video game|AI.?原生游戏|AI.?native game|prototype)/i.test(goal);
@@ -480,9 +483,9 @@ document.getElementById("run").onclick=async()=>{
    }
   }
   const response=await apiFetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({goal})});
-  if(!response.ok){const result=await response.json();document.getElementById("status").textContent="启动失败："+response.status+" · "+(result.error||"访问受限");}
-  else{document.getElementById("status").textContent="已提交执行请求";}
- }catch(e){document.getElementById("status").textContent="请求失败："+e.name;}
+  if(!response.ok){const result=await response.json().catch(()=>({}));status.textContent="启动失败："+response.status+" · "+(result.error||"访问受限");}
+  else{const result=await response.json().catch(()=>({}));status.textContent=result.ok===false?"启动未成功："+(result.error||"服务拒绝请求"):"已提交执行请求，正在刷新任务状态…";poll();}
+ }catch(e){status.textContent="启动异常："+(e&&e.message?e.message:e.name||"未知错误");}
  finally{b.disabled=false;}
 };
 async function refreshProviderStatus(){
