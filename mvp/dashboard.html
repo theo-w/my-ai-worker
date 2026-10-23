@@ -198,7 +198,7 @@ function render(){
   {name:"分身规划",index:1,done:currentIndex>1,status:"auto"},
   {name:"员工执行",index:2,done:workers.length>0&&workers.every(w=>["completed","blocked","failed"].includes(String(w.status||"").toLowerCase())),status:"auto"},
   {name:"真实调研",index:3,done:researchState.status==="completed"&&Number((researchState.quality||{}).accepted||0)>0,blocked:["failed","provider_error","provider_unconfigured"].includes(researchState.status)||Boolean(researchState.error)&&Number((researchState.quality||{}).accepted||0)===0||(researchState.status==="completed"&&Number((researchState.quality||{}).accepted||0)===0),status:"auto"},
-  {name:"玩法假设",index:4,done:designState.status==="completed",blocked:["blocked","failed"].includes(designState.status),status:"auto"},
+  {name:"玩法假设",index:4,done:designState.status==="completed",blocked:currentIndex>=4&&["blocked","failed"].includes(designState.status),status:"auto"},
   {name:"可行性验收",index:5,done:feasibilityState.status==="evaluated"&&feasibilityState.evaluation&&feasibilityState.evaluation.decision==="GO_TO_PROTOTYPE",blocked:feasibilityState.status==="incomplete",status:"auto"},
   {name:"决策 / 原型",index:6,done:Boolean(state.prototype),blocked:Boolean(decisionState&&decisionState.recommendation==="HOLD_FOR_EVIDENCE"),status:"auto"}
  ];
