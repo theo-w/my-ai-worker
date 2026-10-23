@@ -153,6 +153,20 @@ def execute(goal: str):
                               "evidence": [item.__dict__ for item in items], "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
                 STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-reply-" + str(idx), "at": time.time(), "kind": "reply", "from": worker, "to": "Digital Twin", "worker": worker, "text": output, "simulated": bool(result_data.get("simulated", False))})
+                execution_meta = result_data.get("metadata", {}) if isinstance(result_data, dict) else {}
+                execution_mode = execution_meta.get("mode") or result_data.get("mode", "未记录")
+                external_tools = execution_meta.get("external_tools_used", False if result_data.get("simulated") else "未记录")
+                accepted_count = execution_meta.get("quality_accepted_count", 0)
+                review_text = (
+                    "分身回执核验：员工任务状态=" + str(agent.get("status", "unknown"))
+                    + "；执行模式=" + str(execution_mode)
+                    + "；外部工具调用=" + str(external_tools)
+                    + "；员工直接附带证据=" + str(len(agent.get("evidence", [])))
+                    + " 条；执行器报告通过门禁的证据=" + str(accepted_count) + " 条。"
+                    + ("当前输出为模拟内容，不作为真实证据。" if result_data.get("simulated") else
+                       "模型生成的文字不等于已核验事实；来源证据以调研记录和证据门禁为准。")
+                )
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-twin-review-" + str(idx), "at": time.time(), "kind": "review", "from": "Digital Twin", "to": worker, "worker": worker, "text": review_text, "simulated": bool(result_data.get("simulated", False))})
         except Exception as exc:
             with LOCK:
                 agent = STATE["agents"][idx]
