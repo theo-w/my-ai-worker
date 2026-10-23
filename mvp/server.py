@@ -75,6 +75,7 @@ def _build_worker_executor():
 
 
 WORKER_EXECUTOR = _build_worker_executor()
+RUN_THREAD = None  # Track the in-process JARVIS run so stale phases can be recovered safely.
 STATE = {
     "goal": "评估一个 AI 原生游戏机会",
     "chat_messages": [],
@@ -609,6 +610,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        global RUN_THREAD
         # Query parameters must not prevent API route matching.
         self.path = urlsplit(self.path).path
         if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
@@ -1340,12 +1342,28 @@ class Handler(BaseHTTPRequestHandler):
             return
         goal = str(body.get("goal", "")).strip() or "评估一个 AI 原生游戏机会"
         with LOCK:
-            if STATE["phase"] in {"planning", "team", "research", "design", "evaluation"}:
-                self._json({"ok": False, "error": "A run is already in progress."}, 409)
-                return
+            busy_phases = {"planning", "team", "research", "design", "evaluation"}
+            if STATE["phase"] in busy_phases:
+                if RUN_THREAD is not None and RUN_THREAD.is_alive():
+                    self._json({
+                        "ok": False,
+                        "error": "JARVIS 仍有执行线程在运行。请查看流程状态；如果长时间没有进展，应检查当前阶段的错误日志。",
+                        "phase": STATE["phase"],
+                    }, 409)
+                    return
+                # A previous run crashed out of its worker thread but left a busy phase behind.
+                stale_phase = STATE["phase"]
+                STATE["phase"] = "idle"
+                STATE["run_recovery"] = {
+                    "recovered": True,
+                    "stale_phase": stale_phase,
+                    "message": "Recovered a stale phase left by a stopped JARVIS worker thread.",
+                    "at": time.time(),
+                }
             STATE["phase"] = "planning"  # Reserve atomically before starting the worker thread.
-        threading.Thread(target=execute, args=(goal,), daemon=True).start()
-        self._json({"ok": True})
+            RUN_THREAD = threading.Thread(target=execute, args=(goal,), name="jarvis-main-run", daemon=True)
+            RUN_THREAD.start()
+        self._json({"ok": True, "run_thread_started": True})
 
 def supervise_workforce():
     """Continuously recover expired worker leases and persist supervisor events."""
