@@ -363,9 +363,15 @@ function updateRunButton(data){
   hint.textContent="当前项目正在执行，暂不可重复启动。可在下方打开数字分身对话，询问进度或补充方向。";
  }else{
   const serverBusy=["planning","team","research","design","evaluation"].includes(phase);
-  b.disabled=serverBusy;b.textContent=serverBusy?"JARVIS 执行中…":"启动 JARVIS";
+  // Do not silently disable the only recovery control based on phase alone:
+  // stale phases can survive a crashed run thread. Let /api/run confirm whether
+  // a live run still exists and surface a clear 409 if it does.
+  b.disabled=false;
+  b.textContent=serverBusy?"检查 / 恢复 JARVIS":"启动 JARVIS";
   b.classList.toggle("is-running",serverBusy);
-  hint.textContent=serverBusy?"检测到已有任务正在执行，请勿重复启动。":"准备就绪";
+  hint.textContent=serverBusy
+   ?"状态显示阶段「"+phase+"」。点击可检查后端是否仍有执行线程；若旧线程已退出，会自动恢复状态。"
+   :"准备就绪";
  }
 }
 async function poll(){
