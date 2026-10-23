@@ -11,14 +11,23 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 </head>
 <body><main>
 <header class="top"><div><div class="eyebrow">JARVIS / OBSERVABILITY</div><h1>数字分身 · 流程追踪与验收</h1><div class="muted">查看任务分配、员工反馈、输入输出、重试决策与事件时间线。此页面只读，不会自动修改任务。</div></div><div><a href="/">← 返回工作台</a></div></header>
+<section class="panel wide" id="mainRunPanel">
+ <div class="toolbar"><h2 style="margin:0;flex:1">当前工作台运行 · 实时流程</h2><span id="mainRunPhase" class="pill">等待连接</span></div>
+ <div id="mainRunSummary" class="muted">这里直接读取工作台正在运行的同一轮任务，不会重新创建任务或重复调研。</div>
+ <div id="mainRunStages" class="detailgrid" style="margin-top:10px"></div>
+ <div class="sub" style="margin-top:10px"><h3>最近的分身 / 员工对话</h3><div id="mainRunConversation" class="content" style="max-height:260px">连接后显示当前轮次的进展。</div></div>
+</section>
+
 <section class="panel">
  <h2>连接运行中的工作区</h2>
  <div class="auth"><input id="token" type="password" autocomplete="off" placeholder="管理员 Token（仅保存在当前页面内存）"><button class="primary" id="connect">连接并查看</button><button id="refresh" disabled>立即刷新</button><label style="display:flex;align-items:center;gap:6px"><input id="auto" type="checkbox" checked style="min-width:auto"> 每 5 秒刷新</label></div>
  <div id="status" class="notice">尚未连接。请使用运行中 JARVIS 服务配置的管理员 Token。</div>
 </section>
 
-<section class="panel wide">
- <div class="toolbar"><h2 style="margin:0;flex:1">数字分身 · 目标控制</h2><span class="pill">管理员操作</span></div>
+<details class="panel wide">
+ <summary style="cursor:pointer;font-weight:700">高级管理：独立员工队列操作（非日常启动入口）</summary>
+ <div class="muted" style="margin:8px 0 12px">日常任务请从工作台启动一次。本区域仅用于手动建立独立 workforce 项目和审计测试，不会自动关联工作台主流程。</div>
+ <div class="toolbar"><h2 style="margin:0;flex:1">数字分身 · 独立目标控制</h2><span class="pill">管理员操作</span></div>
  <div class="detailgrid">
   <div class="sub">
    <h3>建立目标</h3>
@@ -40,7 +49,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
  </div>
  <div id="twinActionStatus" class="notice">连接管理员 Token 后可操作。目标创建、复核与推进会写入审计事件。</div>
  <pre id="twinActionResult" class="content" style="margin-top:8px;max-height:300px"></pre>
-</section>
+</details>
 
 <section class="panel wide"><div class="toolbar"><h2 style="margin:0;flex:1">运行环境与真实性标记</h2><span id="runtimeMode" class="pill">尚未读取</span></div><div id="runtimeInfo" class="muted">连接后读取当前执行器配置。模拟执行、真实模型调用和外部搜索会明确区分。</div></section>
 <section class="metrics" id="metrics">
@@ -60,7 +69,7 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null;
+ let token="",snapshot=null,selectedId=null,timer=null,busy=false,runtime=null,mainRun=null;
  const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
  const pretty=v=>v==null||v===""?"（无记录）":typeof v==="string"?v:JSON.stringify(v,null,2);
  const label=s=>({queued:"排队中",assigned:"已分配",running:"执行中",working:"执行中",completed:"已完成",blocked:"已阻塞",failed:"失败",approval_required:"等待审批",awaiting_validation:"等待验证",superseded:"已合并/替代",unknown:"状态未知"}[s]||s||"未知");
@@ -74,7 +83,10 @@ main{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content
    const r=await fetch("/api/workforce",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
    const data=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
-   snapshot=data;try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 当前为只读视图","ok");
+   snapshot=data;
+   try{const sr=await fetch("/api/state",{headers:{Authorization:"Bearer "+token},cache:"no-store"});const sd=await sr.json().catch(()=>({}));mainRun=sr.ok?sd:null;}catch(e){mainRun=null;}
+   try{const rr=await fetch("/api/executor/status",{cache:"no-store"});runtime=rr.ok?await rr.json():null;}catch(e){runtime=null;}
+   render();setStatus("已连接 · 最近刷新 "+new Date().toLocaleTimeString()+" · 流程追踪读取工作台同一轮任务，不会重新启动","ok");
   }catch(e){setStatus("读取失败："+e.message+"。请检查 Token、服务状态和权限。","error");}
   finally{busy=false;$("refresh").disabled=false;}
  }
@@ -139,7 +151,20 @@ function renderTasks(){
   $("events").className="events";
   $("events").innerHTML='<ul class="timeline">'+ev.slice(0,150).map(e=>'<li><div class="when">'+esc(e.at||e.timestamp||"时间未知")+'</div><div class="what">'+esc(label(e.type||e.event||"event"))+'</div><pre class="content">'+esc(pretty(e))+'</pre></li>').join("")+'</ul>';
  }
- function render(){renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
+ function renderMainRun(){
+  const phase=String(mainRun&&mainRun.phase||"unknown");
+  const labels={idle:"尚未启动",planning:"规划中",team:"员工执行",research:"真实调研",design:"玩法设计",evaluation:"可行性评估",decision:"本轮已结束",error:"执行异常"};
+  $("mainRunPhase").textContent=labels[phase]||phase;
+  $("mainRunPhase").className="pill "+(phase==="decision"?"good":["idle","unknown"].includes(phase)?"":"warn");
+  if(!mainRun){$("mainRunSummary").textContent="暂时无法读取工作台运行状态。请检查 Token 权限；下方员工队列是辅助诊断视图，不代表工作台主任务。";$("mainRunStages").innerHTML="";$("mainRunConversation").textContent="暂无可读取的主流程对话。";return;}
+  const research=mainRun.research||{}, feasibility=mainRun.feasibility||{}, agents=Array.isArray(mainRun.agents)?mainRun.agents:[];
+  $("mainRunSummary").textContent="目标："+(mainRun.goal||"未设置")+" · 阶段："+(labels[phase]||phase)+" · 员工："+agents.length+" 名 · 调研："+(research.status||"未开始")+" · 可行性："+(feasibility.status||"未开始")+"。返回工作台不会重启这轮任务。";
+  const stages=[["规划",["planning","team","research","design","evaluation","decision"].includes(phase)?"已开始":"待开始"],["员工执行",agents.some(a=>["running","ready"].includes(a.status))?"进行中":agents.some(a=>a.status==="completed")?"有结果":"待开始"],["真实调研",research.status||"待开始"],["可行性评估",feasibility.status||"待开始"],["最终判断",mainRun.decision&&mainRun.decision.verdict||mainRun.decision&&mainRun.decision.decision||(phase==="decision"?"已生成":"待生成")]];
+  $("mainRunStages").innerHTML=stages.map(x=>'<div class="sub"><h3>'+esc(x[0])+'</h3><strong>'+esc(x[1])+'</strong></div>').join("");
+  const conversation=Array.isArray(mainRun.conversation)?mainRun.conversation:Array.isArray(mainRun.chat_messages)?mainRun.chat_messages:[];
+  $("mainRunConversation").textContent=conversation.slice(-12).reverse().map(m=>{const when=m.at?new Date(Number(m.at)*1000).toLocaleTimeString():"";return (when?("["+when+"] "):"")+(m.from||m.worker||"JARVIS")+" → "+(m.to||"工作台")+": "+(m.text||m.content||"");}).join("\n\n")||"本轮暂无对话记录。";
+ }
+ function render(){renderMainRun();renderRuntime();renderMetrics();renderWorkers();renderTasks();renderDetail();renderEvents();}
 
  async function twinAction(path,payload,successLabel){
   if(!token){$("twinActionStatus").textContent="请先连接管理员 Token。";$("twinActionStatus").className="notice error";return;}
