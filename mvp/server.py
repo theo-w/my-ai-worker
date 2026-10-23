@@ -887,10 +887,12 @@ class Handler(BaseHTTPRequestHandler):
                                          + (f"\n\n{assessment_context}" if assessment_context else ""))[:5000],
                             capability=str(item.get("capability", "research" if game_feasibility else "general")),
                             priority=3,
+                            assigned_to="jarvis-internal",
                             success_criteria={
                                 "project_id": project_id,
                                 "goal": goal,
                                 "task": str(item.get("title", goal)),
+                                "internal_dispatch": True,
                                 "acceptance": "结果须独立验收；LLM 输出不自动视为事实",
                                 **assessment_criteria,
                             },
@@ -922,7 +924,7 @@ class Handler(BaseHTTPRequestHandler):
                         "plan_mode": planned.get("mode"),
                         "warnings": planned.get("warnings", []),
                         "tasks": created_tasks,
-                        "next_step": "员工领取任务并持续反馈；分身根据反馈决定继续、重试或重规划；管理员/独立验证者负责验收。",
+                        "next_step": "JARVIS 内置执行器将自动领取并执行任务；完成后进入 awaiting_validation，由管理员/独立验证者验收。",
                     }, 201)
                 elif self.path == "/api/workforce/tasks":
                     task = WORKFORCE.create_task(
@@ -1376,9 +1378,53 @@ def supervise_workforce():
         time.sleep(5)
 
 
+def run_internal_workforce():
+    """Execute tasks explicitly routed to JARVIS's built-in worker, then request independent validation."""
+    worker_id = "jarvis-internal"
+    while True:
+        try:
+            with WORKFORCE.lock:
+                pending_ids = [
+                    task["id"] for task in WORKFORCE.tasks.values()
+                    if task.get("status") == "queued"
+                    and task.get("assigned_to") == worker_id
+                    and isinstance(task.get("success_criteria"), dict)
+                    and task["success_criteria"].get("internal_dispatch") is True
+                ]
+            for task_id in pending_ids[:3]:
+                claimed = WORKFORCE.claim(worker_id, task_id=task_id)
+                if not claimed:
+                    continue
+                criteria = claimed.get("success_criteria") or {}
+                goal = str(criteria.get("goal") or claimed.get("description") or claimed.get("title") or "").strip()
+                try:
+                    result = WORKER_EXECUTOR.execute(claimed, goal)
+                    status = "completed" if getattr(result, "status", "") == "completed" else "blocked"
+                    output = str(getattr(result, "output", "") or "")
+                    blocker = "" if status == "completed" else "Executor returned a non-completed result."
+                    WORKFORCE.report(
+                        task_id, worker_id, status, output=output, blocker=blocker,
+                        lease_token=claimed.get("lease_token"),
+                    )
+                except Exception as exc:
+                    try:
+                        WORKFORCE.report(
+                            task_id, worker_id, "blocked",
+                            output="",
+                            blocker="Internal executor blocked: " + type(exc).__name__,
+                            lease_token=claimed.get("lease_token"),
+                        )
+                    except Exception as report_exc:
+                        print("JARVIS internal worker report error:", type(report_exc).__name__, flush=True)
+        except Exception as exc:
+            print("JARVIS internal workforce error:", type(exc).__name__, flush=True)
+        time.sleep(2)
+
+
 if __name__ == "__main__":
     host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "8765"))
     threading.Thread(target=supervise_workforce, name="jarvis-workforce-supervisor", daemon=True).start()
+    threading.Thread(target=run_internal_workforce, name="jarvis-internal-workforce", daemon=True).start()
     print(f"JARVIS Dashboard listening on {host}:{port}", flush=True)
     ThreadingHTTPServer((host, port), Handler).serve_forever()
