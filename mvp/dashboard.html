@@ -240,11 +240,11 @@ function render(){
  document.getElementById("detailStatus").textContent=a?(a.status+" · "+(a.progress||0)+"%"):"选择员工查看";
  if(a){
   const events=(state.conversation||[]).filter(e=>e.worker===a.worker);
-  const msgs=events.map(e=>{let body=e.text||"";if(e.kind==="reply"){try{const parsed=JSON.parse(body);if(parsed&&typeof parsed==="object"&&(parsed.accepted_evidence||parsed.evidence)){const n=(parsed.accepted_evidence||parsed.evidence||[]).length;body="员工已提交执行反馈，包含 "+n+" 条证据。具体证据与来源摘要请查看下方 Evidence Stream。";}}catch(err){}}return {id:String(e.id||e.from+"-"+e.to),kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body};});
+  const msgs=events.map(e=>{let body=e.text||"";let structured=null;if(e.kind==="reply"){try{const parsed=JSON.parse(body);if(parsed&&typeof parsed==="object"){structured=parsed;body="员工结构化反馈（保留原始字段）\\n"+JSON.stringify(parsed,null,2);}}catch(err){}}return {id:String(e.id||e.from+"-"+e.to),kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body,structured};});
   if(!msgs.length)msgs.push({kind:"meta",label:"暂无对话事件",body:"本轮尚未记录该员工的派发或反馈事件。"});
   detail.innerHTML='<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc((a.evidence||[]).length)+' 条证据</span><span>事件记录</span></div>'+msgs.map((m,i)=>{const id=m.id||String(i);const long=m.body.length>300;const expanded=expandedMessages.has(id);return '<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" data-message-id="'+esc(id)+'" class="chat-body '+(long&&!expanded?'clamped':'')+'">'+esc(m.body)+'</div>'+(long?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">'+(expanded?'收起内容':'展开全文')+'</button></div>':'')+'</div>';}).join("");
  }else detail.innerHTML='<div class="sub">暂无数字员工</div>';
- document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker)+'</b> · '+esc(e.finding)+' <span class="confidence">'+Math.round(e.confidence*100)+'%</span></div>').join("")||'<span class="sub">等待 Worker 产出证据…</span>';
+ document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>'<div class="ev"><b>'+esc(e.worker||"未知员工")+'</b> · '+esc(e.finding||e.title||"未命名证据")+' <span class="confidence">'+(Number.isFinite(Number(e.confidence))?Math.round(Number(e.confidence)*100)+"%":"置信度未记录")+'</span>'+(e.url?'<div><a href="'+esc(e.url)+'" target="_blank" rel="noopener noreferrer">'+esc(e.url)+'</a></div>':'<div class="sub">来源链接：未记录</div>')+(e.snippet?'<div class="sub">'+esc(e.snippet)+'</div>':'')+(e.accepted!==undefined?'<div class="sub">证据门禁：'+(e.accepted?"接受":"未接受")+(e.reason?" · "+esc(e.reason):"")+'</div>':'<div class="sub">证据门禁状态：未记录</div>')+'</div>').join("")||'<span class="sub">暂无员工证据记录；这不等于已经完成真实搜索。</span>';
  const d=state.decision;
  document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待数字分身完成判断…';
  const p=state.prototype;
@@ -359,10 +359,11 @@ function updateRunButton(data){
 }
 async function poll(){
  try{
+  const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
   const r=await apiFetch("/api/state");
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
-  state=data;render();renderRunOutputs(data);renderTwinChat(data);updateRunButton(data);
+  state=data;render();renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
  }catch(e){document.getElementById("status").textContent="API unavailable";}
 }
 function renderRunOutputs(data){
