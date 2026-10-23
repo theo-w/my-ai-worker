@@ -240,7 +240,7 @@ function render(){
  document.getElementById("detailStatus").textContent=a?(a.status+" · "+(a.progress||0)+"%"):"选择员工查看";
  if(a){
   const events=(state.conversation||[]).filter(e=>e.worker===a.worker);
-  const msgs=events.map(e=>{let body=e.text||"";let structured=null;if(e.kind==="reply"){try{const parsed=JSON.parse(body);if(parsed&&typeof parsed==="object"){structured=parsed;body="员工结构化反馈（保留原始字段）\\n"+JSON.stringify(parsed,null,2);}}catch(err){}}return {id:String(e.id||e.from+"-"+e.to),kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.simulated?" · 模拟输出":""),body,structured};});
+  const msgs=events.map(e=>{let body=e.text||"";let structured=null;if(e.kind==="reply"){try{const parsed=JSON.parse(body);if(parsed&&typeof parsed==="object"){structured=parsed;body="员工结构化反馈（保留原始字段）\\n"+JSON.stringify(parsed,null,2);}}catch(err){}}return {id:String(e.id||e.from+"-"+e.to),kind:e.kind==="dispatch"?"user":e.kind==="reply"?"worker":"meta",label:(e.from||"系统")+" → "+(e.to||"系统")+(e.at?" · "+new Date(Number(e.at)*1000).toLocaleTimeString():"")+(e.simulated?" · 模拟输出":""),body,structured};});
   if(!msgs.length)msgs.push({kind:"meta",label:"暂无对话事件",body:"本轮尚未记录该员工的派发或反馈事件。"});
   const exec=a.execution||{};const meta=exec.metadata||{};const workerEvidence=Array.isArray(a.evidence)?a.evidence:[];
   const execMode=meta.mode||exec.mode||(exec.simulated?"simulation":"未记录");
@@ -363,7 +363,7 @@ function updateRunButton(data){
 }
 async function poll(){
  try{
-  const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
+  const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open],#detail details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
   const r=await apiFetch("/api/state");
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
