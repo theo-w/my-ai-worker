@@ -1196,7 +1196,21 @@ class Handler(BaseHTTPRequestHandler):
             )[:5000]
             try:
                 brief = create_design_brief(source_game, concept_name, llm_client, research_context=research_context)
-            except (ValueError, RuntimeError, OSError) as exc:
+            except (ValueError, RuntimeError) as exc:
+                # Malformed model JSON is a recoverable generation failure. Keep the
+                # user moving with an explicitly labeled deterministic draft, never
+                # misrepresent it as model-generated or market-validated.
+                try:
+                    brief = create_design_brief(source_game, concept_name, None, research_context=research_context)
+                    brief["generation"] = {
+                        "mode": "template_fallback",
+                        "model_generated": False,
+                        "fallback_reason": type(exc).__name__,
+                    }
+                except (ValueError, RuntimeError, OSError):
+                    self._json({"ok": False, "error": "Design brief generation failed: " + type(exc).__name__}, 502)
+                    return
+            except OSError as exc:
                 self._json({"ok": False, "error": "Design brief generation failed: " + type(exc).__name__}, 502)
                 return
             self._json({
