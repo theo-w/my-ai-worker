@@ -367,10 +367,11 @@ function updateRunButton(data){
   // stale phases can survive a crashed run thread. Let /api/run confirm whether
   // a live run still exists and surface a clear 409 if it does.
   b.disabled=false;
-  b.textContent=serverBusy?"检查 / 恢复 JARVIS":"启动 JARVIS";
+  b.textContent=serverBusy?"查看当前运行流程":"启动 JARVIS";
   b.classList.toggle("is-running",serverBusy);
+  b.dataset.serverBusy=serverBusy?"true":"false";
   hint.textContent=serverBusy
-   ?"状态显示阶段「"+phase+"」。点击可检查后端是否仍有执行线程；若旧线程已退出，会自动恢复状态。"
+   ?"JARVIS 已在「"+phase+"」阶段运行。点击查看同一轮流程，不会重复启动或重复调研。"
    :"准备就绪";
  }
 }
@@ -504,6 +505,7 @@ let runInFlight=false,activeRunGoal="",activeRunGame=false;
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run"),hint=document.getElementById("runInlineStatus");
  if(runInFlight||b.disabled)return;
+ if(b.dataset.serverBusy==="true"){window.location.href="/trace";return;}
  const status=document.getElementById("status");
  const goal=document.getElementById("goal").value.trim();
  if(!goal){status.textContent="请先输入业务目标";hint.textContent="请先填写业务目标。";return;}
