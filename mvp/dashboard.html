@@ -191,7 +191,6 @@ function render(){
  const researchState=state.research||{};
  const designState=state.design||{};
  const feasibilityState=state.feasibility||{};
- const workers=state.agents||[];
  const decisionState=state.decision||null;
  const currentIndex=({planning:1,team:2,research:3,design:4,evaluation:5,decision:6,prototype:7})[state.phase]||0;
  const stepDefs=[
