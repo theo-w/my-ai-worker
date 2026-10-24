@@ -616,7 +616,7 @@ class Handler(BaseHTTPRequestHandler):
                                 records.append(item)
                         except (ValueError, TypeError):
                             continue
-            records.sort(key=lambda item: float(item.get("finished_at") or item.get("started_at") or 0), reverse=True)
+            records.sort(key=lambda item: float(item.get("finished_at") or item.get("updated_at") or item.get("started_at") or 0), reverse=True)
             self._json({"ok": True, "count": len(records), "runs": records[:50]})
             return
         if self.path == "/api/state":
