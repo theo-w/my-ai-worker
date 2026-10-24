@@ -117,7 +117,7 @@
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里是本轮任务的主视图：上方看阶段进度，下方查看详细事件、员工输入输出与验收依据。认证只在首页填写一次；展开详情会自动沿用本页凭证，不会另起任务。</div>
  <div id="flow" class="flow"></div>
- <details class="content-fold" style="margin-top:12px"><summary>展开本轮详细流程与验收（当前页面内）</summary><div class="sub" style="margin:8px 0">这里复用同一轮任务的追踪与验收记录，不会重新启动任务。若未显示，请先确认管理员 Token 已通过认证。</div><iframe title="本轮详细流程与验收" src="/trace" loading="lazy" style="display:block;width:100%;height:680px;border:1px solid var(--line);border-radius:10px;background:#080d18" referrerpolicy="same-origin"></iframe></details>
+ <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。输入业务目标后点击“启动 JARVIS”；本页将显示真实阶段、阻塞原因与验收结果。</div></div><div class="sub" style="margin-top:8px">主流程、状态和商业可行性验收统一显示在本页，只使用首页管理员认证。逐员工原始输入输出与事件明细保留在下方“高级诊断”，不会再嵌入需要重复认证的独立追踪页。</div>
 </div>
 
 <div class="panel wide" id="twinChatPanel" style="margin-top:14px">
@@ -236,6 +236,8 @@ function render(){
  if(!state)return;
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
  document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
+ const runProgressText=document.getElementById("runProgressText");
+ if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"数字员工："+(state.agents||[]).length+" 名","调研："+(rs.status||"待开始"),"玩法假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("玩法阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);runProgressText.textContent=parts.join(" · ");}
  const researchState=state.research||{};
  const designState=state.design||{};
  const feasibilityState=state.feasibility||{};
@@ -771,5 +773,5 @@ setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProvide
 </script>
 <script>
 // Keep the primary journey and its acceptance gate in one homepage section.
-(function(){const journey=document.getElementById("journeyPanel"),acceptance=document.getElementById("feasibilityPanel");if(!journey||!acceptance)return;const detail=journey.querySelector("details.content-fold");if(detail)journey.insertBefore(acceptance,detail);})();
+(function(){const journey=document.getElementById("journeyPanel"),acceptance=document.getElementById("feasibilityPanel");if(journey&&acceptance)journey.appendChild(acceptance);})();
 </script></body></html>
