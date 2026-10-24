@@ -150,7 +150,7 @@
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行结果</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里集中显示本轮执行状态与结论。完整过程记录（动作、员工输入输出、搜索来源、支持与反对证据）可在下方“流程记录”中按需查询。</div>
  <div id="flow" class="flow"></div>
- <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。点击“启动 JARVIS”后，本页显示本轮状态与结果；详细过程按需展开查询。</div><div id="decisionSummary" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div></div><div class="sub" style="margin-top:8px">主页只保留执行状态与最终结论；详细事件、员工对话、证据来源和决策依据集中放在下方流程记录中，避免重复占用页面。</div>
+ <div id="runProgressSummary" class="sub" style="margin-top:10px"><span id="runProgressText">尚未启动。详细执行过程统一显示在下方“数字分身 · 员工协作流”。</span></div><div id="decisionSummary" class="outcome" style="margin-top:10px"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div>
 </div>
 
 <div class="panel wide" id="twinChatPanel" style="margin-top:14px">
@@ -308,14 +308,17 @@ function render(){
  const decision=state.decision;
  const evidence=state.evidence||[];
  document.getElementById("signalSummary").textContent=!hasRun?"WAITING FOR RUN":live?"WORKERS ACTIVE":decision?"DECISION READY":evidence.length?"EVIDENCE RETURNED":"FLOW IN PROGRESS";
- document.getElementById("signalCaption").textContent=!hasRun?"启动 JARVIS 后，这里会按真实状态显示分身调度、员工执行、证据回传和决策反馈。":live?"数字员工正在执行或等待任务；请查看员工卡片了解各自状态。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
+ const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};document.getElementById("signalCaption").textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、玩法假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/玩法/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续玩法与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在玩法假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
  const node=(title,detail,cls="")=>'<div class="signal-node '+cls+'"><strong>'+esc(title)+'</strong><small>'+esc(detail)+'</small></div>';
  const workerNodes=workers.length?workers.map(w=>{const s=String(w.status||"").toLowerCase();const cls=["running","in_progress","working"].includes(s)?"is-running":s==="completed"?"is-active":["blocked","failed","error"].includes(s)?"is-blocked":["queued","ready","pending"].includes(s)?"is-queued":"";return node(w.worker,w.status+" · "+(w.progress||0)+"%",cls)}).join(""):node("等待员工组建","启动后按目标动态分工");
  const signalMarkup=
  '<svg class="signal-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path class="'+(hasRun?"live":"")+'" d="M 20 50 C 35 50, 35 50, 49 50"/><path class="'+(live?"live":"")+'" d="M 51 50 C 65 50, 65 50, 80 50"/><path class="'+(evidence.length?"feedback":"")+'" d="M 80 65 C 65 90, 35 90, 20 65"/></svg>'+
  '<div class="signal-lane">'+node("数字分身 · AI CEO",t?t.name+" · "+(state.phase||"planning"):"等待业务目标",hasRun?"is-active":"")+
  node("目标与策略",state.goal||"等待输入",hasRun?"is-active":"")+'</div>'+
- '<div class="signal-lane">'+node("协作中枢",live?"任务执行与状态同步":evidence.length?"证据已回传":decision?"等待业务执行":"任务编排与反馈",hasRun?"signal-core is-active":"signal-core")+
+ '<div class="signal-lane">'+node("协作中枢",live?"任务执行与状态同步":evidence.length?"证据已回传":decision?"阶段性判断已返回":"任务编排与反馈",hasRun?"signal-core is-active":"signal-core")+
+ node("真实调研",((state.research||{}).status||"待开始")+" · "+(((state.research||{}).sources||[]).length)+" 个来源"+((state.research||{}).error?" · "+String(state.research.error).slice(0,90):""),((state.research||{}).status==="completed"?"is-active":["failed","blocked","provider_error","provider_unconfigured"].includes((state.research||{}).status)?"is-blocked":""))+
+ node("玩法假设",((state.design||{}).status||"待开始")+((state.design||{}).reason?" · "+String(state.design.reason).slice(0,110):""),((state.design||{}).status==="completed"?"is-active":["failed","blocked"].includes((state.design||{}).status)?"is-blocked":""))+
+ node("可行性验收",((state.feasibility||{}).status||"待开始")+((state.feasibility||{}).evaluation&&((state.feasibility||{}).evaluation.decision)?" · "+(state.feasibility||{}).evaluation.decision:""),((state.feasibility||{}).status==="evaluated"?"is-active":(state.feasibility||{}).status==="incomplete"?"is-blocked":""))+
  node("Evidence Gate",evidence.length?evidence.length+" 条证据已记录":"等待可核验来源",evidence.length?"is-active":"")+'</div>'+
  '<div class="signal-lane">'+workerNodes+node("Business Decision",decision?decision.recommendation:"等待判断",decision?"is-active":"")+'</div>';
   const timeline=(Array.isArray(state.conversation)?state.conversation:[]).slice(-8);
