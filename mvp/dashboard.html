@@ -182,7 +182,15 @@
  </details>
 </div>
 
-<details class="panel wide" id="advancedDiagnostics"><summary style="cursor:pointer;font-weight:800">流程记录与高级诊断 · 本轮动作、观点、来源与员工输入输出</summary><div class="sub" style="margin:6px 0 12px">按需展开查询本轮发生了什么：分身调度、员工任务与反馈、真实搜索来源、支持/反对观点、证据质量、决策依据和阻塞原因。此处是详细记录，不重复展示主页结论。</div><div class="grid">
+<details class="panel wide" id="advancedDiagnostics"><summary style="cursor:pointer;font-weight:800">流程记录与高级诊断 · 本轮动作、观点、来源与员工输入输出</summary><div class="sub" style="margin:6px 0 12px">按需展开查询本轮发生了什么：分身调度、员工任务与反馈、真实搜索来源、支持/反对观点、证据质量、决策依据和阻塞原因。此处是详细记录，不重复展示主页结论。</div><div class="panel wide" id="runHistoryPanel" style="margin-bottom:14px">
+ <div class="section-title"><span>历史流程记录</span><button id="historyRefresh" class="btn" type="button">刷新记录</button></div>
+ <div class="sub">已结束轮次会保存执行摘要、动作时间线、员工输入输出、搜索查询与来源、证据和决策。点击一轮查看详情；如需跨重新部署保留历史，请将 JARVIS_RUN_HISTORY_PATH 指向 Render 持久磁盘。</div>
+ <div class="grid" style="margin-top:10px">
+  <div class="panel"><div id="historyList" class="sub">点击“刷新记录”读取历史记录。</div></div>
+  <div class="panel"><div id="historyDetail" class="sub">选择一轮历史记录查看过程。</div></div>
+ </div>
+</div>
+<div class="grid">
  <div class="panel">
   <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
   <div id="twin">等待业务目标...</div>
@@ -453,6 +461,46 @@ function updateRunButton(data){
    :"准备就绪";
  }
 }
+
+let runHistoryCache=[];
+async function loadRunHistory(){
+ const list=document.getElementById("historyList"),detail=document.getElementById("historyDetail");
+ if(list)list.textContent="正在读取历史记录…";
+ try{
+  const response=await apiFetch("/api/history");
+  const data=await response.json();
+  if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
+  runHistoryCache=Array.isArray(data.runs)?data.runs:[];
+  if(!runHistoryCache.length){list.innerHTML='<div class="sub">暂无已保存的历史轮次。完成一轮任务后会自动记录。</div>';detail.textContent="暂无记录";return;}
+  list.innerHTML=runHistoryCache.map((r,i)=>'<button type="button" class="btn history-run" data-history-index="'+i+'" style="display:block;width:100%;text-align:left;margin:0 0 7px;white-space:normal"><b>'+esc(r.goal||"未命名目标")+'</b><div class="sub">'+esc(new Date(Number(r.started_at||r.finished_at||0)*1000).toLocaleString())+' · '+esc(r.status||r.phase||"unknown")+' · '+esc(r.run_id||"")+'</div></button>').join("");
+  detail.innerHTML='<div class="sub">共 '+runHistoryCache.length+' 轮记录。选择左侧任一轮查看详情。</div>';
+ }catch(error){if(list)list.textContent="读取历史记录失败："+(error.message||"API error")+"。请确认管理员 Token 与服务部署状态。";}
+}
+function renderHistoryDetail(r){
+ const detail=document.getElementById("historyDetail");if(!detail||!r)return;
+ const research=r.research||{},sources=Array.isArray(research.sources)?research.sources:[];
+ const events=Array.isArray(r.conversation)?r.conversation:[];
+ const agents=Array.isArray(r.agents)?r.agents:[];
+ const evidence=Array.isArray(r.evidence)?r.evidence:[];
+ const queries=Array.isArray(research.queries)?research.queries:(research.query?[research.query]:[]);
+ const link=(url,label)=>/^https?:\\/\\//i.test(String(url||""))?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label||url)+'</a>':esc(label||url||"未提供链接");
+ const sourceHtml=sources.length?sources.map((x,i)=>'<li>'+link(x.url,x.title||x.url||("来源 "+(i+1)))+'<div class="sub">'+esc(x.snippet||"")+'</div></li>').join(""):'<li>本轮没有记录到真实搜索来源。</li>';
+ const eventHtml=events.length?events.map(e=>'<li><b>'+esc(e.from||e.worker||"系统")+'</b> · '+esc(e.kind||"event")+' · '+esc(e.at?new Date(Number(e.at)*1000).toLocaleString():"时间未知")+'<div>'+esc(e.text||"")+'</div></li>').join(""):'<li>无事件记录</li>';
+ const agentHtml=agents.length?agents.map(a=>'<li><b>'+esc(a.worker||"员工")+'</b> · '+esc(a.status||"unknown")+'<div class="sub">任务：'+esc(a.task||a.capability||"")+'</div><div>'+esc(a.output||"无输出")+'</div></li>').join(""):'<li>本轮未组建员工团队或无员工记录。</li>';
+ const evidenceHtml=evidence.length?evidence.map(e=>'<li><b>'+esc(e.worker||"证据")+'</b> · 置信度 '+esc(e.confidence??"未提供")+'<div>'+esc(e.finding||e.text||JSON.stringify(e))+'</div><div class="sub">'+(e.source?link(e.source.url,e.source.title||e.source.url):"未附来源链接")+'</div></li>').join(""):'<li>本轮没有通过证据门禁的证据记录；这不代表没有反对观点，只代表未记录到通过门禁的证据。</li>';
+ const decision=r.decision||{};
+ detail.innerHTML='<h3>'+esc(r.goal||"本轮记录")+'</h3><div class="sub">运行 ID：'+esc(r.run_id||"")+' · 状态：'+esc(r.status||r.phase||"unknown")+' · 开始：'+esc(r.started_at?new Date(Number(r.started_at)*1000).toLocaleString():"未知")+' · 结束：'+esc(r.finished_at?new Date(Number(r.finished_at)*1000).toLocaleString():"未知")+'</div>'+
+ '<div class="content-fold"><b>执行动作与对话时间线 ('+events.length+')</b><ol>'+eventHtml+'</ol></div>'+
+ '<div class="content-fold"><b>调研查询与来源 ('+sources.length+')</b><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></div>'+
+ '<div class="content-fold"><b>员工输入输出 ('+agents.length+')</b><ul>'+agentHtml+'</ul></div>'+
+ '<div class="content-fold"><b>证据与观点 ('+evidence.length+')</b><div class="sub">系统按实际记录展示支持或反对的材料，不把未核验的模型观点自动当成事实。</div><ul>'+evidenceHtml+'</ul></div>'+
+ '<div class="content-fold"><b>决策与评估</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></div>';
+}
+document.getElementById("historyRefresh")?.addEventListener("click",loadRunHistory);
+document.getElementById("historyList")?.addEventListener("click",event=>{
+ const button=event.target.closest("[data-history-index]");if(!button)return;
+ const record=runHistoryCache[Number(button.dataset.historyIndex)];renderHistoryDetail(record);
+});
 async function poll(){
  try{
   const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open],#detail details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
