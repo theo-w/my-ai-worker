@@ -318,8 +318,14 @@ function render(){
  '<div class="signal-lane">'+node("协作中枢",live?"任务执行与状态同步":evidence.length?"证据已回传":decision?"等待业务执行":"任务编排与反馈",hasRun?"signal-core is-active":"signal-core")+
  node("Evidence Gate",evidence.length?evidence.length+" 条证据已记录":"等待可核验来源",evidence.length?"is-active":"")+'</div>'+
  '<div class="signal-lane">'+workerNodes+node("Business Decision",decision?decision.recommendation:"等待判断",decision?"is-active":"")+'</div>';
-  const signalOffice=document.getElementById("signalOffice");
- if(signalOffice.dataset.renderedMarkup!==signalMarkup){signalOffice.innerHTML=signalMarkup;signalOffice.dataset.renderedMarkup=signalMarkup;}
+  const timeline=(Array.isArray(state.conversation)?state.conversation:[]).slice(-8);
+ const timelineMarkup=timeline.length
+  ? '<div class="signal-lane"><div class="signal-node is-active"><strong>本轮协作记录</strong><small>最近 '+timeline.length+' 条事件</small></div>'+timeline.map(m=>'<div class="signal-node"><strong>'+esc((m.from||m.worker||"系统")+" → "+(m.to||"系统"))+'</strong><small>'+esc((m.at?new Date(Number(m.at)*1000).toLocaleTimeString()+" · ":"")+String(m.text||"").replace(/\\s+/g," ").slice(0,220))+'</small></div>').join("")+'</div>'
+  : '<div class="signal-lane"><div class="signal-node is-blocked"><strong>尚无协作事件</strong><small>后台尚未记录分身派发或员工反馈。请检查启动接口和执行器日志；不能视为已完成。</small></div></div>';
+ const visibleWorkerOutput=workers.filter(w=>String(w.output||"").trim()).map(w=>'<div class="signal-node"><strong>'+esc(w.worker||"数字员工")+'</strong><small>'+esc(String(w.status||"unknown"))+' · '+esc(String(w.output).slice(0,280))+'</small></div>').join("");
+ const signalOffice=document.getElementById("signalOffice");
+ const expandedSignalMarkup=signalMarkup+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
+ if(signalOffice.dataset.renderedMarkup!==expandedSignalMarkup){signalOffice.innerHTML=expandedSignalMarkup;signalOffice.dataset.renderedMarkup=expandedSignalMarkup;}
  document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>Intent</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
  document.getElementById("intent").textContent=state.goal||"等待目标...";
  document.getElementById("teamSummary").textContent=(t?t.team_size:0)+" Digital Workers";
