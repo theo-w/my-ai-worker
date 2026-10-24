@@ -768,6 +768,7 @@ tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInp
 tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
 tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
 setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+</script>
 <script>
 // Keep the primary journey and its acceptance gate in one homepage section.
 (function(){const journey=document.getElementById("journeyPanel"),acceptance=document.getElementById("feasibilityPanel");if(!journey||!acceptance)return;const detail=journey.querySelector("details.content-fold");if(detail)journey.insertBefore(acceptance,detail);})();
