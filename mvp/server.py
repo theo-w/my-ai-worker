@@ -57,9 +57,14 @@ else:
     GAME_KNOWLEDGE = GameKnowledgeBase()
 PROJECT_LOOP = AutonomousProjectLoop()
 WORKFORCE = WorkforceRegistry(path=os.getenv("JARVIS_WORKFORCE_STORE", "data/workforce.json"))
+def _llm_enabled() -> bool:
+    """LLM calls are opt-in to avoid accidental spend during MVP testing."""
+    return os.getenv("JARVIS_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _build_worker_executor():
     llm_executor = None
-    if all(os.getenv(key, "").strip() for key in (
+    if _llm_enabled() and all(os.getenv(key, "").strip() for key in (
         "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"
     )):
         try:
@@ -652,8 +657,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/executor/status":
             search_configured = bool(os.getenv("JARVIS_SEARCH_ENDPOINT", "").strip())
-            llm_configured = getattr(WORKER_EXECUTOR, "client", None) is not None
+            llm_configured = _llm_enabled() and getattr(WORKER_EXECUTOR, "client", None) is not None
             self._json({
+                "llm_enabled": _llm_enabled(),
                 "mode": (
                     "simulated" if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor)
                     else "hybrid" if isinstance(WORKER_EXECUTOR, HybridWorkerExecutor)
@@ -677,7 +683,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/llm/status":
             llm_client = getattr(WORKER_EXECUTOR, "client", None)
-            llm_configured = llm_client is not None
+            llm_configured = _llm_enabled() and llm_client is not None
             llm_model = getattr(llm_client, "model", None)
             llm_host = (urlsplit(os.getenv("JARVIS_LLM_BASE_URL", "").strip()).hostname or "").lower()
             model_warning = None
