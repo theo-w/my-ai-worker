@@ -483,7 +483,7 @@ function renderHistoryDetail(r){
  const agents=Array.isArray(r.agents)?r.agents:[];
  const evidence=Array.isArray(r.evidence)?r.evidence:[];
  const queries=Array.isArray(research.queries)?research.queries:(research.query?[research.query]:[]);
- const link=(url,label)=>/^https?:\\/\\//i.test(String(url||""))?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label||url)+'</a>':esc(label||url||"未提供链接");
+ const link=(url,label)=>/^https?:\/\//i.test(String(url||""))?'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(label||url)+'</a>':esc(label||url||"未提供链接");
  const sourceHtml=sources.length?sources.map((x,i)=>'<li>'+link(x.url,x.title||x.url||("来源 "+(i+1)))+'<div class="sub">'+esc(x.snippet||"")+'</div></li>').join(""):'<li>本轮没有记录到真实搜索来源。</li>';
  const eventHtml=events.length?events.map(e=>'<li><b>'+esc(e.from||e.worker||"系统")+'</b> · '+esc(e.kind||"event")+' · '+esc(e.at?new Date(Number(e.at)*1000).toLocaleString():"时间未知")+'<div>'+esc(e.text||"")+'</div></li>').join(""):'<li>无事件记录</li>';
  const agentHtml=agents.length?agents.map(a=>'<li><b>'+esc(a.worker||"员工")+'</b> · '+esc(a.status||"unknown")+'<div class="sub">任务：'+esc(a.task||a.capability||"")+'</div><div>'+esc(a.output||"无输出")+'</div></li>').join(""):'<li>本轮未组建员工团队或无员工记录。</li>';
