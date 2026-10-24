@@ -129,6 +129,7 @@ def reset(goal: str):
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
+    _persist_run_history()
     time.sleep(.1)
     with LOCK:
         STATE["phase"] = "team"
@@ -136,6 +137,7 @@ def _execute_run(goal: str):
         for agent in STATE["agents"]:
             agent["status"] = "ready"
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
+    _persist_run_history()
 
     for idx, (worker, capability) in enumerate(planned):
         with LOCK:
@@ -183,6 +185,7 @@ def _execute_run(goal: str):
         STATE["phase"] = "research"
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
         STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
+    _persist_run_history()
     try:
         is_game_feasibility = any(token in goal.casefold() for token in (
             "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
@@ -234,6 +237,7 @@ def _execute_run(goal: str):
                                   "quality": None, "error": type(exc).__name__}
             STATE["design"] = {"status": "blocked", "reason": "真实调研失败，不能生成本轮创意。", "brief": None}
 
+    _persist_run_history()
     with LOCK:
         should_design = STATE["design"]["status"] == "running"
     if should_design:
@@ -270,6 +274,7 @@ def _execute_run(goal: str):
 
     with LOCK:
         STATE["phase"] = "evaluation"
+    _persist_run_history()
     evidence = [type("E", (), item) for item in STATE["evidence"]]
     decision = evaluate(goal, evidence, demo_mode=isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor))
     with LOCK:
