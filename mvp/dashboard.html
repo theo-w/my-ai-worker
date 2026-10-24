@@ -360,7 +360,7 @@ function updateRunButton(data){
   const feasibilityReady=!activeRunGame||(String(feasibility.goal||feasibility.contract&&feasibility.contract.goal||"").trim()===activeRunGoal&&Boolean(feasibility.status));
   const activePhase=["planning","team","research","design","evaluation"].includes(phase);
   const terminalPhase=["decision","idle","prototype","blocked","failed","error"].includes(phase);
-  if((sameGoal&&phase==="decision"&&feasibilityReady)||(!activePhase&&terminalPhase)){
+  if(sameGoal&&terminalPhase&&(!activePhase)&&(phase!=="decision"||feasibilityReady)){
    runInFlight=false;activeRunGoal="";activeRunGame=false;b.disabled=false;b.textContent="启动 JARVIS";b.classList.remove("is-running");
    hint.textContent="本轮已结束，可在下方与数字分身继续对话，或启动新目标。";return;
   }
@@ -510,8 +510,7 @@ let runInFlight=false,activeRunGoal="",activeRunGame=false;
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run"),hint=document.getElementById("runInlineStatus");
  if(runInFlight){
-  status.textContent="JARVIS 请求仍在处理中";
-  hint.textContent="上一次启动请求尚未结束。若状态长期不变，刷新后可重新尝试。";
+  hint.textContent="JARVIS 请求仍在处理中。若状态长期不变，请查看上方连接状态。";
   return;
  }
  if(b.disabled){status.textContent="启动暂不可用";hint.textContent="按钮当前被禁用；请等待状态刷新后重试。";return;}
