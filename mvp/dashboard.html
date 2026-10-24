@@ -63,6 +63,9 @@
 @media(max-width:650px){.grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"decision" "workers" "conversation" "twin" "context" "team" "evidence" "prototype"}}
 @media(max-width:700px){.app{gap:0}#identityIntro{display:none}#goalPanel{order:1}#journeyPanel{order:2}#twinChatPanel{order:3}.signal-panel{order:4}#advancedDiagnostics{order:5}#supportingTools{order:6}}
 
+
+/* Consolidate the business decision into the primary run summary; keep the original data node for live updates. */
+#advancedDiagnostics .grid>.panel:nth-child(6){display:none}
 </style>
 </head>
 <body><div class="app">
@@ -144,7 +147,7 @@
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里是本轮任务的主视图：上方看阶段进度，下方查看详细事件、员工输入输出与验收依据。认证只在首页填写一次；展开详情会自动沿用本页凭证，不会另起任务。</div>
  <div id="flow" class="flow"></div>
- <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。输入业务目标后点击“启动 JARVIS”；本页将显示真实阶段、阻塞原因与验收结果。</div></div><div class="sub" style="margin-top:8px">主流程、状态和商业可行性验收统一显示在本页，只使用首页管理员认证。逐员工原始输入输出与事件明细保留在下方“高级诊断”，不会再嵌入需要重复认证的独立追踪页。</div>
+ <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。输入业务目标后点击“启动 JARVIS”；本页将显示真实阶段、阻塞原因与验收结果。</div><div id="decisionSummary" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div></div><div class="sub" style="margin-top:8px">主流程、运行状态、商业决策与验收统一显示在本页。高级诊断仅保留逐员工原始输入输出和证据明细，避免重复展示。</div>
 </div>
 
 <div class="panel wide" id="twinChatPanel" style="margin-top:14px">
@@ -798,6 +801,11 @@ tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInpu
 tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
 setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
 </script>
+<script>
+// Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.
+(function(){const source=document.getElementById("decision"),target=document.getElementById("decisionSummaryText");if(!source||!target)return;const sync=()=>{const value=(source.innerText||source.textContent||"").trim();target.textContent=value||"等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。";};sync();new MutationObserver(sync).observe(source,{subtree:true,childList:true,characterData:true,attributes:true});})();
+</script>
+
 <script>
 // Keep the primary journey and its acceptance gate in one homepage section.
 (function(){const journey=document.getElementById("journeyPanel"),acceptance=document.getElementById("feasibilityPanel");if(journey&&acceptance)journey.appendChild(acceptance);})();
