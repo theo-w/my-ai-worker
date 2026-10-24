@@ -207,7 +207,38 @@ def _execute_run(goal: str):
                 goal + " criticism failures negative reviews counter evidence risks",
                 goal + " 玩家需求 竞品 负面反馈 推理成本 延迟 风险",
             ]
-            result = run_live_research_batch(research_queries, 3)
+            def report_research_progress(progress):
+                with LOCK:
+                    STATE["last_progress_at"] = time.time()
+                    STATE["research"] = {
+                        "status": "running",
+                        "query": goal,
+                        "queries": research_queries,
+                        "sources": progress.get("sources", []),
+                        "query_errors": progress.get("query_errors", []),
+                        "quality": {"accepted": 0, "total": len(progress.get("sources", []))},
+                        "progress": {
+                            "queries_completed": progress.get("queries_completed", 0),
+                            "queries_total": progress.get("queries_total", len(research_queries)),
+                            "current_query": progress.get("current_query", ""),
+                            "successful_angles": progress.get("successful_angles", 0),
+                            "empty_angles": progress.get("empty_angles", 0),
+                            "failed_angles": progress.get("failed_angles", 0),
+                        },
+                        "error": None,
+                    }
+                    STATE.setdefault("conversation", []).append({
+                        "id": str(int(time.time() * 1000)) + "-research-progress",
+                        "at": time.time(), "kind": "progress",
+                        "from": "Live Research Adapter", "to": "Digital Twin",
+                        "worker": "Live Research Adapter",
+                        "text": "调研进度：" + str(progress.get("queries_completed", 0)) + "/"
+                            + str(progress.get("queries_total", len(research_queries)))
+                            + " 个角度已查询；当前来源 " + str(len(progress.get("sources", [])))
+                            + " 个；失败角度 " + str(progress.get("failed_angles", 0)) + " 个。",
+                        "simulated": False,
+                    })
+            result = run_live_research_batch(research_queries, 3, progress_callback=report_research_progress)
         else:
             research_queries = [goal]
             result = run_live_research(goal, 5)
