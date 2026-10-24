@@ -237,7 +237,7 @@ function render(){
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
  document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
  const runProgressText=document.getElementById("runProgressText");
- if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"数字员工："+(state.agents||[]).length+" 名","调研："+(rs.status||"待开始"),"玩法假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("玩法阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);runProgressText.textContent=parts.join(" · ");}
+ if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const agents=Array.isArray(state.agents)?state.agents:[];const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"运行 ID："+(state.run_id||"尚未创建"),"员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）","调研："+(rs.status||"待开始"),"玩法假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("玩法阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);const messages=Array.isArray(state.conversation)?state.conversation.slice(-4):[];const activity=messages.map(m=>{const who=m.from||m.worker||"系统";const msg=String(m.text||"").replace(/\\s+/g," ").trim();return who+"："+msg;}).filter(Boolean);const outputs=agents.filter(a=>a.output&&String(a.output).trim()).slice(-3).map(a=>(a.worker||"员工")+" 输出："+String(a.output).slice(0,240));runProgressText.textContent=parts.join(" · ")+(activity.length?"\n\n最新执行记录：\n"+activity.join("\n"):"")+(outputs.length?"\n\n员工输出：\n"+outputs.join("\n"):"");}
  const researchState=state.research||{};
  const designState=state.design||{};
  const feasibilityState=state.feasibility||{};
@@ -427,7 +427,7 @@ async function poll(){
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
   state=data;render();renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
- }catch(e){document.getElementById("status").textContent="API unavailable";}
+ }catch(e){document.getElementById("status").textContent="API unavailable";const progress=document.getElementById("runProgressText");if(progress)progress.textContent="无法读取本轮运行状态："+(e&&e.message?e.message:"API unavailable")+"。请检查管理员认证与服务连接；不能将“服务器已接收”视为任务已运行。";}
 }
 function renderRunOutputs(data){
  const research=data.research||{};
