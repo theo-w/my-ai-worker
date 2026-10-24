@@ -173,6 +173,13 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
     """Optional LLM synthesis over accepted, source-backed findings only."""
     import json
     import os
+    if os.getenv("JARVIS_LLM_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+        return {
+            "status": "disabled_by_cost_safety",
+            "text": None,
+            "source_urls": [],
+            "message": "LLM synthesis is disabled by default to avoid test costs; source-backed deterministic results are retained.",
+        }
     if not accepted_items:
         return {
             "status": "skipped_no_accepted_evidence",
