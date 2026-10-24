@@ -54,6 +54,10 @@ class OpenAICompatibleLLM:
         return cls(base_url, api_key, model, timeout=timeout, max_tokens=max_tokens)
 
     def complete(self, system_prompt: str, user_prompt: str, max_tokens: int | None = None) -> str:
+        if os.getenv("JARVIS_LLM_ENABLED", "false").strip().lower() not in {"1", "true", "yes", "on"}:
+            raise LLMConfigurationError(
+                "LLM calls are disabled by default for cost-safe testing. Set JARVIS_LLM_ENABLED=true only when a model call is explicitly needed."
+            )
         endpoint = self.base_url
         if not endpoint.endswith("/chat/completions"):
             endpoint += "/chat/completions"
