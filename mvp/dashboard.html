@@ -635,7 +635,7 @@ refreshKnowledgeStatus();
 // Share homepage authentication with the embedded read-only detail view in memory only.
 // Sync on iframe load and when the token changes; the iframe may load before auth is entered.
 const traceFrame=document.querySelector("#journeyPanel iframe");
-function syncTraceAuth(connectNow=false){try{const doc=traceFrame&&traceFrame.contentDocument;const token=document.getElementById("adminToken").value.trim();const field=doc&&doc.getElementById("token");if(!field)return;field.value=token;if(token&&connectNow){const connect=doc.getElementById("connect");if(connect)connect.click();}}catch(_){}}
+function syncTraceAuth(connectNow=false){try{const doc=traceFrame&&traceFrame.contentDocument;const token=document.getElementById("adminToken").value.trim();const field=doc&&doc.getElementById("token");if(!field)return;field.value=token;const auth=doc.querySelector(".auth");if(auth)auth.style.display=token?"none":"";if(token&&connectNow){const connect=doc.getElementById("connect");if(connect)connect.click();}}catch(_){}}
 if(traceFrame)traceFrame.addEventListener("load",()=>syncTraceAuth(true));
 document.getElementById("adminToken").addEventListener("input",()=>syncTraceAuth(false));
 document.getElementById("adminToken").addEventListener("change",()=>syncTraceAuth(true));
