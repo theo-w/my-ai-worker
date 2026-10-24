@@ -180,6 +180,8 @@ def _execute_run(goal: str):
                               "execution": {"status": "failed", "error_type": type(exc).__name__}})
                 STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-error-" + str(idx), "at": time.time(), "kind": "system", "from": worker, "to": "Digital Twin", "worker": worker, "text": "员工执行受阻：" + type(exc).__name__})
 
+    _persist_run_history()
+
     # Research is part of this run; missing providers fail closed rather than fabricating results.
     with LOCK:
         STATE["phase"] = "research"
