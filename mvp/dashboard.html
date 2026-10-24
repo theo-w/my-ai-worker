@@ -323,8 +323,40 @@ function render(){
   ? '<div class="signal-lane"><div class="signal-node is-active"><strong>本轮协作记录</strong><small>最近 '+timeline.length+' 条事件</small></div>'+timeline.map(m=>'<div class="signal-node"><strong>'+esc((m.from||m.worker||"系统")+" → "+(m.to||"系统"))+'</strong><small>'+esc((m.at?new Date(Number(m.at)*1000).toLocaleTimeString()+" · ":"")+String(m.text||"").replace(/\\s+/g," ").slice(0,220))+'</small></div>').join("")+'</div>'
   : '<div class="signal-lane"><div class="signal-node is-blocked"><strong>尚无协作事件</strong><small>后台尚未记录分身派发或员工反馈。请检查启动接口和执行器日志；不能视为已完成。</small></div></div>';
  const visibleWorkerOutput=workers.filter(w=>String(w.output||"").trim()).map(w=>'<div class="signal-node"><strong>'+esc(w.worker||"数字员工")+'</strong><small>'+esc(String(w.status||"unknown"))+' · '+esc(String(w.output).slice(0,280))+'</small></div>').join("");
+ const researchDetail=(state.research||{});
+ const designDetail=(state.design||{});
+ const feasibilityDetail=(state.feasibility||{});
+ const researchSources=Array.isArray(researchDetail.sources)?researchDetail.sources:[];
+ const researchProgress=researchDetail.progress||{};
+ const researchSummary=researchDetail.error
+  ? "调研受阻："+String(researchDetail.error)
+  : researchDetail.status==="running"||researchDetail.status==="queued"
+   ? "进行中："+String(researchProgress.completed_queries||0)+"/"+String(researchProgress.total_queries||"?")+" 个查询；已收集 "+researchSources.length+" 个来源。"+(researchProgress.current_query?" 当前："+String(researchProgress.current_query):"")
+   : researchSources.length
+    ? "已收集 "+researchSources.length+" 个来源。"+(researchDetail.summary?" 摘要："+String(researchDetail.summary):"")
+    : "没有可展示的调研来源；请确认搜索服务已配置并查看运行日志。";
+ const designSummary=designDetail.error||designDetail.reason
+  ? "未形成玩法假设："+String(designDetail.error||designDetail.reason)
+  : designDetail.title||designDetail.concept||designDetail.core_loop
+   ? "玩法假设："+String(designDetail.title||designDetail.concept||designDetail.core_loop)
+   : designDetail.status==="blocked"
+    ? "玩法阶段被阻断；原因未返回，需检查执行器与上游证据。"
+    : "暂无玩法假设输出。若本轮仅返回等待决策，说明下游阶段尚未产出，不能视为完成。";
+ const completionBlockers=feasibilityDetail.completion&&Array.isArray(feasibilityDetail.completion.blockers)?feasibilityDetail.completion.blockers:[];
+ const feasibilitySummary=feasibilityDetail.evaluation&&feasibilityDetail.evaluation.decision
+  ? "验收结论："+String(feasibilityDetail.evaluation.decision)+(completionBlockers.length?"；缺口："+completionBlockers.slice(0,3).join("、"):"")
+  : feasibilityDetail.status==="incomplete"
+   ? "评估报告已生成但未通过验收。缺口："+(completionBlockers.length?completionBlockers.slice(0,4).join("、"):"未返回具体缺口")
+   : feasibilityDetail.status==="evaluated"
+    ? "已完成评估，但缺少可展示的决策字段；需检查报告结构。"
+    : "尚无可行性验收结果。当前阶段状态："+String(feasibilityDetail.status||"待开始")+"；成本、证据与原型验证未被确认前，不应标记完成。";
+ const stageDetails='<div class="signal-lane stage-detail-lane">'+
+  node("真实调研 · 阶段输出",researchSummary,researchDetail.error?"is-blocked":researchSources.length?"is-active":researchDetail.status==="running"?"is-running":"is-queued")+
+  node("玩法假设 · 阶段输出",designSummary,designDetail.status==="blocked"||designDetail.error?"is-blocked":designDetail.title||designDetail.concept?"is-active":"is-queued")+
+  node("可行性验收 · 阶段输出",feasibilitySummary,feasibilityDetail.status==="incomplete"?"is-blocked":feasibilityDetail.status==="evaluated"?"is-active":"is-queued")+
+  '</div>';
  const signalOffice=document.getElementById("signalOffice");
- const expandedSignalMarkup=signalMarkup+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
+ const expandedSignalMarkup=signalMarkup+stageDetails+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
  if(signalOffice.dataset.renderedMarkup!==expandedSignalMarkup){signalOffice.innerHTML=expandedSignalMarkup;signalOffice.dataset.renderedMarkup=expandedSignalMarkup;}
  document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>Intent</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
  document.getElementById("intent").textContent=state.goal||"等待目标...";
