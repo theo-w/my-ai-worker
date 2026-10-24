@@ -66,6 +66,9 @@
 
 /* Consolidate the business decision into the primary run summary; keep the original data node for live updates. */
 #advancedDiagnostics .grid>.panel:nth-child(6){display:none}
+
+/* The detailed feasibility gate remains available to the runtime but is not a second homepage workflow; final status and decision are summarized above. */
+#feasibilityPanel{display:none!important}
 </style>
 </head>
 <body><div class="app">
@@ -104,9 +107,9 @@
    const result=await response.json().catch(()=>({}));
    if(!response.ok||result.ok===false)throw new Error(result.error||("HTTP "+response.status));
    if(status)status.textContent="任务已接收 · 正在确认执行线程";
-   if(hint)hint.textContent="启动请求已接受，正在轮询实际任务状态与员工输出；若后台未推进，会明确显示停滞阶段。";
+   if(hint)hint.textContent="启动请求已接受，正在读取本轮真实状态与员工输出；结果和详细过程会显示在本页。";
    const progress=document.getElementById("runProgressText");
-   const deadline=Date.now()+20000;
+   const deadline=Date.now()+120000;
    let lastState=null;
    while(Date.now()<deadline){
     const stateResponse=await fetch("/api/state",{headers:token?{Authorization:"Bearer "+token}:{},cache:"no-store"});
@@ -132,7 +135,7 @@
     await new Promise(resolve=>setTimeout(resolve,1500));
    }
    if(lastState&&["planning","team","research","design","evaluation"].includes(lastState.phase)){
-    const stuck="后台阶段超过 20 秒仍未退出："+lastState.phase+"。请检查执行器/调研 provider 与服务日志。";
+    const stuck="本轮仍处于「"+lastState.phase+"」阶段，暂未返回最终结果。主页会继续显示可读取到的状态；请展开“流程记录”查看最后事件、员工反馈和调研来源。若阶段与事件长时间均无变化，说明后台执行可能卡住，不能视为完成。";
     if(hint)hint.textContent=stuck;
     if(status)status.textContent="任务疑似停滞 · "+lastState.phase;
    }else if(hint)hint.textContent="已读取本轮任务状态。员工输出和事件已更新到本页。";
@@ -145,9 +148,9 @@
 </script>
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
- <div class="section-title"><span>本轮执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里是本轮任务的主视图：上方看阶段进度，下方查看详细事件、员工输入输出与验收依据。认证只在首页填写一次；展开详情会自动沿用本页凭证，不会另起任务。</div>
+ <div class="section-title"><span>本轮执行结果</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里集中显示本轮执行状态与结论。完整过程记录（动作、员工输入输出、搜索来源、支持与反对证据）可在下方“流程记录”中按需查询。</div>
  <div id="flow" class="flow"></div>
- <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。输入业务目标后点击“启动 JARVIS”；本页将显示真实阶段、阻塞原因与验收结果。</div><div id="decisionSummary" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div></div><div class="sub" style="margin-top:8px">主流程、运行状态、商业决策与验收统一显示在本页。高级诊断仅保留逐员工原始输入输出和证据明细，避免重复展示。</div>
+ <div id="runProgressSummary" class="outcome" style="margin-top:12px"><strong>本轮运行状态</strong><div id="runProgressText" class="sub" style="margin-top:6px">尚未启动。点击“启动 JARVIS”后，本页显示本轮状态与结果；详细过程按需展开查询。</div><div id="decisionSummary" style="margin-top:10px;padding-top:9px;border-top:1px solid var(--line)"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div></div><div class="sub" style="margin-top:8px">主页只保留执行状态与最终结论；详细事件、员工对话、证据来源和决策依据集中放在下方流程记录中，避免重复占用页面。</div>
 </div>
 
 <div class="panel wide" id="twinChatPanel" style="margin-top:14px">
@@ -179,7 +182,7 @@
  </details>
 </div>
 
-<details class="panel wide" id="advancedDiagnostics"><summary style="cursor:pointer;font-weight:800">高级诊断：员工输入输出、证据流与决策明细</summary><div class="sub" style="margin:6px 0 12px">主流程和验收结论已集中在上方。这里保留逐员工对话、原始证据与执行详情，默认收起以减少重复信息。</div><div class="grid">
+<details class="panel wide" id="advancedDiagnostics"><summary style="cursor:pointer;font-weight:800">流程记录与高级诊断 · 本轮动作、观点、来源与员工输入输出</summary><div class="sub" style="margin:6px 0 12px">按需展开查询本轮发生了什么：分身调度、员工任务与反馈、真实搜索来源、支持/反对观点、证据质量、决策依据和阻塞原因。此处是详细记录，不重复展示主页结论。</div><div class="grid">
  <div class="panel">
   <div class="section-title"><span>Digital Twin / AI CEO</span><span class="sub">IDENTITY + POLICY</span></div>
   <div id="twin">等待业务目标...</div>
