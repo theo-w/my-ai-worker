@@ -109,6 +109,9 @@ def reset(goal: str):
         else:
             STATE["feasibility"] = {"status": "not_started", "contract": None, "report": None, "evaluation": None}
         STATE["run_id"] = str(int(time.time() * 1000))
+        STATE["started_at"] = time.time()
+        STATE.pop("history_error", None)
+        STATE.pop("run_error", None)
         STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
         STATE["agents"] = [
             {"id": i, "worker": w, "capability": cap, "status": "queued",
@@ -123,7 +126,7 @@ def reset(goal: str):
         STATE["prototype"] = None
         STATE["twin"] = TWIN.snapshot(goal, team)
 
-def execute(goal: str):
+def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
     time.sleep(.1)
@@ -291,6 +294,84 @@ def execute(goal: str):
         with LOCK:
             STATE["decision"] = apply_feasibility_gate(STATE.get("decision") or {}, draft)
             STATE["feasibility"] = draft
+
+
+RUN_HISTORY_LOCK = threading.Lock()
+def _run_history_path() -> Path:
+    configured = os.getenv("JARVIS_RUN_HISTORY_PATH", "").strip()
+    if configured:
+        return Path(configured)
+    persistent_dir = Path("/var/data")
+    if persistent_dir.is_dir() and os.access(str(persistent_dir), os.W_OK):
+        return persistent_dir / "jarvis-run-history.jsonl"
+    return ROOT / "data" / "jarvis-run-history.jsonl"
+
+
+def _persist_run_history():
+    """Append a sanitized snapshot for later lookup; never persist credentials."""
+    with LOCK:
+        snapshot = json.loads(json.dumps(STATE, ensure_ascii=False, default=str))
+    run_id = str(snapshot.get("run_id") or "")
+    if not run_id:
+        return
+    record = {
+        "run_id": run_id,
+        "goal": snapshot.get("goal", ""),
+        "started_at": snapshot.get("started_at"),
+        "finished_at": time.time(),
+        "status": snapshot.get("phase", "unknown"),
+        "phase": snapshot.get("phase", "unknown"),
+        "research": snapshot.get("research") or {},
+        "design": snapshot.get("design") or {},
+        "agents": snapshot.get("agents") or [],
+        "conversation": snapshot.get("conversation") or [],
+        "evidence": snapshot.get("evidence") or [],
+        "decision": snapshot.get("decision"),
+        "feasibility": snapshot.get("feasibility") or {},
+        "knowledge": snapshot.get("knowledge") or {},
+        "run_recovery": snapshot.get("run_recovery"),
+    }
+    path = _run_history_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with RUN_HISTORY_LOCK:
+            # Replace an existing snapshot for this run instead of creating duplicates.
+            existing = []
+            if path.exists():
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    try:
+                        item = json.loads(line)
+                        if str(item.get("run_id")) != run_id:
+                            existing.append(item)
+                    except (ValueError, TypeError):
+                        continue
+            existing.append(record)
+            existing = existing[-200:]
+            temp = path.with_suffix(path.suffix + ".tmp")
+            temp.write_text("".join(json.dumps(item, ensure_ascii=False, default=str) + "\\n" for item in existing), encoding="utf-8")
+            temp.replace(path)
+    except OSError as exc:
+        # History persistence failure must not crash the task itself.
+        with LOCK:
+            STATE["history_error"] = type(exc).__name__
+
+
+def execute(goal: str):
+    """Run a JARVIS task and persist its final event/evidence snapshot."""
+    try:
+        _execute_run(goal)
+    except Exception as exc:
+        with LOCK:
+            STATE["phase"] = "failed"
+            STATE["run_error"] = type(exc).__name__
+            STATE.setdefault("conversation", []).append({
+                "id": str(int(time.time() * 1000)) + "-fatal",
+                "at": time.time(), "kind": "system", "from": "JARVIS Runtime",
+                "to": "Digital Twin", "worker": "", "text": "本轮执行异常终止：" + type(exc).__name__,
+            })
+    finally:
+        _persist_run_history()
+
 
 def validate_autonomous_request(body: dict) -> dict:
     """Validate untrusted API fields before planning or execution."""
@@ -511,6 +592,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
             self._json({"ok": True, **WORKFORCE.snapshot()})
+            return
+        if self.path == "/api/history":
+            try:
+                authenticate_dashboard(self.headers)
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            requested_run_id = str(urlsplit(self.path).query or "")
+            # Query string is parsed from the original request target before pathname normalization.
+            with RUN_HISTORY_LOCK:
+                path = _run_history_path()
+                records = []
+                if path.exists():
+                    for line in path.read_text(encoding="utf-8").splitlines():
+                        try:
+                            item = json.loads(line)
+                            if isinstance(item, dict):
+                                records.append(item)
+                        except (ValueError, TypeError):
+                            continue
+            records.sort(key=lambda item: float(item.get("finished_at") or item.get("started_at") or 0), reverse=True)
+            self._json({"ok": True, "count": len(records), "runs": records[:50]})
             return
         if self.path == "/api/state":
             try:
