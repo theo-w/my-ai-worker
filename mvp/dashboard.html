@@ -491,7 +491,7 @@ function renderHistoryDetail(r){
  const decision=r.decision||{};
  detail.innerHTML='<h3>'+esc(r.goal||"本轮记录")+'</h3><div class="sub">运行 ID：'+esc(r.run_id||"")+' · 状态：'+esc(r.status||r.phase||"unknown")+' · 开始：'+esc(r.started_at?new Date(Number(r.started_at)*1000).toLocaleString():"未知")+' · 结束：'+esc(r.finished_at?new Date(Number(r.finished_at)*1000).toLocaleString():"未知")+'</div>'+
  '<div class="content-fold"><b>执行动作与对话时间线 ('+events.length+')</b><ol>'+eventHtml+'</ol></div>'+
- '<div class="content-fold"><b>调研查询与来源 ('+sources.length+')</b><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></div>'+
+ '<div class="content-fold"><b>调研查询、观点与来源 ('+sources.length+')</b><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><div class="sub">调研综合：'+esc(research.synthesis||research.llm_synthesis||"本轮未返回综合摘要；可根据下方原始来源和证据逐条核查。")+'</div><div class="sub">查询错误：'+esc((research.query_errors||[]).map(x=>typeof x==="string"?x:JSON.stringify(x)).join("；")||"无")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></div>'+
  '<div class="content-fold"><b>员工输入输出 ('+agents.length+')</b><ul>'+agentHtml+'</ul></div>'+
  '<div class="content-fold"><b>证据与观点 ('+evidence.length+')</b><div class="sub">系统按实际记录展示支持或反对的材料，不把未核验的模型观点自动当成事实。</div><ul>'+evidenceHtml+'</ul></div>'+
  '<div class="content-fold"><b>决策与评估</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></div>';
