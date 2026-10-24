@@ -571,7 +571,12 @@ function renderRunOutputs(data){
  const labels={planning:"正在规划",team:"员工执行中",research:"真实调研中",design:"创意生成中",evaluation:"独立评估中",decision:"阶段决策已形成",prototype:"原型阶段"};
  const supervision=data.supervision||{};document.getElementById("signalSummary").textContent=(labels[phase]||phase.toUpperCase())+" · "+(data.run_id||"无运行 ID")+(supervision.status==="attention_required"?" · 分身警报：执行停滞":supervision.status==="blocked"?" · 分身警报：流程受阻":supervision.status==="monitoring"?" · 分身监督中":"");
  if(research.status==="running"||research.status==="queued"){
-  researchOut.textContent=research.status==="running"?"本轮自动调研正在执行，结果返回后会显示在这里。":"等待本轮调研阶段。";
+  const progress=research.progress||{};
+  if(research.status==="running"&&Number(progress.queries_total)>0){
+   researchOut.textContent="本轮自动调研正在执行："+Number(progress.queries_completed||0)+"/"+Number(progress.queries_total)+" 个角度已查询；当前累计 "+(research.sources||[]).length+" 个来源；成功角度 "+Number(progress.successful_angles||0)+"，失败角度 "+Number(progress.failed_angles||0)+"。\\n当前查询："+String(progress.current_query||"正在准备查询")+"\\n结果会随每个查询完成逐步更新，不必等待整批调研结束。";
+  }else{
+   researchOut.textContent=research.status==="running"?"本轮自动调研正在执行，等待第一个查询检查点…":"等待本轮调研阶段。";
+  }
  }else if(research.status==="provider_error"||research.status==="provider_unconfigured"||research.status==="failed"){
   researchOut.textContent="本轮调研未成功："+(research.error||"搜索服务未配置或请求失败")+"。未生成可验证的真实研究结果。";
  }else if(research.status==="completed"||research.status==="no_results"){
