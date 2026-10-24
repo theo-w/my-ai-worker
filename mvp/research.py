@@ -255,7 +255,7 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
 
 
 
-def run_live_research_batch(queries: list[str], limit_per_query: int = 3) -> dict:
+def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progress_callback: Callable[[dict], None] | None = None) -> dict:
     """Run a bounded multi-angle search, deduplicate sources, then synthesize once.
 
     This is intended for feasibility work where a single broad query would miss
@@ -313,27 +313,46 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3) -> dic
     query_errors = []
     empty_queries = []
     successful_queries = set()
-    for query in normalized:
+    for query_index, query in enumerate(normalized, start=1):
+        query_error = None
         try:
             found = provider.search(query, limit)
         except Exception as exc:
-            query_errors.append({"query": query, "error": type(exc).__name__})
-            continue
-        if found:
-            successful_queries.add(query)
-        else:
-            empty_queries.append(query)
-        for source in found:
-            normalized_url = source.url.split("#", 1)[0].rstrip("/")
-            if not normalized_url:
-                continue
-            if normalized_url not in source_rows:
-                source_rows[normalized_url] = {
-                    **source.to_dict(),
-                    "research_queries": [query],
-                }
-            elif query not in source_rows[normalized_url]["research_queries"]:
-                source_rows[normalized_url]["research_queries"].append(query)
+            found = []
+            query_error = type(exc).__name__
+            query_errors.append({"query": query, "error": query_error})
+        if query_error is None:
+            if found:
+                successful_queries.add(query)
+            else:
+                empty_queries.append(query)
+            for source in found:
+                normalized_url = source.url.split("#", 1)[0].rstrip("/")
+                if not normalized_url:
+                    continue
+                if normalized_url not in source_rows:
+                    source_rows[normalized_url] = {
+                        **source.to_dict(),
+                        "research_queries": [query],
+                    }
+                elif query not in source_rows[normalized_url]["research_queries"]:
+                    source_rows[normalized_url]["research_queries"].append(query)
+        if progress_callback is not None:
+            try:
+                progress_callback({
+                    "status": "running",
+                    "queries_completed": query_index,
+                    "queries_total": len(normalized),
+                    "current_query": query,
+                    "query_errors": list(query_errors),
+                    "sources": list(source_rows.values())[:20],
+                    "successful_angles": len(successful_queries),
+                    "empty_angles": len(empty_queries),
+                    "failed_angles": len(query_errors),
+                })
+            except Exception:
+                # Progress reporting must never interrupt the research task.
+                pass
 
     sources = list(source_rows.values())[:20]
     evidence = [{
