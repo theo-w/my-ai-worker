@@ -348,7 +348,7 @@ def _persist_run_history():
             existing.append(record)
             existing = existing[-200:]
             temp = path.with_suffix(path.suffix + ".tmp")
-            temp.write_text("".join(json.dumps(item, ensure_ascii=False, default=str) + "\\n" for item in existing), encoding="utf-8")
+            temp.write_text("".join(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in existing), encoding="utf-8")
             temp.replace(path)
     except OSError as exc:
         # History persistence failure must not crash the task itself.
@@ -599,8 +599,6 @@ class Handler(BaseHTTPRequestHandler):
             except WorkforceAuthError as exc:
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
-            requested_run_id = str(urlsplit(self.path).query or "")
-            # Query string is parsed from the original request target before pathname normalization.
             with RUN_HISTORY_LOCK:
                 path = _run_history_path()
                 records = []
