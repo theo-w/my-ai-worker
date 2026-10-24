@@ -115,6 +115,7 @@ def reset(goal: str):
             STATE["feasibility"] = {"status": "not_started", "contract": None, "report": None, "evaluation": None}
         STATE["run_id"] = str(int(time.time() * 1000))
         STATE["started_at"] = time.time()
+        STATE["last_progress_at"] = STATE["started_at"]
         STATE.pop("history_error", None)
         STATE.pop("run_error", None)
         STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
@@ -322,6 +323,7 @@ def _run_history_path() -> Path:
 def _persist_run_history():
     """Append a sanitized snapshot for later lookup; never persist credentials."""
     with LOCK:
+        STATE["last_progress_at"] = time.time()
         snapshot = json.loads(json.dumps(STATE, ensure_ascii=False, default=str))
     run_id = str(snapshot.get("run_id") or "")
     if not run_id:
@@ -633,7 +635,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(exc)}, exc.status)
                 return
             with LOCK:
-                self._json(dict(STATE))
+                snapshot = json.loads(json.dumps(STATE, ensure_ascii=False, default=str))
+            phase = str(snapshot.get("phase") or "idle")
+            last_progress = float(snapshot.get("last_progress_at") or snapshot.get("started_at") or 0)
+            age_seconds = max(0, int(time.time() - last_progress)) if last_progress else 0
+            active_phases = {"planning", "team", "research", "design", "evaluation"}
+            if phase in active_phases and age_seconds >= 90:
+                supervision = {"status": "attention_required", "stale": True, "age_seconds": age_seconds,
+                    "message": "流程超过 90 秒没有新的检查点；任务尚不能视为完成。请检查当前阶段、执行日志和外部服务响应。",
+                    "recommended_action": "检查阻塞原因；确认可安全重试后再重试，不自动重复收费请求。"}
+            elif phase in {"failed", "blocked"}:
+                supervision = {"status": "blocked", "stale": False, "age_seconds": age_seconds,
+                    "message": "本轮处于失败或阻塞状态，需要查看具体错误并处理后才能继续。",
+                    "recommended_action": "查看 run_error、research.error、员工输出和历史事件。"}
+            elif phase in {"decision", "prototype", "idle"}:
+                supervision = {"status": "terminal_or_idle", "stale": False, "age_seconds": age_seconds,
+                    "message": "当前执行线程已到阶段终点或尚未启动；需结合员工、调研和验收状态判断是否真正完成。",
+                    "recommended_action": "只有验收条件全部满足时才可判定任务完成。"}
+            else:
+                supervision = {"status": "monitoring", "stale": False, "age_seconds": age_seconds,
+                    "message": "分身正在监控本轮执行；阶段标签本身不代表任务已验收。",
+                    "recommended_action": "持续检查员工回执、调研证据和验收条件。"}
+            snapshot["supervision"] = supervision
+            self._json(snapshot)
             return
         if self.path == "/api/knowledge":
             try:
