@@ -100,12 +100,39 @@
    const response=await fetch("/api/run",{method:"POST",headers,body:JSON.stringify({goal}),cache:"no-store"});
    const result=await response.json().catch(()=>({}));
    if(!response.ok||result.ok===false)throw new Error(result.error||("HTTP "+response.status));
-   if(status)status.textContent="任务已接收 · "+(result.run_id||result.project_id||"正在启动");
-   if(hint)hint.textContent="服务器已接受启动请求。正在读取任务状态；若阶段没有变化，错误会显示在这里。";
-   const stateResponse=await fetch("/api/state",{headers:token?{Authorization:"Bearer "+token}:{},cache:"no-store"});
-   const state=await stateResponse.json().catch(()=>({}));
-   if(!stateResponse.ok)throw new Error(state.error||("状态读取 HTTP "+stateResponse.status));
-   if(status)status.textContent="JARVIS 状态 · "+String(state.phase||"已接收").toUpperCase();
+   if(status)status.textContent="任务已接收 · 正在确认执行线程";
+   if(hint)hint.textContent="启动请求已接受，正在轮询实际任务状态与员工输出；若后台未推进，会明确显示停滞阶段。";
+   const progress=document.getElementById("runProgressText");
+   const deadline=Date.now()+20000;
+   let lastState=null;
+   while(Date.now()<deadline){
+    const stateResponse=await fetch("/api/state",{headers:token?{Authorization:"Bearer "+token}:{},cache:"no-store"});
+    const state=await stateResponse.json().catch(()=>({}));
+    if(!stateResponse.ok)throw new Error(state.error||("状态读取 HTTP "+stateResponse.status));
+    lastState=state;
+    const agents=Array.isArray(state.agents)?state.agents:[];
+    const messages=Array.isArray(state.conversation)?state.conversation.slice(-5):[];
+    const lines=[
+     "阶段："+String(state.phase||"unknown"),
+     "运行 ID："+String(state.run_id||"未生成"),
+     "员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）",
+     "调研："+String((state.research||{}).status||"待开始"),
+     "玩法分析："+String((state.design||{}).status||"待开始"),
+     "验收："+String((state.feasibility||{}).status||"待开始")
+    ];
+    if((state.research||{}).error)lines.push("调研错误："+state.research.error);
+    messages.forEach(m=>lines.push((m.from||m.worker||"系统")+"："+String(m.text||"").replace(/\\s+/g," ").slice(0,260)));
+    agents.filter(a=>a.output).forEach(a=>lines.push((a.worker||"员工")+" 输出："+String(a.output).slice(0,260)));
+    if(progress)progress.textContent=lines.join("\\n");
+    if(status)status.textContent="JARVIS 状态 · "+String(state.phase||"unknown").toUpperCase();
+    if(!["planning","team","research","design","evaluation"].includes(state.phase))break;
+    await new Promise(resolve=>setTimeout(resolve,1500));
+   }
+   if(lastState&&["planning","team","research","design","evaluation"].includes(lastState.phase)){
+    const stuck="后台阶段超过 20 秒仍未退出："+lastState.phase+"。请检查执行器/调研 provider 与服务日志。";
+    if(hint)hint.textContent=stuck;
+    if(status)status.textContent="任务疑似停滞 · "+lastState.phase;
+   }else if(hint)hint.textContent="已读取本轮任务状态。员工输出和事件已更新到本页。";
   }catch(error){
    if(status)status.textContent="启动失败 · "+error.message;
    if(hint)hint.textContent="启动请求未成功。请检查管理员 Token 与服务响应后重试。";
