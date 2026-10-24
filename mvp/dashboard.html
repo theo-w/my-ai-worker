@@ -115,7 +115,7 @@
 </script>
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
- <div class="section-title"><span>执行流程 · 启动后的实时追踪</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">下一步：查看详细追踪与验收 ↗</a></div></div><div class="sub" style="margin:-4px 0 10px">启动 JARVIS 后，这里跟随同一轮任务显示阶段变化；完成后进入验收，检查证据、成本、风险与结论。打开详细页只查看当前任务，不会重复启动。</div>
+ <div class="section-title"><span>本轮执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里是本轮任务的主视图：上方看阶段进度，下方查看详细事件、员工输入输出与验收依据。认证只在首页填写一次；展开详情会自动沿用本页凭证，不会另起任务。</div>
  <div id="flow" class="flow"></div>
  <details class="content-fold" style="margin-top:12px"><summary>展开本轮详细流程与验收（当前页面内）</summary><div class="sub" style="margin:8px 0">这里复用同一轮任务的追踪与验收记录，不会重新启动任务。若未显示，请先确认管理员 Token 已通过认证。</div><iframe title="本轮详细流程与验收" src="/trace" loading="lazy" style="display:block;width:100%;height:680px;border:1px solid var(--line);border-radius:10px;background:#080d18" referrerpolicy="same-origin"></iframe></details>
 </div>
@@ -632,9 +632,13 @@ async function refreshKnowledgeStatus(){
  }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
 }
 refreshKnowledgeStatus();
-// Pass the already-entered token to the embedded trace page in-memory only.
-const traceFrame=document.querySelector('#journeyPanel iframe');
-if(traceFrame)traceFrame.addEventListener("load",()=>{try{const doc=traceFrame.contentDocument;const token=document.getElementById("adminToken").value.trim();if(token&&doc&&doc.getElementById("token")){doc.getElementById("token").value=token;doc.getElementById("connect").click();}}catch(_){}});
+// Share homepage authentication with the embedded read-only detail view in memory only.
+// Sync on iframe load and when the token changes; the iframe may load before auth is entered.
+const traceFrame=document.querySelector("#journeyPanel iframe");
+function syncTraceAuth(connectNow=false){try{const doc=traceFrame&&traceFrame.contentDocument;const token=document.getElementById("adminToken").value.trim();const field=doc&&doc.getElementById("token");if(!field)return;field.value=token;if(token&&connectNow){const connect=doc.getElementById("connect");if(connect)connect.click();}}catch(_){}}
+if(traceFrame)traceFrame.addEventListener("load",()=>syncTraceAuth(true));
+document.getElementById("adminToken").addEventListener("input",()=>syncTraceAuth(false));
+document.getElementById("adminToken").addEventListener("change",()=>syncTraceAuth(true));
 document.getElementById("knowledgeSearch").onclick=async function(){
  const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
  const query=document.getElementById("knowledgeQuery").value.trim();
