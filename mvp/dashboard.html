@@ -121,9 +121,9 @@
      "验收："+String((state.feasibility||{}).status||"待开始")
     ];
     if((state.research||{}).error)lines.push("调研错误："+state.research.error);
-    messages.forEach(m=>lines.push((m.from||m.worker||"系统")+"："+String(m.text||"").replace(/\\s+/g," ").slice(0,260)));
+    messages.forEach(m=>lines.push((m.from||m.worker||"系统")+"："+String(m.text||"").replace(/\s+/g," ").slice(0,260)));
     agents.filter(a=>a.output).forEach(a=>lines.push((a.worker||"员工")+" 输出："+String(a.output).slice(0,260)));
-    if(progress)progress.textContent=lines.join("\\n");
+    if(progress)progress.textContent=lines.join("\n");
     if(status)status.textContent="JARVIS 状态 · "+String(state.phase||"unknown").toUpperCase();
     if(!["planning","team","research","design","evaluation"].includes(state.phase))break;
     await new Promise(resolve=>setTimeout(resolve,1500));
