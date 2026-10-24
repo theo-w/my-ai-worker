@@ -79,6 +79,40 @@
  <div class="section-title"><span>Business Goal · 让数字分身替我完成什么业务</span><span class="sub">Natural Language</span></div>
  <div class="input"><input id="goal" value="评估一款玩家可以与长期记忆 NPC 建立关系的 AI 原生 RPG 是否值得进入 Prototype"><button id="run" class="btn" type="button" aria-live="polite" onclick="document.getElementById('runInlineStatus').textContent='已触发点击，正在连接执行接口…'">启动 JARVIS</button><span id="runInlineStatus" class="run-inline-status" role="status" aria-live="polite">准备就绪</span></div>
 </div>
+<script>
+// Early launch guard: provide visible feedback and a direct API fallback if another script error prevents the main handler from binding.
+(function(){
+ const button=document.getElementById("run");
+ if(!button)return;
+ button.addEventListener("click",async function(){
+  if(window.__jarvisLaunchHandlerReady)return;
+  const hint=document.getElementById("runInlineStatus");
+  const status=document.getElementById("status");
+  const goal=document.getElementById("goal").value.trim();
+  if(hint)hint.textContent="启动按钮已触发，正在直接连接执行接口…";
+  if(status)status.textContent="正在提交 JARVIS 启动请求…";
+  if(!goal){if(status)status.textContent="请先输入业务目标";return;}
+  button.disabled=true;button.textContent="正在连接 JARVIS…";
+  try{
+   const headers={"Content-Type":"application/json"};
+   const token=document.getElementById("adminToken").value.trim();
+   if(token)headers.Authorization="Bearer "+token;
+   const response=await fetch("/api/run",{method:"POST",headers,body:JSON.stringify({goal}),cache:"no-store"});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||result.ok===false)throw new Error(result.error||("HTTP "+response.status));
+   if(status)status.textContent="任务已接收 · "+(result.run_id||result.project_id||"正在启动");
+   if(hint)hint.textContent="服务器已接受启动请求。正在读取任务状态；若阶段没有变化，错误会显示在这里。";
+   const stateResponse=await fetch("/api/state",{headers:token?{Authorization:"Bearer "+token}:{},cache:"no-store"});
+   const state=await stateResponse.json().catch(()=>({}));
+   if(!stateResponse.ok)throw new Error(state.error||("状态读取 HTTP "+stateResponse.status));
+   if(status)status.textContent="JARVIS 状态 · "+String(state.phase||"已接收").toUpperCase();
+  }catch(error){
+   if(status)status.textContent="启动失败 · "+error.message;
+   if(hint)hint.textContent="启动请求未成功。请检查管理员 Token 与服务响应后重试。";
+  }finally{button.disabled=false;button.textContent="启动 JARVIS";}
+ },true);
+})();
+</script>
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>执行流程 · 启动后的实时追踪</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">下一步：查看详细追踪与验收 ↗</a></div></div><div class="sub" style="margin:-4px 0 10px">启动 JARVIS 后，这里跟随同一轮任务显示阶段变化；完成后进入验收，检查证据、成本、风险与结论。打开详细页只查看当前任务，不会重复启动。</div>
@@ -564,6 +598,7 @@ document.getElementById("run").onclick=async()=>{
   hint.textContent="请求未能完成："+(e&&e.message?e.message:"未知错误");
  }
 };
+window.__jarvisLaunchHandlerReady=true;
 async function refreshProviderStatus(){
  try{
   const results=await Promise.all([
@@ -597,6 +632,9 @@ async function refreshKnowledgeStatus(){
  }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
 }
 refreshKnowledgeStatus();
+// Pass the already-entered token to the embedded trace page in-memory only.
+const traceFrame=document.querySelector('#journeyPanel iframe');
+if(traceFrame)traceFrame.addEventListener("load",()=>{try{const doc=traceFrame.contentDocument;const token=document.getElementById("adminToken").value.trim();if(token&&doc&&doc.getElementById("token")){doc.getElementById("token").value=token;doc.getElementById("connect").click();}}catch(_){}});
 document.getElementById("knowledgeSearch").onclick=async function(){
  const button=document.getElementById("knowledgeSearch"),out=document.getElementById("knowledgeResult");
  const query=document.getElementById("knowledgeQuery").value.trim();
