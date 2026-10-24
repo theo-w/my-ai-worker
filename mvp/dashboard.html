@@ -358,7 +358,9 @@ function updateRunButton(data){
   const feasibility=data&&data.feasibility||{};
   const sameGoal=String(data&&data.goal||"").trim()===activeRunGoal;
   const feasibilityReady=!activeRunGame||(String(feasibility.goal||feasibility.contract&&feasibility.contract.goal||"").trim()===activeRunGoal&&Boolean(feasibility.status));
-  if(sameGoal&&phase==="decision"&&feasibilityReady){
+  const activePhase=["planning","team","research","design","evaluation"].includes(phase);
+  const terminalPhase=["decision","idle","prototype","blocked","failed","error"].includes(phase);
+  if((sameGoal&&phase==="decision"&&feasibilityReady)||(!activePhase&&terminalPhase)){
    runInFlight=false;activeRunGoal="";activeRunGame=false;b.disabled=false;b.textContent="启动 JARVIS";b.classList.remove("is-running");
    hint.textContent="本轮已结束，可在下方与数字分身继续对话，或启动新目标。";return;
   }
@@ -507,8 +509,13 @@ function renderRunOutputs(data){
 let runInFlight=false,activeRunGoal="",activeRunGame=false;
 document.getElementById("run").onclick=async()=>{
  const b=document.getElementById("run"),hint=document.getElementById("runInlineStatus");
- if(runInFlight||b.disabled)return;
- if(b.dataset.serverBusy==="true"){window.location.href="/trace";return;}
+ if(runInFlight){
+  status.textContent="JARVIS 请求仍在处理中";
+  hint.textContent="上一次启动请求尚未结束。若状态长期不变，刷新后可重新尝试。";
+  return;
+ }
+ if(b.disabled){status.textContent="启动暂不可用";hint.textContent="按钮当前被禁用；请等待状态刷新后重试。";return;}
+ // Do not silently navigate away based on a stale phase. Let /api/run confirm whether a live run exists.
  const status=document.getElementById("status");
  const goal=document.getElementById("goal").value.trim();
  if(!goal){status.textContent="请先输入业务目标";hint.textContent="请先填写业务目标。";return;}
