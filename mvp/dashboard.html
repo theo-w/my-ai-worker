@@ -121,15 +121,12 @@
     const lines=[
      "阶段："+String(state.phase||"unknown"),
      "运行 ID："+String(state.run_id||"未生成"),
-     "员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）",
-     "调研："+String((state.research||{}).status||"待开始"),
-     "玩法分析："+String((state.design||{}).status||"待开始"),
-     "验收："+String((state.feasibility||{}).status||"待开始")
+     "员工 "+agents.filter(a=>a.status==="completed").length+"/"+agents.length+" 完成",
+     "调研："+String((state.research||{}).status||"待开始")+"；玩法："+String((state.design||{}).status||"待开始")+"；验收："+String((state.feasibility||{}).status||"待开始")
     ];
-    if((state.research||{}).error)lines.push("调研错误："+state.research.error);
-    messages.forEach(m=>lines.push((m.from||m.worker||"系统")+"："+String(m.text||"").replace(/\s+/g," ").slice(0,260)));
-    agents.filter(a=>a.output).forEach(a=>lines.push((a.worker||"员工")+" 输出："+String(a.output).slice(0,260)));
-    if(progress)progress.textContent=lines.join("\n");
+    if((state.supervision||{}).message)lines.push("监督："+state.supervision.message);
+    if((state.research||{}).error)lines.push("当前阻塞："+state.research.error);
+    if(progress)progress.textContent=lines.join(" · ");
     if(status)status.textContent="JARVIS 状态 · "+String(state.phase||"unknown").toUpperCase();
     if(!["planning","team","research","design","evaluation"].includes(state.phase))break;
     await new Promise(resolve=>setTimeout(resolve,1500));
