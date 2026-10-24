@@ -66,7 +66,7 @@
 </style>
 </head>
 <body><div class="app">
-<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><label style="display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap"><input id="rememberToken" type="checkbox" checked>在此设备记住</label><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">流程追踪与验收 ↗</a><div id="status" class="status">IDLE</div></div></div>
+<div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><label style="display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap"><input id="rememberToken" type="checkbox" checked>在此设备记住</label><div id="status" class="status">IDLE</div></div></div>
 
 <div class="panel wide" id="identityIntro">
  <div class="hero">
@@ -81,7 +81,7 @@
 </div>
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
- <div class="section-title"><span>Business Journey</span><span id="phase" class="status">IDLE</span></div>
+ <div class="section-title"><span>执行流程 · 启动后的实时追踪</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span><a href="/trace" style="color:var(--accent);font-size:12px;font-weight:750;text-decoration:none">下一步：查看详细追踪与验收 ↗</a></div></div><div class="sub" style="margin:-4px 0 10px">启动 JARVIS 后，这里跟随同一轮任务显示阶段变化；完成后进入验收，检查证据、成本、风险与结论。打开详细页只查看当前任务，不会重复启动。</div>
  <div id="flow" class="flow"></div>
 </div>
 
