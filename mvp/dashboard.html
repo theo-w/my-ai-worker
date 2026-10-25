@@ -526,12 +526,23 @@ function renderHistoryDetail(r){
  const agentHtml=agents.length?agents.map(a=>'<li><b>'+esc(a.worker||"员工")+'</b> · '+esc(a.status||"unknown")+'<div class="sub">任务：'+esc(a.task||a.capability||"")+'</div><div>'+esc(a.output||"无输出")+'</div></li>').join(""):'<li>本轮未组建员工团队或无员工记录。</li>';
  const evidenceHtml=evidence.length?evidence.map(e=>'<li><b>'+esc(e.worker||"证据")+'</b> · 置信度 '+esc(e.confidence??"未提供")+'<div>'+esc(e.finding||e.text||JSON.stringify(e))+'</div><div class="sub">'+(e.source?link(e.source.url,e.source.title||e.source.url):"未附来源链接")+'</div></li>').join(""):'<li>本轮没有通过证据门禁的证据记录；这不代表没有反对观点，只代表未记录到通过门禁的证据。</li>';
  const decision=r.decision||{};
+ const completed=agents.filter(a=>String(a.status||"").toLowerCase()==="completed").length;
+ const failed=agents.filter(a=>["blocked","failed","error"].includes(String(a.status||"").toLowerCase())).length;
+ const brief=[
+  "总体状态："+String(r.status||r.phase||"unknown"),
+  "员工："+agents.length+" 人（完成 "+completed+"，异常 "+failed+"）",
+  "调研来源："+sources.length+" 条",
+  "事件记录："+events.length+" 条",
+  "证据记录："+evidence.length+" 条",
+  "决策结论："+String(decision.recommendation||decision.status||"尚无明确结论")
+ ];
  detail.innerHTML='<h3>'+esc(r.goal||"本轮记录")+'</h3><div class="sub">运行 ID：'+esc(r.run_id||"")+' · 状态：'+esc(r.status||r.phase||"unknown")+' · 开始：'+esc(r.started_at?new Date(Number(r.started_at)*1000).toLocaleString():"未知")+' · 结束：'+esc(r.finished_at?new Date(Number(r.finished_at)*1000).toLocaleString():(r.updated_at?"尚未结束 · 最近更新 "+new Date(Number(r.updated_at)*1000).toLocaleString():"未知"))+'</div>'+
- '<div class="content-fold"><b>执行动作与对话时间线 ('+events.length+')</b><ol>'+eventHtml+'</ol></div>'+
- '<div class="content-fold"><b>调研查询、观点与来源 ('+sources.length+')</b><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><div class="sub">调研综合：'+esc(research.synthesis||research.llm_synthesis||"本轮未返回综合摘要；可根据下方原始来源和证据逐条核查。")+'</div><div class="sub">查询错误：'+esc((research.query_errors||[]).map(x=>typeof x==="string"?x:JSON.stringify(x)).join("；")||"无")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></div>'+
- '<div class="content-fold"><b>员工输入输出 ('+agents.length+')</b><ul>'+agentHtml+'</ul></div>'+
- '<div class="content-fold"><b>证据与观点 ('+evidence.length+')</b><div class="sub">系统按实际记录展示支持或反对的材料，不把未核验的模型观点自动当成事实。</div><ul>'+evidenceHtml+'</ul></div>'+
- '<div class="content-fold"><b>决策与评估</b><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></div>';
+ '<div class="content-fold"><b>本轮摘要</b><ul>'+brief.map(x=>'<li>'+esc(x)+'</li>').join("")+'</ul></div>'+
+ '<details class="content-fold"><summary>执行动作与对话时间线（'+events.length+' 条）</summary><ol>'+eventHtml+'</ol></details>'+
+ '<details class="content-fold"><summary>调研查询、观点与来源（'+sources.length+' 条来源）</summary><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><div class="sub">调研综合：'+esc(research.synthesis||research.llm_synthesis||"本轮未返回综合摘要；可根据下方原始来源和证据逐条核查。")+'</div><div class="sub">查询错误：'+esc((research.query_errors||[]).map(x=>typeof x==="string"?x:JSON.stringify(x)).join("；")||"无")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></details>'+
+ '<details class="content-fold"><summary>员工输入输出（'+agents.length+' 人）</summary><ul>'+agentHtml+'</ul></details>'+
+ '<details class="content-fold"><summary>证据与观点（'+evidence.length+' 条）</summary><div class="sub">系统按实际记录展示支持或反对的材料，不把未核验的模型观点自动当成事实。</div><ul>'+evidenceHtml+'</ul></details>'+
+ '<details class="content-fold"><summary>决策与评估详情</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></details>';
 }
 document.getElementById("historyRefresh")?.addEventListener("click",loadRunHistory);
 document.getElementById("historyList")?.addEventListener("click",event=>{
@@ -562,7 +573,7 @@ function renderCriticalFlow(data){
  const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"： "+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
  office.innerHTML='<div class="signal-lane">'+
   card("数字分身 · AI CEO","阶段："+(data.phase||"idle")+"；监督："+(twin.status||"等待本轮运行")+"；判断："+(twin.last_decision||"等待分身判断")+"；下一步："+(twin.next_action||"等待启动"))+
-  card("协作流 · 员工执行",agents.length?agents.map(a=>(a.worker||"员工")+"："+(a.status||"unknown")+"；输出："+(a.output||"暂无输出")).join("\n"):"后端尚未返回员工列表")+
+  card("协作流 · 员工执行",agents.length?("员工数："+agents.length+" · 已完成："+agents.filter(a=>String(a.status||"").toLowerCase()==="completed").length+" · 异常："+agents.filter(a=>["blocked","failed","error"].includes(String(a.status||"").toLowerCase())).length+'<details class="content-fold"><summary>查看员工执行详情（'+agents.length+'）</summary><ul>'+agents.map(a=>'<li><b>'+esc(a.worker||"员工")+"</b> · "+esc(a.status||"unknown")+'<div class="sub">任务：'+esc(a.task||a.capability||"未记录")+"</div><div>"+esc(a.output||"暂无输出")+"</div></li>").join("")+"</ul></details>"):"后端尚未返回员工列表")+
   '</div><div class="signal-lane">'+
   card("真实调研 · 本轮输出","状态："+(research.status||"not_started")+"；来源："+sources.length+"；"+(research.error||research.summary||"暂无调研摘要"))+
   card("玩法假设 · 本轮输出",design.status==="blocked"?"已阻断："+designOutput:String(designOutput))+
