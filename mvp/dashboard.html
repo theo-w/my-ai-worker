@@ -145,25 +145,14 @@
 </script>
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
- <div class="section-title"><span>本轮执行结果</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div><div class="sub" style="margin:-4px 0 10px">这里集中显示本轮执行状态与结论。完整过程记录（动作、员工输入输出、搜索来源、支持与反对证据）可在下方“流程记录”中按需查询。</div>
+ <div class="section-title"><span>首页 · 本轮任务执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div>
+ <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、玩法方案、阻塞原因和验收结论。独立流程页已合并，不需要切换页面。</div>
  <div id="flow" class="flow"></div>
- <div id="runProgressSummary" class="sub" style="margin-top:10px"><span id="runProgressText">尚未启动。详细执行过程统一显示在下方“数字分身 · 员工协作流”。</span></div><div id="decisionSummary" class="outcome" style="margin-top:10px"><strong>商业决策</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div>
-</div>
-
-<div class="panel wide" id="twinChatPanel" style="margin-top:14px">
- <div class="section-title"><span>数字分身 · 即时会话</span><div class="twin-chat-launch"><button id="twinChatOpenText" class="btn twin-chat-mini" type="button">文字对话</button><button id="twinChatOpenVoice" class="btn twin-chat-mini" type="button">🎙 语音对话</button><button id="twinChatClose" class="btn twin-chat-mini twin-chat-close" type="button" hidden>收起会话</button><span id="twinChatStatus" class="status">会话已收起</span></div></div>
- <div id="twinChatContent" hidden>
-  <div id="twinChatLog" class="twin-chat-log" role="log" aria-live="polite"><div class="twin-bubble assistant"><div class="bubble-meta">Digital Twin</div>你好，我会根据当前工作台状态回答进度问题。你也可以用“新目标：……”记录新的工作方向。</div></div>
-  <div class="twin-chat-compose" style="margin-top:10px"><input id="twinChatInput" maxlength="2000" placeholder="问进度、风险，或输入：新目标：……" aria-label="与数字分身对话"><button id="twinChatSend" class="btn">发送</button></div>
-  <div class="twin-chat-actions" style="margin-top:8px"><button id="twinChatMic" class="btn" type="button">🎙 开始语音输入</button><label><input id="twinChatSpeak" type="checkbox"> 回复后语音播报</label><span id="twinVoiceNote" class="voice-note">语音功能取决于浏览器支持情况；文字始终可用。</span></div>
- </div>
-</div>
-
-<div class="panel wide signal-panel" style="margin-top:14px">
- <div class="section-title"><span>数字分身 · 员工协作流</span><span id="signalSummary" class="status">WAITING FOR RUN</span></div>
- <div class="signal-legend"><span><i class="legend-dot twin-dot"></i>数字分身：目标与调度</span><span><i class="legend-dot worker-dot"></i>数字员工：执行中</span><span><i class="legend-dot evidence-dot"></i>证据与反馈</span></div>
- <div id="signalOffice" class="signal-office" aria-label="数字分身和数字员工的信息流可视化"></div>
- <div id="signalCaption" class="sub">启动 JARVIS 后，这里会根据实际流程状态显示分身调度、员工执行、证据回传和决策反馈；动画只表示当前状态，不代表虚构的实时思考。</div>
+ <div id="runProgressSummary" class="sub" style="margin-top:10px"><span id="runProgressText">尚未启动。启动后，本区域会显示真实运行阶段与状态。</span></div>
+ <div id="decisionSummary" class="outcome" style="margin-top:10px"><strong>当前结论</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div>
+ <div class="signal-legend" style="margin-top:14px"><span><i class="legend-dot twin-dot"></i>数字分身：目标与调度</span><span><i class="legend-dot worker-dot"></i>数字员工：执行中</span><span><i class="legend-dot evidence-dot"></i>证据与反馈</span><span id="signalSummary" class="status">WAITING FOR RUN</span></div>
+ <div id="signalOffice" class="signal-office" aria-label="首页中的数字分身、员工协作、调研、玩法与验收输出"></div>
+ <div id="signalCaption" class="sub" style="margin-top:8px">以上内容来自本轮后端状态；缺失数据会明确显示“暂无输出/受阻”，不会用旧模板伪装成本轮结果。</div>
 </div>
 
 <div class="panel wide" style="margin-top:14px" id="feasibilityPanel">
