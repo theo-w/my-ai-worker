@@ -335,10 +335,14 @@ function render(){
    : researchSources.length
     ? "已收集 "+researchSources.length+" 个来源。"+(researchDetail.summary?" 摘要："+String(researchDetail.summary):"")
     : "没有可展示的调研来源；请确认搜索服务已配置并查看运行日志。";
+ const designBrief=designDetail.brief||{};
+ const originalConcept=designBrief.original_concept||{};
+ const designTitle=originalConcept.title||designBrief.title||designDetail.title||designDetail.concept;
+ const designLoop=originalConcept.core_loop||originalConcept.gameplay_loop||originalConcept.description||designBrief.core_loop;
  const designSummary=designDetail.error||designDetail.reason
   ? "未形成玩法假设："+String(designDetail.error||designDetail.reason)
-  : designDetail.title||designDetail.concept||designDetail.core_loop
-   ? "玩法假设："+String(designDetail.title||designDetail.concept||designDetail.core_loop)
+  : designTitle||designLoop
+   ? "玩法假设："+String(designTitle||"已生成概念")+(designLoop?"；核心玩法："+String(designLoop):"")+(designBrief.generation&&designBrief.generation.mode==="template_fallback"?"（模板结果，非本轮 LLM 原创输出）":"")
    : designDetail.status==="blocked"
     ? "玩法阶段被阻断；原因未返回，需检查执行器与上游证据。"
     : "暂无玩法假设输出。若本轮仅返回等待决策，说明下游阶段尚未产出，不能视为完成。";
