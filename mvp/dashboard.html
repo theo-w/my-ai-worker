@@ -354,11 +354,17 @@ function render(){
    : feasibilityDetail.status==="evaluated"
     ? "已完成评估，但缺少可展示的决策字段；需检查报告结构。"
     : "尚无可行性验收结果。当前阶段状态："+String(feasibilityDetail.status||"待开始")+"；成本、证据与原型验证未被确认前，不应标记完成。";
+ const twinSupervision=state.twin_supervision||{};
+ const twinEvents=Array.isArray(twinSupervision.events)?twinSupervision.events:[];
+ const latestTwinEvents=twinEvents.slice(-4).reverse();
+ const twinSummary="状态："+String(twinSupervision.status||"等待运行")+"；当前阶段："+String(twinSupervision.current_stage||"尚未开始")+"；判断："+String(twinSupervision.last_decision||"等待分身判断")+"；下一步："+String(twinSupervision.next_action||"启动后自动规划");
+ const twinEventMarkup=latestTwinEvents.length?'<div class="twin-push-events">'+latestTwinEvents.map(e=>'<p><b>'+esc(e.stage||"阶段")+'</b> · '+esc(e.decision||"")+'<br><span>'+esc(e.action||"")+'</span>'+(e.blocker?'<br><strong>阻塞：'+esc(e.blocker)+'</strong>':'')+'</p>').join("")+'</div>':'<p>启动后将记录分身判断、采取的动作、动作结果与阻塞原因。</p>';
  const stageDetails='<div class="signal-lane stage-detail-lane">'+
+  node("分身推进与监督",twinSummary+(twinSupervision.blocker?"；当前阻塞："+twinSupervision.blocker:""),twinSupervision.status==="blocked"?"is-blocked":twinEvents.length?"is-active":"is-queued")+
   node("真实调研 · 阶段输出",researchSummary,researchDetail.error?"is-blocked":researchSources.length?"is-active":researchDetail.status==="running"?"is-running":"is-queued")+
   node("玩法假设 · 阶段输出",designSummary,designDetail.status==="blocked"||designDetail.error?"is-blocked":designDetail.title||designDetail.concept?"is-active":"is-queued")+
   node("可行性验收 · 阶段输出",feasibilitySummary,feasibilityDetail.status==="incomplete"?"is-blocked":feasibilityDetail.status==="evaluated"?"is-active":"is-queued")+
-  '</div>';
+  '</div><div class="twin-push-history">'+twinEventMarkup+'</div>';
  const signalOffice=document.getElementById("signalOffice");
  const expandedSignalMarkup=signalMarkup+stageDetails+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
  if(signalOffice.dataset.renderedMarkup!==expandedSignalMarkup){signalOffice.innerHTML=expandedSignalMarkup;signalOffice.dataset.renderedMarkup=expandedSignalMarkup;}
