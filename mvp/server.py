@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import hmac
+import logging
 import os
 import threading
 import time
@@ -46,6 +47,8 @@ except ImportError:  # Direct script execution from mvp/
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
 ROOT = Path(__file__).parent
+logging.basicConfig(level=os.getenv("JARVIS_LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+LOGGER = logging.getLogger("jarvis.server")
 LOCK = threading.Lock()
 TWIN = DigitalTwin()
 MEMORY = PersistentTwinMemory()
@@ -442,9 +445,11 @@ def _persist_run_history():
 
 def execute(goal: str):
     """Run a JARVIS task and persist its final event/evidence snapshot."""
+    LOGGER.info("run.start goal_chars=%s", len(goal or ""))
     try:
         _execute_run(goal)
     except Exception as exc:
+        LOGGER.exception("run.failed phase=%s run_id=%s error_type=%s", STATE.get("phase"), STATE.get("run_id"), type(exc).__name__)
         _record_twin_push("运行异常", "检测到执行异常，停止虚报完成", "保留错误类型与当前阶段，等待诊断后安全重试或人工处理", blocker=type(exc).__name__)
         with LOCK:
             STATE["phase"] = "failed"
@@ -456,6 +461,7 @@ def execute(goal: str):
             })
     finally:
         _persist_run_history()
+        LOGGER.info("run.end phase=%s run_id=%s agents=%s evidence=%s", STATE.get("phase"), STATE.get("run_id"), len(STATE.get("agents") or []), len(STATE.get("evidence") or []))
 
 
 def validate_autonomous_request(body: dict) -> dict:
@@ -1096,7 +1102,7 @@ class Handler(BaseHTTPRequestHandler):
                                          + (f"\n\n{assessment_context}" if assessment_context else ""))[:5000],
                             capability=str(item.get("capability", "research" if game_feasibility else "general")),
                             priority=3,
-                            assigned_to="jarvis-internal",
+                            assigned_to=None,  # External worker identities are configured per deployment; do not pre-lock to an unclaimable internal ID.
                             success_criteria={
                                 "project_id": project_id,
                                 "goal": goal,
