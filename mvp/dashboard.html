@@ -549,13 +549,40 @@ document.getElementById("historyList")?.addEventListener("click",event=>{
  const button=event.target.closest("[data-history-index]");if(!button)return;
  const record=runHistoryCache[Number(button.dataset.historyIndex)];renderHistoryDetail(record);
 });
+function renderCriticalFlow(data){
+ const office=document.getElementById("signalOffice");
+ if(!office)return;
+ const escText=v=>esc(v===undefined||v===null||v===""?"暂无输出":v);
+ const agents=Array.isArray(data.agents)?data.agents:[];
+ const research=data.research&&typeof data.research==="object"?data.research:{};
+ const design=data.design&&typeof data.design==="object"?data.design:{};
+ const feasibility=data.feasibility&&typeof data.feasibility==="object"?data.feasibility:{};
+ const twin=data.twin_supervision&&typeof data.twin_supervision==="object"?data.twin_supervision:{};
+ const events=Array.isArray(twin.events)?twin.events.slice(-3).reverse():[];
+ const brief=design.brief&&typeof design.brief==="object"?design.brief:{};
+ const concept=brief.original_concept&&typeof brief.original_concept==="object"?brief.original_concept:{};
+ const designOutput=design.error||design.reason||concept.title||brief.title||design.title||design.concept||concept.core_loop||concept.gameplay_loop||"本轮尚未生成玩法假设";
+ const sources=Array.isArray(research.sources)?research.sources:[];
+ const blockers=feasibility.completion&&Array.isArray(feasibility.completion.blockers)?feasibility.completion.blockers:[];
+ const decision=feasibility.evaluation&&feasibility.evaluation.decision||data.decision&&data.decision.recommendation||"尚无最终结论";
+ const card=(title,body)=>'<div class="signal-node"><strong>'+escText(title)+'</strong><small>'+escText(body)+'</small></div>';
+ const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"： "+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
+ office.innerHTML='<div class="signal-lane">'+
+  card("数字分身 · AI CEO","阶段："+(data.phase||"idle")+"；监督："+(twin.status||"等待本轮运行")+"；判断："+(twin.last_decision||"等待分身判断")+"；下一步："+(twin.next_action||"等待启动"))+
+  card("协作流 · 员工执行",agents.length?agents.map(a=>(a.worker||"员工")+"："+(a.status||"unknown")+"；输出："+(a.output||"暂无输出")).join("\n"):"后端尚未返回员工列表")+
+  '</div><div class="signal-lane">'+
+  card("真实调研 · 本轮输出","状态："+(research.status||"not_started")+"；来源："+sources.length+"；"+(research.error||research.summary||"暂无调研摘要"))+
+  card("玩法假设 · 本轮输出",design.status==="blocked"?"已阻断："+designOutput:String(designOutput))+
+  card("可行性验收 · 本轮输出","状态："+(feasibility.status||"not_started")+"；结论："+decision+(blockers.length?"；缺口："+blockers.join("、"):""))+
+  '</div><div class="twin-push-history"><strong>分身推进记录</strong><pre>'+escText(eventText)+'</pre></div>';
+}
 async function poll(){
  try{
   const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open],#detail details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
   const r=await apiFetch("/api/state");
   const data=await r.json();
   if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
-  state=data;render();renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
+  state=data;try{render();}catch(renderError){const progress=document.getElementById("runProgressText");if(progress)progress.textContent="主视图渲染异常："+(renderError&&renderError.message?renderError.message:String(renderError))+"。已切换到独立流程输出，避免数字分身与下游阶段整块空白。";}renderCriticalFlow(data);renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
  }catch(e){document.getElementById("status").textContent="API unavailable";const progress=document.getElementById("runProgressText");if(progress)progress.textContent="无法读取本轮运行状态："+(e&&e.message?e.message:"API unavailable")+"。请检查管理员认证与服务连接；不能将“服务器已接收”视为任务已运行。";}
 }
 function renderRunOutputs(data){
