@@ -631,7 +631,7 @@ async function poll(){
   const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open],#detail details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
   const r=await apiFetch("/api/state");
   const data=await r.json();
-  if(!r.ok){state=null;document.getElementById("status").textContent="API "+r.status+" · "+(data.error||"访问受限");return;}
+  if(!r.ok){state=null;const message=data.error||"访问受限";document.getElementById("status").textContent="API "+r.status+" · "+message;const progress=document.getElementById("runProgressText");if(progress)progress.textContent=r.status===401?"认证失败：主页管理员 Token 缺失或无效。请在页面顶部输入正确 Token；勾选“在此设备记住”后，同一设备后续无需重复输入。":"状态读取失败（HTTP "+r.status+"）："+message;const hint=document.getElementById("runInlineStatus");if(hint&&r.status===401)hint.textContent="未能读取运行状态：管理员 Token 未通过认证。请检查顶部 Token；无需在流程页重复输入。";return;}
   state=data;try{render();}catch(renderError){const progress=document.getElementById("runProgressText");if(progress)progress.textContent="主视图渲染异常："+(renderError&&renderError.message?renderError.message:String(renderError))+"。已切换到独立流程输出，避免数字分身与下游阶段整块空白。";}renderCriticalFlow(data);renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
  }catch(e){document.getElementById("status").textContent="API unavailable";const progress=document.getElementById("runProgressText");if(progress)progress.textContent="无法读取本轮运行状态："+(e&&e.message?e.message:"API unavailable")+"。请检查管理员认证与服务连接；不能将“服务器已接收”视为任务已运行。";}
 }
@@ -845,7 +845,7 @@ async function refreshKnowledgeStatus(){
    (k.storage_error?" · SYNC ERROR":"");
   if(k.storage_error)document.getElementById("knowledgeResult").textContent=
    "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
- }catch(e){document.getElementById("knowledgeSummary").textContent="STORAGE STATUS UNAVAILABLE";}
+ }catch(e){document.getElementById("knowledgeSummary").textContent=(String(e.message||"").includes("401")||String(e.message||"").toLowerCase().includes("token"))?"认证失败 · 请检查主页顶部管理员 Token":"STORAGE STATUS UNAVAILABLE";}
 }
 refreshKnowledgeStatus();
 // Share homepage authentication with the embedded read-only detail view in memory only.
