@@ -220,6 +220,7 @@ def _execute_run(goal: str):
     _persist_run_history()
 
     # Research is part of this run; missing providers fail closed rather than fabricating results.
+    _record_twin_push("真实调研", "进入证据收集阶段", "运行真实检索并逐查询记录进度、来源和失败角度")
     with LOCK:
         STATE["phase"] = "research"
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
@@ -351,6 +352,11 @@ def _execute_run(goal: str):
     with LOCK:
         STATE["decision"] = decision.__dict__
         STATE["phase"] = "decision"
+    _record_twin_push(
+        "阶段性结论", "检查评估结果是否有证据支撑",
+        "展示当前建议与未解决缺口；独立验收未通过前不宣称事实已证实",
+        outcome=str(getattr(decision, "recommendation", "已生成评估结果"))
+    )
 
     if any(token in goal.casefold() for token in (
         "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
