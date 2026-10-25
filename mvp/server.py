@@ -96,12 +96,41 @@ STATE = {
     "knowledge": {"status": "not_started", "retrieved": [], "ingest": None},
 }
 
+def _record_twin_push(stage: str, decision: str, action: str, outcome: str = "", blocker: str = ""):
+    """Record deterministic digital-twin supervision decisions in the primary JARVIS run."""
+    event = {
+        "at": time.time(), "stage": str(stage), "decision": str(decision),
+        "action": str(action), "outcome": str(outcome), "blocker": str(blocker),
+        "llm_used": False,
+    }
+    with LOCK:
+        supervision = STATE.setdefault("twin_supervision", {})
+        supervision["current_stage"] = str(stage)
+        supervision["last_decision"] = str(decision)
+        supervision["next_action"] = str(action)
+        supervision["updated_at"] = event["at"]
+        supervision.setdefault("events", []).append(event)
+        supervision["events"] = supervision["events"][-40:]
+        supervision["status"] = "blocked" if blocker else "monitoring"
+        supervision["blocker"] = str(blocker)
+        STATE.setdefault("conversation", []).append({
+            "id": str(int(event["at"] * 1000)) + "-twin-push",
+            "at": event["at"], "kind": "supervision", "from": "Digital Twin",
+            "to": "JARVIS Run", "worker": "",
+            "text": f"监督判断：{decision}；采取动作：{action}"
+                  + (f"；结果：{outcome}" if outcome else "")
+                  + (f"；阻塞：{blocker}" if blocker else ""),
+        })
+        STATE["conversation"] = STATE["conversation"][-120:]
+
+
 def reset(goal: str):
     team = TWIN.form_team(goal, WORKERS)
     prior_knowledge = GAME_KNOWLEDGE.search(goal, 5)
     with LOCK:
         STATE["goal"] = goal
         STATE["phase"] = "planning"
+        STATE["twin_supervision"] = {"status": "monitoring", "current_stage": "目标接收", "last_decision": "已接收目标，先按单代理优先推进", "next_action": "组建员工并执行；持续检查各阶段真实输出", "blocker": "", "updated_at": time.time(), "events": []}
         game_goal = any(token in goal.casefold() for token in (
             "游戏", "玩法", "rpg", "gameplay", "video game", "ai-native game",
             "ai native game", "game feasibility", "游戏可行性"
@@ -135,6 +164,7 @@ def reset(goal: str):
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
+    _record_twin_push("目标与规划", "目标已登记，进入执行", "组建最小必要团队并派发任务", "已建立本轮 run_id 与验收上下文")
     _persist_run_history()
     time.sleep(.1)
     with LOCK:
@@ -143,6 +173,7 @@ def _execute_run(goal: str):
         for agent in STATE["agents"]:
             agent["status"] = "ready"
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
+    _record_twin_push("员工执行", "检查员工输入输出与状态", "逐个派发任务；记录返回结果，异常则进入阻塞处理", f"已规划 {len(planned)} 个员工任务")
     _persist_run_history()
 
     for idx, (worker, capability) in enumerate(planned):
@@ -311,6 +342,7 @@ def _execute_run(goal: str):
             with LOCK:
                 STATE["design"] = {"status": "failed", "reason": "创意生成失败：" + type(exc).__name__, "brief": None}
 
+    _record_twin_push("独立验收", "检查玩法输出与验收条件", "计算可行性门禁并列出缺失证据；未满足标准不判定完成")
     with LOCK:
         STATE["phase"] = "evaluation"
     _persist_run_history()
@@ -407,6 +439,7 @@ def execute(goal: str):
     try:
         _execute_run(goal)
     except Exception as exc:
+        _record_twin_push("运行异常", "检测到执行异常，停止虚报完成", "保留错误类型与当前阶段，等待诊断后安全重试或人工处理", blocker=type(exc).__name__)
         with LOCK:
             STATE["phase"] = "failed"
             STATE["run_error"] = type(exc).__name__
