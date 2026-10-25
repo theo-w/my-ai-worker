@@ -604,7 +604,8 @@ function renderCriticalFlow(data){
  const decision=feasibility.evaluation&&feasibility.evaluation.decision||data.decision&&data.decision.recommendation||"尚无最终结论";
  const card=(title,body,extraClass="")=>'<section class="signal-node '+extraClass+'"><strong>'+escText(title)+'</strong><div class="signal-card-body">'+body+'</div></section>';
  const plainText=v=>String(v??"").replace(/\\n/g," ").replace(/<\/?(?:details|summary|div|b|ul|li|p)[^>]*>/gi," ").replace(/&quot;/g,'"').replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"\'").replace(/\s+/g," ").trim();
- const shortText=(v,n=220)=>{const s=plainText(v);return s.length>n?s.slice(0,n).trimEnd()+"…":s||"暂无输出"};\n const statusOf=a=>String(a.status||"unknown").toLowerCase();
+ const shortText=(v,n=220)=>{const s=plainText(v);return s.length>n?s.slice(0,n).trimEnd()+"…":s||"暂无输出"};
+ const statusOf=a=>String(a.status||"unknown").toLowerCase();
  const completed=agents.filter(a=>statusOf(a)==="completed").length;
  const failed=agents.filter(a=>["blocked","failed","error"].includes(statusOf(a))).length;
  const workerCards=agents.length?agents.map((a,i)=>{const raw=plainText(a.output||"");return '<details class="worker-mini-card"><summary><span class="worker-number">'+(i+1)+'</span><span class="worker-card-name">'+esc(a.worker||("员工 "+(i+1)))+'</span><span class="worker-status '+(["completed"].includes(statusOf(a))?"ok":(["blocked","failed","error"].includes(statusOf(a))?"bad":"") )+'">'+esc(a.status||"unknown")+'</span></summary><div class="worker-card-content"><div class="worker-field"><b>任务</b><p>'+esc(shortText(a.task||a.capability||"未记录",180))+'</p></div><div class="worker-field"><b>执行摘要</b><p>'+esc(shortText(raw,220))+'</p></div><details class="worker-raw-fold"><summary>查看完整输出</summary><pre>'+esc(raw||"暂无输出")+'</pre></details></div></details>'}).join(""):'<p class="signal-muted">后端尚未返回员工列表</p>';
