@@ -356,7 +356,7 @@ function render(){
   '</div><div class="twin-push-history">'+twinEventMarkup+'</div>';
  const signalOffice=document.getElementById("signalOffice");
  const expandedSignalMarkup=signalMarkup+stageDetails+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
- if(signalOffice.dataset.renderedMarkup!==expandedSignalMarkup){signalOffice.innerHTML=expandedSignalMarkup;signalOffice.dataset.renderedMarkup=expandedSignalMarkup;}
+ // Single rendering authority: renderCriticalFlow(data), called after render() in poll().
  document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>Intent</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
  document.getElementById("intent").textContent=state.goal||"等待目标...";
  document.getElementById("teamSummary").textContent=(t?t.team_size:0)+" Digital Workers";
@@ -548,13 +548,17 @@ function renderCriticalFlow(data){
  const feasibility=data.feasibility&&typeof data.feasibility==="object"?data.feasibility:{};
  const twin=data.twin_supervision&&typeof data.twin_supervision==="object"?data.twin_supervision:{};
  const events=Array.isArray(twin.events)?twin.events.slice(-3).reverse():[];
+ const summary=document.getElementById("signalSummary");
+ const caption=document.getElementById("signalCaption");
+ if(summary)summary.textContent=!data.goal&&(!data.phase||data.phase==="idle")?"等待启动":["planning","team","research","design","evaluation"].includes(data.phase)?"执行中 · "+String(data.phase).toUpperCase():["failed","blocked","error"].includes(data.phase)?"执行受阻 · "+String(data.phase).toUpperCase():"状态 · "+String(data.phase||"unknown").toUpperCase();
+ if(caption)caption.textContent=data.run_error?"本轮执行异常："+String(data.run_error)+"。请查看分身推进记录与阶段输出。":research.error?"调研受阻："+String(research.error)+"；下游阶段不会被伪装成完成。":design.status==="blocked"?"玩法阶段受阻："+String(design.reason||"未返回原因"):"首页内容来自本轮后端状态；空数据会明确标记，不以旧结果填充。";
  const brief=design.brief&&typeof design.brief==="object"?design.brief:{};
  const concept=brief.original_concept&&typeof brief.original_concept==="object"?brief.original_concept:{};
  const designOutput=design.error||design.reason||concept.title||brief.title||design.title||design.concept||concept.core_loop||concept.gameplay_loop||"本轮尚未生成玩法假设";
  const sources=Array.isArray(research.sources)?research.sources:[];
  const blockers=feasibility.completion&&Array.isArray(feasibility.completion.blockers)?feasibility.completion.blockers:[];
  const decision=feasibility.evaluation&&feasibility.evaluation.decision||data.decision&&data.decision.recommendation||"尚无最终结论";
- const card=(title,body)=>'<div class="signal-node"><strong>'+escText(title)+'</strong><small>'+escText(body)+'</small></div>';
+ const card=(title,body)=>'<div class="signal-node"><strong>'+escText(title)+'</strong><small style="white-space:pre-wrap">'+escText(body)+'</small></div>';
  const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"： "+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
  office.innerHTML='<div class="signal-lane">'+
   card("数字分身 · AI CEO","阶段："+(data.phase||"idle")+"；监督："+(twin.status||"等待本轮运行")+"；判断："+(twin.last_decision||"等待分身判断")+"；下一步："+(twin.next_action||"等待启动"))+
