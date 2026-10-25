@@ -399,15 +399,15 @@ async function sendTwinMessage(){
   if(result.pending_direction){document.getElementById("goal").value=result.pending_direction;document.getElementById("twinChatStatus").textContent="新方向已填入目标框 · 待确认启动";}
   else document.getElementById("twinChatStatus").textContent=result.mode==="llm"?"已回复 · 上下文对话":"已回复 · 状态摘要";
   await poll();
-  if(document.getElementById("twinChatSpeak").checked&&"speechSynthesis" in window){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(result.reply);utterance.lang="zh-CN";window.speechSynthesis.speak(utterance);}
+  if(document.getElementById("twinChatSpeak")?.checked&&"speechSynthesis" in window){window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(result.reply);utterance.lang="zh-CN";window.speechSynthesis.speak(utterance);}
  }catch(e){document.getElementById("twinChatStatus").textContent="发送失败："+e.message;input.value=text;}
  finally{send.disabled=false;}
 }
-document.getElementById("twinChatSpeak").addEventListener("change",function(){if(!this.checked&&"speechSynthesis" in window)window.speechSynthesis.cancel();});
+document.getElementById("twinChatSpeak")?.addEventListener("change",function(){if(!this.checked&&"speechSynthesis" in window)window.speechSynthesis.cancel();});
 let twinRecognition=null;
 let twinRecognitionActive=false;
 let twinRecognitionSession=0;
-document.getElementById("twinChatMic").addEventListener("click",()=>{
+document.getElementById("twinChatMic")?.addEventListener("click",()=>{
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  const button=document.getElementById("twinChatMic");const note=document.getElementById("twinVoiceNote");
  if(!Recognition){note.textContent="此浏览器未提供语音识别。请使用系统键盘听写，或继续输入文字。";return;}
@@ -447,8 +447,8 @@ document.getElementById("twinChatMic").addEventListener("click",()=>{
   note.textContent="无法启动语音识别，请稍后重试；已有输入内容不会清空。";
  }
 });
-document.getElementById("twinChatSend").addEventListener("click",sendTwinMessage);
-document.getElementById("twinChatInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendTwinMessage();}});
+document.getElementById("twinChatSend")?.addEventListener("click",sendTwinMessage);
+document.getElementById("twinChatInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendTwinMessage();}});
 function setTwinChatExpanded(mode){
  const content=document.getElementById("twinChatContent");
  content.hidden=false;
@@ -458,9 +458,9 @@ function setTwinChatExpanded(mode){
  if(mode==="text"){document.getElementById("twinChatStatus").textContent="文字对话已展开";document.getElementById("twinChatInput").focus();}
  else if(mode==="voice"){document.getElementById("twinChatStatus").textContent="语音对话已展开";document.getElementById("twinChatMic").click();}
 }
-document.getElementById("twinChatOpenText").addEventListener("click",()=>setTwinChatExpanded("text"));
-document.getElementById("twinChatOpenVoice").addEventListener("click",()=>setTwinChatExpanded("voice"));
-document.getElementById("twinChatClose").addEventListener("click",()=>{
+document.getElementById("twinChatOpenText")?.addEventListener("click",()=>setTwinChatExpanded("text"));
+document.getElementById("twinChatOpenVoice")?.addEventListener("click",()=>setTwinChatExpanded("voice"));
+document.getElementById("twinChatClose")?.addEventListener("click",()=>{
  if(twinRecognitionActive&&twinRecognition){try{twinRecognition.stop();}catch(_){}}
  document.getElementById("twinChatContent").hidden=true;
  document.getElementById("twinChatOpenText").hidden=false;
