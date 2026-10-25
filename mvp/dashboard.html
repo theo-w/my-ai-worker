@@ -69,6 +69,39 @@
 
 /* The detailed feasibility gate remains available to the runtime but is not a second homepage workflow; final status and decision are summarized above. */
 #feasibilityPanel{display:none!important}
+
+/* Structured collaboration flow: compact cards with explicit dependencies */
+.signal-flow-map{display:flex;flex-direction:column;gap:0;width:100%;min-width:0}
+.signal-flow-row{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0}
+.signal-flow-parallel{grid-template-columns:repeat(2,minmax(0,1fr))}
+.signal-flow-map .signal-node{min-width:0;max-width:100%;padding:13px;border:1px solid #2b4261;border-radius:12px;background:linear-gradient(145deg,rgba(19,34,56,.95),rgba(10,19,34,.95));}
+.signal-flow-map .signal-node>strong{display:block;margin-bottom:9px;font-size:13px;letter-spacing:.1px}
+.signal-card-body,.signal-facts,.worker-cards{min-width:0;overflow-wrap:anywhere}
+.signal-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.signal-facts>div{padding:8px;border-radius:8px;background:rgba(255,255,255,.035);min-width:0}
+.signal-facts small{display:block;color:var(--muted);font-size:11px;margin-bottom:3px}
+.signal-facts b,.signal-facts p{margin:0;overflow-wrap:anywhere}
+.signal-facts p{font-size:12px;line-height:1.5}
+.worker-counts{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px}
+.worker-counts span{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.worker-counts b{color:var(--text)}
+.worker-mini-card{border:1px solid var(--line);border-radius:9px;margin-top:7px;overflow:hidden;background:rgba(255,255,255,.025)}
+.worker-mini-card summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:9px;min-width:0}
+.worker-mini-card summary::-webkit-details-marker{display:none}
+.worker-number{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#203751;color:var(--accent);font-size:11px;flex-shrink:0}
+.worker-card-name{font-weight:650;flex:1;min-width:0;overflow-wrap:anywhere}
+.worker-status{font-size:10px;color:var(--muted);border:1px solid var(--line);padding:2px 6px;border-radius:999px;flex-shrink:0}
+.worker-status.ok{color:var(--good);border-color:rgba(88,227,155,.4)}
+.worker-status.bad{color:#ff9b9b;border-color:rgba(255,120,120,.4)}
+.worker-card-content{padding:0 10px 10px}
+.worker-field{padding-top:8px;border-top:1px solid rgba(255,255,255,.06);margin-top:8px}
+.worker-field b{font-size:11px;color:var(--muted)}
+.worker-field p{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+.signal-flow-connector{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 0;color:var(--muted);font-size:10px}
+.signal-flow-connector i{font-style:normal;color:var(--accent);font-size:18px;line-height:1}
+.signal-muted{font-size:12px;color:var(--muted);margin:0}
+.signal-event-fold{margin-top:12px}
+@media(max-width:650px){.signal-flow-parallel{grid-template-columns:minmax(0,1fr)}.signal-flow-map .signal-node{padding:10px}.signal-facts{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body><div class="app">
@@ -569,16 +602,27 @@ function renderCriticalFlow(data){
  const sources=Array.isArray(research.sources)?research.sources:[];
  const blockers=feasibility.completion&&Array.isArray(feasibility.completion.blockers)?feasibility.completion.blockers:[];
  const decision=feasibility.evaluation&&feasibility.evaluation.decision||data.decision&&data.decision.recommendation||"尚无最终结论";
- const card=(title,body)=>'<div class="signal-node"><strong>'+escText(title)+'</strong><small style="white-space:pre-wrap">'+escText(body)+'</small></div>';
- const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"： "+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
- office.innerHTML='<div class="signal-lane">'+
-  card("数字分身 · AI CEO","阶段："+(data.phase||"idle")+"；监督："+(twin.status||"等待本轮运行")+"；判断："+(twin.last_decision||"等待分身判断")+"；下一步："+(twin.next_action||"等待启动"))+
-  card("协作流 · 员工执行",agents.length?("员工数："+agents.length+" · 已完成："+agents.filter(a=>String(a.status||"").toLowerCase()==="completed").length+" · 异常："+agents.filter(a=>["blocked","failed","error"].includes(String(a.status||"").toLowerCase())).length+'<details class="content-fold"><summary>查看员工执行详情（'+agents.length+'）</summary><ul>'+agents.map(a=>'<li><b>'+esc(a.worker||"员工")+"</b> · "+esc(a.status||"unknown")+'<div class="sub">任务：'+esc(a.task||a.capability||"未记录")+"</div><div>"+esc(a.output||"暂无输出")+"</div></li>").join("")+"</ul></details>"):"后端尚未返回员工列表")+
-  '</div><div class="signal-lane">'+
-  card("真实调研 · 本轮输出","状态："+(research.status||"not_started")+"；来源："+sources.length+"；"+(research.error||research.summary||"暂无调研摘要"))+
-  card("玩法假设 · 本轮输出",design.status==="blocked"?"已阻断："+designOutput:String(designOutput))+
-  card("可行性验收 · 本轮输出","状态："+(feasibility.status||"not_started")+"；结论："+decision+(blockers.length?"；缺口："+blockers.join("、"):""))+
-  '</div><div class="twin-push-history"><strong>分身推进记录</strong><pre>'+escText(eventText)+'</pre></div>';
+ const card=(title,body,extraClass="")=>'<section class="signal-node '+extraClass+'"><strong>'+escText(title)+'</strong><div class="signal-card-body">'+body+'</div></section>';
+ const statusOf=a=>String(a.status||"unknown").toLowerCase();
+ const completed=agents.filter(a=>statusOf(a)==="completed").length;
+ const failed=agents.filter(a=>["blocked","failed","error"].includes(statusOf(a))).length;
+ const workerCards=agents.length?agents.map((a,i)=>'<details class="worker-mini-card"><summary><span class="worker-number">'+(i+1)+'</span><span class="worker-card-name">'+esc(a.worker||("员工 "+(i+1)))+'</span><span class="worker-status '+(["completed"].includes(statusOf(a))?"ok":(["blocked","failed","error"].includes(statusOf(a))?"bad":"") )+'">'+esc(a.status||"unknown")+'</span></summary><div class="worker-card-content"><div class="worker-field"><b>任务</b><p>'+esc(a.task||a.capability||"未记录")+'</p></div><div class="worker-field"><b>执行输出</b><p>'+esc(a.output||"暂无输出")+'</p></div></div></details>').join(""):'<p class="signal-muted">后端尚未返回员工列表</p>';
+ const workerBody='<div class="worker-counts"><span>员工 <b>'+agents.length+'</b></span><span>完成 <b>'+completed+'</b></span><span>异常 <b>'+failed+'</b></span></div><div class="worker-cards">'+workerCards+'</div>';
+ const twinBody='<div class="signal-facts"><div><small>当前阶段</small><b>'+esc(data.phase||"idle")+'</b></div><div><small>监督状态</small><b>'+esc(twin.status||"等待本轮运行")+'</b></div><div><small>分身判断</small><p>'+esc(twin.last_decision||"等待分身判断")+'</p></div><div><small>下一步</small><p>'+esc(twin.next_action||"等待启动")+'</p></div></div>';
+ const researchBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(research.status||"not_started")+'</b></div><div><small>来源数量</small><b>'+sources.length+'</b></div><div><small>摘要 / 阻塞</small><p>'+esc(research.error||research.summary||"暂无调研摘要")+'</p></div></div>';
+ const designBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(design.status||"not_started")+'</b></div><div><small>玩法假设</small><p>'+esc(String(designOutput))+'</p></div></div>';
+ const feasibilityBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(feasibility.status||"not_started")+'</b></div><div><small>结论</small><b>'+esc(decision)+'</b></div><div><small>待解决缺口</small><p>'+esc(blockers.length?blockers.join("、"):"暂无记录")+'</p></div></div>';
+ const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"："+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
+ office.innerHTML='<div class="signal-flow-map">'+
+ '<div class="signal-flow-row">'+card("01 · 数字分身","<div class=\"signal-card-html\">"+twinBody+"</div>","twin-flow-card")+'</div>'+
+ '<div class="signal-flow-connector"><span>拆解目标 / 分派任务</span><i>↓</i></div>'+
+ '<div class="signal-flow-row">'+card("02 · 员工协作",workerBody,"workers-flow-card")+'</div>'+
+ '<div class="signal-flow-connector"><span>汇总执行输出</span><i>↓</i></div>'+
+ '<div class="signal-flow-row signal-flow-parallel">'+card("03 · 真实调研",researchBody,"research-flow-card")+card("04 · 玩法假设",designBody,"design-flow-card")+'</div>'+
+ '<div class="signal-flow-connector"><span>证据输入 · 独立验收</span><i>↓</i></div>'+
+ '<div class="signal-flow-row">'+card("05 · 可行性验收",feasibilityBody,"acceptance-flow-card")+'</div>'+
+ '<details class="content-fold signal-event-fold"><summary>查看分身推进记录（'+events.length+' 条）</summary><pre>'+escText(eventText)+'</pre></details>'+
+ '</div>';
 }
 async function poll(){
  try{
