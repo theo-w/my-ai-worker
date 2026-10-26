@@ -461,7 +461,8 @@ function renderExplainableReport(data){
  const sourceCountKnown=Number.isFinite(sourceCount);
  const hasPrototype=Array.isArray(report.prototype_evidence_refs)&&report.prototype_evidence_refs.length>0;
  const cost=report.cost_model||{},scenarios=cost.scenarios||{};
- const costComplete=["conservative","base","optimistic"].every(k=>scenarios[k]&&["prototype_cost_usd","model_cost_per_session_usd","monthly_cost_usd_at_1000_users","monthly_revenue_usd_at_1000_users","break_even_users","gross_margin_percent"].every(field=>Number.isFinite(Number(scenarios[k][field]))));
+ const hasFiniteNumber=v=>(typeof v==="number"&&Number.isFinite(v))||(typeof v==="string"&&v.trim()!==""&&Number.isFinite(Number(v)));
+ const costComplete=["conservative","base","optimistic"].every(k=>scenarios[k]&&["prototype_cost_usd","model_cost_per_session_usd","monthly_cost_usd_at_1000_users","monthly_revenue_usd_at_1000_users","break_even_users","gross_margin_percent"].every(field=>hasFiniteNumber(scenarios[k][field])));
  const counterRefs=Array.isArray(report.counter_evidence_refs)?report.counter_evidence_refs:[];
  const allWorkersDone=agents.length>0&&agents.every(a=>String(a.status||"").toLowerCase()==="completed");
  const researchOk=["completed","no_results"].includes(String(research.status||""))&&sources.length>0;
