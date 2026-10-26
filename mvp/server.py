@@ -317,8 +317,11 @@ def _execute_run(goal: str):
                 agent = STATE["agents"][idx]
                 worker_evidence = [item.__dict__ for item in items]
                 twin_review = _audit_worker_result(output, result_data, worker_evidence)
-                review_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
-                twin_review["semantic_review"] = _llm_review_worker_result(goal, output, worker_evidence, review_client)
+                twin_review["semantic_review"] = {
+                    "status": "pending_research",
+                    "message": "等待本轮调研证据返回后，再将员工主张与来源摘录逐项对照。",
+                    "truth_verified": False,
+                }
                 agent.update({"progress": 100, "output": output, "execution": result_data,
                               "evidence": worker_evidence, "twin_review": twin_review, "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
@@ -435,6 +438,42 @@ def _execute_run(goal: str):
                                   "quality": None, "error": type(exc).__name__}
             STATE["design"] = {"status": "blocked", "reason": "真实调研失败，不能生成本轮创意。", "brief": None}
 
+    # The Twin reviews worker conclusions against the current run's returned research,
+    # rather than treating the worker's own output as its evidence.
+    with LOCK:
+        review_agents = list(STATE.get("agents") or [])
+        research_state_for_review = dict(STATE.get("research") or {})
+        research_evidence_for_review = list(research_state_for_review.get("evidence") or [])
+        research_sources_for_review = list(research_state_for_review.get("sources") or [])
+        quality_items_for_review = list((research_state_for_review.get("quality") or {}).get("items") or [])
+    if not research_evidence_for_review:
+        research_evidence_for_review = [
+            {"finding": row.get("snippet", ""), "source": row}
+            for row in research_sources_for_review if isinstance(row, dict)
+        ]
+    review_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+    for idx, review_agent in enumerate(review_agents):
+        output_text = str(review_agent.get("output") or "")
+        if not output_text:
+            continue
+        try:
+            semantic_review = _llm_review_worker_result(goal, output_text, research_evidence_for_review, review_client)
+        except Exception as review_exc:
+            semantic_review = {"status": "failed", "message": "员工结果语义审查失败：" + type(review_exc).__name__, "truth_verified": False}
+        with LOCK:
+            if idx < len(STATE.get("agents") or []):
+                current = STATE["agents"][idx]
+                twin_review = current.setdefault("twin_review", {})
+                twin_review["semantic_review"] = semantic_review
+                STATE["conversation"].append({
+                    "id": str(int(time.time() * 1000)) + "-semantic-review-" + str(idx),
+                    "at": time.time(), "kind": "review", "from": "Digital Twin",
+                    "to": current.get("worker", "数字员工"), "worker": current.get("worker", ""),
+                    "text": "员工结果语义审查：" + str(semantic_review.get("status", "unknown")) + "；"
+                        + str(semantic_review.get("summary") or semantic_review.get("message") or "未提供审查摘要")
+                        + "；事实核验标记=" + str(semantic_review.get("truth_verified", False)) + "。",
+                    "simulated": bool((current.get("execution") or {}).get("simulated", False)),
+                })
     _persist_run_history()
     with LOCK:
         should_design = STATE["design"]["status"] == "running"
