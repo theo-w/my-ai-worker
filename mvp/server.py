@@ -527,6 +527,39 @@ def _execute_run(goal: str):
             if not revision.get("ok"):
                 break
             current_output = str(revision.get("revised_output", "")).strip()
+            # If the revision identifies concrete evidence gaps, run one bounded follow-up search batch.
+            follow_up_queries = revision.get("follow_up_queries") if isinstance(revision.get("follow_up_queries"), list) else []
+            follow_up_queries = [str(q).strip()[:300] for q in follow_up_queries if isinstance(q, str) and q.strip()][:3]
+            if follow_up_queries:
+                try:
+                    follow_up_result = run_live_research_batch(follow_up_queries, limit_per_query=3)
+                    new_sources = follow_up_result.get("sources") if isinstance(follow_up_result.get("sources"), list) else []
+                    new_evidence = follow_up_result.get("evidence") if isinstance(follow_up_result.get("evidence"), list) else []
+                    seen_urls = {str(((row.get("source") or {}).get("url", ""))) for row in research_evidence_for_review if isinstance(row, dict)}
+                    added_evidence = [row for row in new_evidence if isinstance(row, dict) and str(((row.get("source") or {}).get("url", ""))) not in seen_urls]
+                    research_evidence_for_review.extend(added_evidence)
+                    with LOCK:
+                        current_research = STATE.setdefault("research", {})
+                        current_sources = current_research.get("sources") if isinstance(current_research.get("sources"), list) else []
+                        known_source_urls = {str(row.get("url", "")) for row in current_sources if isinstance(row, dict)}
+                        current_research["sources"] = (current_sources + [row for row in new_sources if isinstance(row, dict) and str(row.get("url", "")) not in known_source_urls])[:40]
+                        current_research.setdefault("follow_up_batches", []).append({
+                            "round": revision_round, "queries": follow_up_queries,
+                            "status": follow_up_result.get("status", "unknown"),
+                            "added_source_count": len(new_sources), "added_evidence_count": len(added_evidence),
+                            "errors": follow_up_result.get("query_errors", []),
+                        })
+                        current_research["follow_up_batches"] = current_research["follow_up_batches"][-4:]
+                        STATE["conversation"].append({
+                            "id": str(int(time.time() * 1000)) + "-followup-research-" + str(idx) + "-" + str(revision_round),
+                            "at": time.time(), "kind": "research", "from": "Digital Twin",
+                            "to": review_agent.get("worker", "数字员工"), "worker": review_agent.get("worker", ""),
+                            "text": "根据分身指出的证据缺口追加调研；查询=" + "；".join(follow_up_queries)
+                                + "；新增来源=" + str(len(new_sources)) + "；新增证据记录=" + str(len(added_evidence))
+                                + "；调研状态=" + str(follow_up_result.get("status", "unknown")),
+                        })
+                except Exception as research_exc:
+                    revision_history[-1]["follow_up_research_error"] = type(research_exc).__name__
             try:
                 semantic_review = _llm_review_worker_result(goal, current_output, research_evidence_for_review, review_client)
             except Exception as review_exc:
