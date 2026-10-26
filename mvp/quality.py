@@ -76,6 +76,43 @@ def classify_source_role(source: dict | None) -> dict:
     }
 
 
+
+def classify_evidence_use(source: dict | None) -> dict:
+    """Separate direct evidence candidates from auxiliary material and weak leads."""
+    source = source if isinstance(source, dict) else {}
+    role = classify_source_role(source)
+    demand = assess_user_demand_source(source)
+    if demand.get("user_demand_eligible"):
+        return {
+            "evidence_use": "direct_user_signal_candidate",
+            "evidence_use_label": "可直接支持有限的用户体验/需求主张（候选）",
+            "evidence_use_reason": "有可追溯用户原文记录；仍需核查抽样偏差、重复、真实性及主张范围。",
+        }
+    if role["source_role"] == "official_or_industry_data":
+        has_data = bool(source.get("snippet") or source.get("description") or source.get("raw_text") or source.get("data"))
+        return {
+            "evidence_use": "claim_specific_official_candidate" if has_data else "lead_only",
+            "evidence_use_label": "仅可支持与其数据直接对应的事实主张（候选）" if has_data else "仅作线索",
+            "evidence_use_reason": "必须检查发布机构、统计口径、时间范围与具体主张是否匹配；不能用于证明玩家主观需求。",
+        }
+    if role["source_role"] == "secondary_analysis":
+        return {
+            "evidence_use": "auxiliary_only",
+            "evidence_use_label": "辅助材料，不可单独作为直接证据",
+            "evidence_use_reason": "可用于背景、提出假设、寻找原始出处或反证；应追溯文章引用的原始数据/用户原文。",
+        }
+    if role["source_role"] == "primary_user_signal":
+        return {
+            "evidence_use": "lead_only",
+            "evidence_use_label": "用户平台线索，原始性未确认",
+            "evidence_use_reason": "平台域名或 source_role 标签不足以证明是用户原帖/原始评价；缺少可追溯原文记录。",
+        }
+    return {
+        "evidence_use": "lead_only",
+        "evidence_use_label": "待分类线索，不得直接支撑关键结论",
+        "evidence_use_reason": "来源性质不明；需人工或进一步抓取核实来源类型、原文与主张相关性。",
+    }
+
 def assess_user_demand_source(source: dict | None) -> dict:
     """Distinguish actual collected user-originated records from articles and search snippets."""
     source = source if isinstance(source, dict) else {}
@@ -179,6 +216,8 @@ def evaluate_evidence(evidence: list[dict]) -> dict:
         row = dict(item)
         row.update(role)
         row.update(assess_user_demand_source(source))
+        row.update(classify_evidence_use(source))
+        row["claim_support_status"] = "not_assessed"
         row["quality_score"] = quality.score
         row["quality_accepted"] = quality.accepted
         row["quality_reasons"] = quality.reasons
