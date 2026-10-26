@@ -430,6 +430,7 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
                 pass
 
     sources = list(source_rows.values())[:20]
+    retrieved_page_source_count = len(sources)
     raw_user_reviews, review_collection_errors = collect_steam_raw_reviews(sources)
     # Keep article/search-result sources and individual original reviews separate.
     sources.extend(raw_user_reviews)
@@ -470,7 +471,9 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
             "successful_angles": len(successful_queries),
             "empty_angles": len(empty_queries),
             "failed_angles": len(query_errors),
-            "distinct_sources": len(sources),
+            "distinct_sources": retrieved_page_source_count,
+            "raw_user_review_records": len(raw_user_reviews),
+            "review_collection_errors": len(review_collection_errors),
             "accepted_evidence": quality.get("accepted", 0),
             "comprehensive": bool(sources) and not query_errors and not empty_queries,
         },
