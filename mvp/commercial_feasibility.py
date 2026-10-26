@@ -209,6 +209,11 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         queries = queries if isinstance(queries, list) else []
         source_role = classify_source_role(source)
         demand_status = assess_user_demand_source(source)
+        try:
+            from .quality import classify_evidence_use
+        except ImportError:
+            from quality import classify_evidence_use
+        evidence_use = classify_evidence_use(source)
         if demand_status.get("user_demand_eligible"):
             raw_user_demand_count += 1
         row = {
@@ -218,6 +223,10 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
             "provider": str(source.get("provider", "unknown")),
             "source_role": source_role.get("source_role", "unclassified"),
             "role_is_heuristic": source_role.get("role_is_heuristic", True),
+            "evidence_use": evidence_use.get("evidence_use", "lead_only"),
+            "evidence_use_label": evidence_use.get("evidence_use_label", "待分类线索"),
+            "evidence_use_reason": evidence_use.get("evidence_use_reason", ""),
+            "claim_support_status": "not_assessed",
             "user_demand_eligible": bool(demand_status.get("user_demand_eligible")),
             "raw_user_content_available": bool(demand_status.get("raw_user_content_available")),
             "user_demand_eligibility_reason": demand_status.get("user_demand_eligibility_reason", ""),
