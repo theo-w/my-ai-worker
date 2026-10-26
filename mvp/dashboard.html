@@ -473,7 +473,7 @@ function renderExplainableReport(data){
  const realResearch=researchOk&&!sources.every(s=>s.simulated===true)&&research.status==="completed";
  const truthVerified=quality.truth_verified===true;
  const isGame=Boolean(feas.contract||feas.status!=="not_started");
- const semanticReviewClear=agents.length>0&&agents.every(a=>{const r=((a.twin_review||{}).semantic_review)||{};const claims=Array.isArray(r.claims)?r.claims:[];const unsupported=Array.isArray(r.unsupported_claims)?r.unsupported_claims:[];return r.status==="completed_review_required"&&unsupported.length===0&&!claims.some(c=>["unsupported","not_testable"].includes(String(c.status||"").toLowerCase()));});
+ const semanticReviewClear=agents.length>0&&agents.every(a=>{const r=((a.twin_review||{}).semantic_review)||{};const claims=Array.isArray(r.claims)?r.claims:[];const unsupported=Array.isArray(r.unsupported_claims)?r.unsupported_claims:[];return r.status==="completed_review_required"&&claims.length>0&&unsupported.length===0&&claims.every(c=>["supported","partially_supported"].includes(String(c.status||"").toLowerCase()));});
  const genericAccepted=allWorkersDone&&realResearch&&Number(quality.accepted||0)>0&&decision.recommendation&&decision.recommendation!=="HOLD_FOR_EVIDENCE"&&semanticReviewClear&&agents.every(a=>!(a.execution||{}).simulated);
  const gameAccepted=feas.status==="evaluated"&&evaluation.decision==="GO_TO_PROTOTYPE"&&scored.length===8&&sourceCountKnown&&sourceCount>=3&&hasPrototype&&costComplete&&counterRefs.length>0&&failedChecks.length===0&&semanticReviewClear&&Number(quality.accepted_user_demand_records||0)>=3;
  let adoption="NEEDS_VALIDATION",adoptionLabel="需继续验证";
