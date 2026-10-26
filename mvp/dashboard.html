@@ -191,6 +191,27 @@
  <div id="flow" class="flow"></div>
  <div id="runProgressSummary" class="sub" style="margin-top:10px"><span id="runProgressText">尚未启动。启动后，本区域会显示真实运行阶段与状态。</span></div>
  <div id="decisionSummary" class="outcome" style="margin-top:10px"><strong>当前结论</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div>
+ <section id="explainableReport" class="panel" style="margin-top:12px;padding:12px;background:rgba(8,15,27,.72)" aria-live="polite">
+  <div class="section-title"><span>数字分身结果汇报</span><span id="reportAdoption" class="status">等待任务</span></div>
+  <div class="report-grid">
+   <article class="report-section"><h3>1. 结论</h3><div id="reportConclusion" class="summary-copy">等待本轮任务数据。</div></article>
+   <article class="report-section"><h3>2. 推导过程</h3><div id="reportDerivation" class="summary-copy"></div></article>
+   <article class="report-section"><h3>3. 证据追溯</h3><div id="reportEvidence" class="summary-copy"></div></article>
+   <article class="report-section"><h3>4. 客观性与反证</h3><div id="reportObjectivity" class="summary-copy"></div></article>
+   <article class="report-section"><h3>5. 采纳建议</h3><div id="reportAdvice" class="summary-copy"></div></article>
+   <article class="report-section"><h3>6. 验收状态</h3><div id="reportAcceptance" class="summary-copy"></div></article>
+  </div>
+  <div class="fv-note">数据口径：内容来自当前运行状态与后端评估字段。来源链接/模型置信度本身不证明事实；未执行的验证会标为未测试。</div>
+ </section>
+ <style>
+ .report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .report-section{min-width:0;border:1px solid var(--line);border-radius:10px;padding:11px;background:rgba(11,19,35,.72)}
+ .report-section h3{font-size:13px;margin:0 0 7px;color:var(--accent)}
+ .report-section .summary-copy{font-size:12px;line-height:1.65;overflow-wrap:anywhere;word-break:normal}
+ .report-list{margin:5px 0 0;padding-left:18px}.report-list li{margin:4px 0;overflow-wrap:anywhere}
+ .report-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 7px;margin:2px 4px 2px 0;font-size:10px;color:var(--muted)}
+ @media(max-width:650px){.report-grid{grid-template-columns:minmax(0,1fr)}#explainableReport{padding:10px!important}.report-section{padding:10px}.report-section h3{font-size:13px}.report-section .summary-copy{font-size:13px;line-height:1.6}}
+ </style>
  <div class="signal-legend" style="margin-top:14px"><span><i class="legend-dot twin-dot"></i>数字分身：目标与调度</span><span><i class="legend-dot worker-dot"></i>数字员工：执行中</span><span><i class="legend-dot evidence-dot"></i>证据与反馈</span><span id="signalSummary" class="status">WAITING FOR RUN</span></div>
  <div id="signalOffice" class="signal-office" aria-label="首页中的数字分身、员工协作、调研、玩法与验收输出"></div>
  <div id="signalCaption" class="sub" style="margin-top:8px">以上内容来自本轮后端状态；缺失数据会明确显示“暂无输出/受阻”，不会用旧模板伪装成本轮结果。</div>
@@ -422,7 +443,71 @@ function render(){
  document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待数字分身完成判断…';
  const p=state.prototype;
  document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
+ renderExplainableReport(state);
 }
+
+function renderExplainableReport(data){
+ const put=(id,value)=>{const el=document.getElementById(id);if(el)el.innerHTML=value;};
+ const text=(v,fallback="未记录")=>v===null||v===undefined||v===""?fallback:String(v);
+ const list=(items,empty="暂无记录")=>Array.isArray(items)&&items.length?'<ul class="report-list">'+items.map(x=>'<li>'+esc(typeof x==="string"?x:JSON.stringify(x))+'</li>').join("")+'</ul>':'<div class="sub">'+esc(empty)+'</div>';
+ const goal=text(data.goal,"本轮目标未记录"),phase=text(data.phase,"unknown");
+ const research=data.research||{},quality=research.quality||{},decision=data.decision||{},feas=data.feasibility||{},report=feas.report||{},evaluation=feas.evaluation||{};
+ const agents=Array.isArray(data.agents)?data.agents:[],sources=Array.isArray(research.sources)?research.sources:[],evidence=Array.isArray(data.evidence)?data.evidence:[];
+ const dims=report.dimensions||{},dimNames={player_value:"玩家价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与重复游玩",risk_and_compliance:"风险与合规"};
+ const scored=Object.entries(dimNames).filter(([k])=>{const d=dims[k]||{};return Number.isFinite(Number(d.score))&&Number(d.score)>=1&&Number(d.score)<=5&&Array.isArray(d.evidence_refs)&&d.evidence_refs.length>0&&String(d.rationale||"").trim();});
+ const checks=Array.isArray(evaluation.checks)?evaluation.checks:[];
+ const failedChecks=checks.filter(c=>c.passed===false);
+ const sourceCount=Number(report.independent_source_count);
+ const sourceCountKnown=Number.isFinite(sourceCount);
+ const hasPrototype=Array.isArray(report.prototype_evidence_refs)&&report.prototype_evidence_refs.length>0;
+ const cost=report.cost_model||{},scenarios=cost.scenarios||{};
+ const costComplete=["conservative","base","optimistic"].every(k=>scenarios[k]&&["prototype_cost_usd","model_cost_per_session_usd","monthly_cost_usd_at_1000_users","monthly_revenue_usd_at_1000_users","break_even_users","gross_margin_percent"].every(field=>Number.isFinite(Number(scenarios[k][field]))));
+ const counterRefs=Array.isArray(report.counter_evidence_refs)?report.counter_evidence_refs:[];
+ const allWorkersDone=agents.length>0&&agents.every(a=>String(a.status||"").toLowerCase()==="completed");
+ const researchOk=["completed","no_results"].includes(String(research.status||""))&&sources.length>0;
+ const realResearch=researchOk&&!sources.every(s=>s.simulated===true)&&research.status==="completed";
+ const truthVerified=quality.truth_verified===true;
+ const isGame=Boolean(feas.contract||feas.status!=="not_started");
+ const genericAccepted=allWorkersDone&&realResearch&&Number(quality.accepted||0)>0&&decision.recommendation&&decision.recommendation!=="HOLD_FOR_EVIDENCE"&&agents.every(a=>!(a.execution||{}).simulated);
+ const gameAccepted=feas.status==="evaluated"&&evaluation.decision==="GO_TO_PROTOTYPE"&&scored.length===8&&sourceCountKnown&&sourceCount>=3&&hasPrototype&&costComplete&&counterRefs.length>0&&failedChecks.length===0;
+ let adoption="NEEDS_VALIDATION",adoptionLabel="需继续验证";
+ if(["failed","blocked"].includes(phase)||research.status==="provider_unconfigured"||research.status==="provider_error") {adoption="BLOCKED";adoptionLabel="流程受阻";}
+ else if(isGame&&feas.status==="evaluated"&&evaluation.decision==="NO_GO"){adoption="REJECT";adoptionLabel="当前不建议采纳";}
+ else if(isGame&&gameAccepted){adoption="CONDITIONAL";adoptionLabel="仅建议进入受控原型";}
+ else if(!isGame&&genericAccepted){adoption="CONDITIONAL";adoptionLabel="有条件采纳";}
+ else if(!sources.length&&research.status!=="running"&&research.status!=="queued"){adoption="NEEDS_VALIDATION";adoptionLabel="证据不足";}
+ const decisionLabel=({GO_TO_PROTOTYPE:"建议进入有限原型验证",ITERATE:"建议调整后再验证",NO_GO:"当前不建议继续",INSUFFICIENT_EVIDENCE:"证据不足，暂不决策",HOLD_FOR_EVIDENCE:"证据门禁阻止推进",DEMO_GO_TO_PROTOTYPE:"仅为模拟演示建议"})[decision.recommendation]||text(decision.recommendation,"尚无决策");
+ put("reportAdoption",esc(adoption+" · "+adoptionLabel));
+ put("reportConclusion",'<b>'+esc(decisionLabel)+'</b><div style="margin-top:6px">任务：'+esc(goal)+'</div><div>阶段：'+esc(phase)+' · 运行 ID：'+esc(text(data.run_id))+'</div><div>员工：'+agents.length+' 名；研究来源：'+sources.length+' 个；门禁接受证据：'+esc(text(quality.accepted,"0"))+' 条</div><div style="margin-top:6px">'+esc(text(decision.next_step,"后端尚未提供下一步建议。"))+'</div>'+(decision.risks&&decision.risks.length?list(decision.risks,"未记录风险"):""));
+ const steps=["目标："+goal,"员工执行："+agents.filter(a=>a.status==="completed").length+"/"+agents.length+" 完成；"+agents.filter(a=>["blocked","failed"].includes(String(a.status||""))).length+" 受阻","调研："+text(research.status)+"；"+sources.length+" 个来源，"+text(quality.accepted,0)+" 条通过机械门禁","玩法生成："+text((data.design||{}).status)+"；"+text((data.design||{}).reason,"未提供生成说明"),"评估："+text(feas.status)+"；八维度中"+scored.length+"项同时具备有效评分、理由和证据引用"];
+ put("reportDerivation",list(steps)+(Array.isArray(data.conversation)&&data.conversation.length?'<details class="content-fold"><summary>查看最近执行记录</summary>'+list(data.conversation.slice(-5).map(m=>text(m.from,"系统")+"："+text(m.text,"无正文")))+"</details>":""));
+ const sourceRows=sources.map((s,i)=>'<li><b>[S'+(i+1)+'] '+esc(text(s.title,"未命名来源"))+'</b><div>'+esc(text(s.provider,"来源渠道未记录"))+' · '+esc(text(s.source_role,"来源角色未分类"))+'</div><div>'+esc(text(s.snippet,"来源摘要未记录"))+'</div>'+(s.url?'<a href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.url)+'</a>':'<span class="sub">URL 未记录</span>')+'<div class="sub">语义支持、来源独立性及真实性：未由此页面自动证明</div></li>').join("");
+ put("reportEvidence",'<div><span class="report-chip">研究来源 '+sources.length+'</span><span class="report-chip">接受证据 '+esc(text(quality.accepted,0))+'</span><span class="report-chip">事实已核实：'+(truthVerified?"是（需有实际核验记录）":"否")+'</span></div>'+(sourceRows?'<ol class="report-list">'+sourceRows+'</ol>':'<div class="sub">本轮没有可追溯的研究来源。员工文本输出不会自动计作外部事实证据。</div>')+(evidence.length?'<details class="content-fold"><summary>员工/证据条目 '+evidence.length+' 条</summary>'+list(evidence.slice(0,20).map(e=>text(e.worker,"员工")+"："+text(e.finding,"无发现")+" · "+text((e.source||{}).url,"无来源 URL")))+'</details>':""));
+ const counterCandidates=Array.isArray(report.candidate_counter_evidence_refs)?report.candidate_counter_evidence_refs:[];
+ const errors=Array.isArray(research.query_errors)?research.query_errors:[];
+ const gaps=[!realResearch?"未确认本轮真实调研完整成功":"",!sourceCountKnown?"独立来源数量未核实":"",sourceCountKnown&&sourceCount<3?"独立来源数量低于 3":"",!hasPrototype?"缺少真实原型/玩家实验引用":"",!costComplete?"保守/基准/乐观成本情景不完整":"",!counterRefs.length?"未提交已审查的反证引用":"",truthVerified?"":"没有独立事实核验记录",...errors.map(e=>"查询失败："+text(e.query,"未知查询")+"（"+text(e.error,"错误未记录")+"）")].filter(Boolean);
+ put("reportObjectivity",'<div><b>反证已审查：</b>'+counterRefs.length+' 条；<b>反证候选：</b>'+counterCandidates.length+' 条</div><div><b>独立真实性核验：</b>'+(truthVerified?"后端标记已核验，请查看核验记录":"未记录；URL、搜索摘要和模型置信度都不等于事实核验")+'</div><div style="margin-top:6px"><b>未解决缺口</b>'+list(gaps,"当前门禁字段未发现缺口，但仍需人工/独立核验确认")+'</div><div class="fv-note">来源角色若由域名推断，只是启发式分类；不代表内容真实、用户有代表性或不同来源彼此独立。</div>');
+ const advice=[];
+ if(adoption==="BLOCKED")advice.push("先修复阻塞的服务/查询，再重新运行；不要用旧结果替代本轮输出。");
+ else if(isGame){advice.push("当前不要直接批准完整开发。先逐项补齐八维证据、独立来源、反证、成本情景与可运行原型证据。");if(costComplete)advice.push("成本情景字段已齐，但仍要核对每个输入的来源、公式、单位与实际用量。");else advice.push("成本模型缺少完整数值；不以空值或假设值冒充真实预算。");}
+ else if(adoption==="CONDITIONAL")advice.push("只在明确边界内试用；上线/扩展前由独立验收核对关键主张和风险。");
+ else advice.push("暂不采纳为事实或最终决策。补充可追溯数据，并记录能推翻当前判断的验证条件。");
+ advice.push("最小下一步：选择影响结论最大的一个假设，设计可证伪测试，记录样本、指标、成本与结果。");
+ put("reportAdvice",list(advice));
+ const acceptanceItems=[
+  ["员工任务","完成 "+agents.filter(a=>a.status==="completed").length+"/"+agents.length+"；"+(allWorkersDone?"通过状态检查":"未全部完成")],
+  ["真实调研",text(research.status)+"；"+sources.length+" 来源；"+text(quality.accepted,0)+" 条机械门禁接受"],
+  ["八维度证据",scored.length+"/8 同时具备评分、理由和引用"],
+  ["独立来源",sourceCountKnown?sourceCount+"（要求至少 3）":"未记录"],
+  ["反证审查",counterRefs.length+" 条已提交引用"],
+  ["原型证据",hasPrototype?"已提供引用；内容真实性仍待核验":"未提供"],
+  ["成本情景",costComplete?"三种情景字段完整":"三种情景字段不完整"],
+  ["事实核验",truthVerified?"后端有核验标记":"未记录核验程序/结果"]
+ ];
+ const acceptancePassed=isGame?gameAccepted:genericAccepted;
+ put("reportAcceptance",'<div><b>总状态：</b><span class="report-chip">'+(acceptancePassed?"通过当前验收门禁":"未通过 / 未完成验收")+'</span></div>'+list(acceptanceItems.map(x=>x[0]+"： "+x[1]))+'<div class="fv-blockers"><b>验收规则：</b>游戏可行性只有在八维度均有有效评分/理由/证据引用、至少 3 个独立来源、反证引用、原型证据、完整三情景成本且后端决策为 GO 时才通过。通用任务须完成员工执行、真实研究与证据门禁；模拟执行不能判为真实任务通过。此界面不会将阶段结束等同于验收通过。</div>');
+}
+
 function renderTwinChat(data){
  const log=document.getElementById("twinChatLog");const rows=(data.chat_messages||[]);
  if(!rows.length)return;
