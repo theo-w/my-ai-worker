@@ -210,6 +210,10 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
                 "title": source.get("title"),
                 "url": source.get("url"),
                 "excerpt": source.get("snippet"),
+                "source_role": item.get("source_role", "unclassified"),
+                "user_demand_eligible": item.get("user_demand_eligible", False),
+                "raw_user_content_available": item.get("raw_user_content_available", False),
+                "user_demand_eligibility_reason": item.get("user_demand_eligibility_reason", "not assessed"),
                 "finding": item.get("finding"),
                 "confidence": item.get("confidence"),
             })
@@ -221,6 +225,9 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
                 "Cite claims using the supplied source IDs (for example [S1]).",
                 "Never invent URLs, citations, data, or facts not present in the input.",
                 "Distinguish evidence from inference and explicitly note gaps or conflicts.",
+                "Do not treat secondary_analysis or media/editorial articles as original user demand.",
+                "Do not claim original user reviews were collected unless raw_user_content_available and user_demand_eligible are both true.",
+                "A search-result excerpt is not the full original review and cannot establish sentiment prevalence or representativeness.",
                 "If the evidence is insufficient, say so instead of guessing.",
             ],
         }
