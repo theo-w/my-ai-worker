@@ -362,6 +362,8 @@ def _execute_run(goal: str):
                 goal + " target players needs user feedback reviews",
                 goal + " AI inference costs latency production feasibility",
                 goal + " criticism failures negative reviews counter evidence risks",
+                "site:store.steampowered.com/app/ " + goal + " reviews",
+                "site:steamcommunity.com/app/ " + goal + " player feedback discussions",
                 goal + " 玩家需求 竞品 负面反馈 推理成本 延迟 风险",
             ]
             def report_research_progress(progress):
