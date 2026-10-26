@@ -2,6 +2,7 @@
 import unittest
 
 from mvp.quality import classify_source_role, evaluate_evidence
+from mvp.commercial_feasibility import build_feasibility_draft
 
 
 class EvidenceRoleTests(unittest.TestCase):
@@ -92,6 +93,17 @@ class EvidenceRoleTests(unittest.TestCase):
         self.assertTrue(row["user_demand_eligible"])
         self.assertTrue(row["raw_user_content_available"])
         self.assertEqual(result["accepted_user_demand_records"], 1)
+
+    def test_media_only_feasibility_draft_has_original_user_review_blocker(self):
+        draft = build_feasibility_draft("AI 游戏玩法可行性", sources=[{
+            "url": "https://www.pcgamer.com/example-review/",
+            "title": "Editorial review",
+            "snippet": "A media analysis of the game.",
+            "provider": "test",
+        }])
+        self.assertEqual(draft["report"]["original_user_review_record_count"], 0)
+        self.assertEqual(draft["report"]["user_demand_evidence_status"], "missing_original_user_reviews")
+        self.assertTrue(any("原始用户评价" in blocker for blocker in draft["completion"]["blockers"]))
 
     def test_quality_pass_does_not_claim_truth(self):
         result = evaluate_evidence([{
