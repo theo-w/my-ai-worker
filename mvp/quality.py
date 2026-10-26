@@ -94,7 +94,9 @@ def assess_user_demand_source(source: dict | None) -> dict:
     if host in {"reddit.com", "old.reddit.com"} or host.endswith(".reddit.com"):
         known_user_content = "/comments/" in path
     elif host == "store.steampowered.com":
-        known_user_content = "/reviews/" in path
+        known_user_content = "/reviews/" in path or (
+            "/appreviews/" in path and source.get("provider") == "steam_store_reviews_api"
+        )
     elif host == "steamcommunity.com":
         known_user_content = "/app/" in path and ("/discussions/" in path or "/comment/" in path)
 
