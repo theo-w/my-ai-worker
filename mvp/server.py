@@ -62,7 +62,13 @@ PROJECT_LOOP = AutonomousProjectLoop()
 WORKFORCE = WorkforceRegistry(path=os.getenv("JARVIS_WORKFORCE_STORE", "data/workforce.json"))
 def _llm_enabled() -> bool:
     """LLM calls are opt-in to avoid accidental spend during MVP testing."""
-    return os.getenv("JARVIS_LLM_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    # Live LLM is enabled by default when credentials are present. Set JARVIS_LLM_ENABLED=false explicitly to pause paid calls during a test window.
+    raw = os.getenv("JARVIS_LLM_ENABLED", "").strip().lower()
+    if raw:
+        return raw in {"1", "true", "yes", "on"}
+    return all(os.getenv(key, "").strip() for key in (
+        "JARVIS_LLM_BASE_URL", "JARVIS_LLM_API_KEY", "JARVIS_LLM_MODEL"
+    ))
 
 
 def _build_worker_executor():
@@ -1409,8 +1415,8 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_json(max_bytes=65536)
             if body is None:
                 return
-            source_game = body.get("source_game", "塞尔达传说：王国之泪")
-            concept_name = body.get("concept_name", "潮痕档案馆")
+            source_game = body.get("source_game", "")
+            concept_name = body.get("concept_name", "")
             if not isinstance(source_game, str) or not isinstance(concept_name, str):
                 self._json({"ok": False, "error": "source_game and concept_name must be strings."}, 400)
                 return
@@ -1427,6 +1433,9 @@ class Handler(BaseHTTPRequestHandler):
                 f"- {row.get('title', '')}: {row.get('snippet', '')} ({row.get('url', '')})"
                 for row in rows
             )[:5000]
+            # Empty form fields mean derive from this run's accepted research; no canned demo defaults.
+            source_game = source_game.strip() or "从本轮调研证据中提取最相关的参考游戏"
+            concept_name = concept_name.strip() or "请基于本轮证据生成原创玩法名称"
             try:
                 brief = create_design_brief(source_game, concept_name, llm_client, research_context=research_context)
             except (ValueError, RuntimeError) as exc:
