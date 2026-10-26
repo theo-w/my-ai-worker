@@ -195,18 +195,32 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         raise ValueError("goal must be a non-empty string")
     source_rows = sources if isinstance(sources, list) else []
     errors = query_errors if isinstance(query_errors, list) else []
+    try:
+        from .quality import classify_source_role, assess_user_demand_source
+    except ImportError:
+        from quality import classify_source_role, assess_user_demand_source
     registry = []
     counter_candidates = []
+    raw_user_demand_count = 0
     for index, source in enumerate(source_rows, start=1):
         if not isinstance(source, dict):
             continue
         queries = source.get("research_queries", [])
         queries = queries if isinstance(queries, list) else []
+        source_role = classify_source_role(source)
+        demand_status = assess_user_demand_source(source)
+        if demand_status.get("user_demand_eligible"):
+            raw_user_demand_count += 1
         row = {
             "id": "S" + str(index),
             "title": str(source.get("title", "")),
             "url": str(source.get("url", "")),
             "provider": str(source.get("provider", "unknown")),
+            "source_role": source_role.get("source_role", "unclassified"),
+            "role_is_heuristic": source_role.get("role_is_heuristic", True),
+            "user_demand_eligible": bool(demand_status.get("user_demand_eligible")),
+            "raw_user_content_available": bool(demand_status.get("raw_user_content_available")),
+            "user_demand_eligibility_reason": demand_status.get("user_demand_eligibility_reason", ""),
             "research_queries": queries,
             "status": "retrieved_semantic_support_unverified",
         }
@@ -267,6 +281,8 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
         "goal": goal.strip(),
         "dimensions": dimensions,
         "evidence_registry": registry,
+        "original_user_review_record_count": raw_user_demand_count,
+        "user_demand_evidence_status": "available_needs_validation" if raw_user_demand_count else "missing_original_user_reviews",
         "independent_source_count": 0,
         "source_independence_review": "not_run",
         "prototype_evidence_refs": [],
@@ -292,6 +308,8 @@ def build_feasibility_draft(goal: str, sources: list[dict[str, Any]] | None = No
          else "成本情景缺少可用模型价格与已验证的使用量、商业假设"),
         "反证仍是候选来源，尚未完成逐条审查",
     ]
+    if raw_user_demand_count == 0:
+        blockers.append("未采集到可追溯的原始用户评价记录；媒体文章和搜索摘要不能替代玩家原始反馈")
     if errors:
         blockers.append(f"{len(errors)} 个调研角度搜索失败，需要补查")
     return {
