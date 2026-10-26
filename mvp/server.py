@@ -218,6 +218,72 @@ def _audit_worker_result(output: str, result_data: dict, evidence: list) -> dict
     }
 
 
+def _llm_review_worker_result(goal: str, output: str, evidence: list, client) -> dict:
+    """Use the configured model as a critic of a worker output, not as a truth oracle."""
+    if client is None:
+        return {
+            "status": "not_configured",
+            "message": "未配置可用 LLM 审核器；本轮只有确定性初筛，没有完成语义分析。",
+            "claims": [], "unsupported_claims": [], "counterarguments": [],
+            "unknowns": ["员工输出的主张尚未逐条与原文核对。"],
+            "truth_verified": False,
+        }
+    rows = []
+    for index, item in enumerate(evidence if isinstance(evidence, list) else [], start=1):
+        row = item if isinstance(item, dict) else getattr(item, "__dict__", {})
+        source = row.get("source") if isinstance(row, dict) else {}
+        source = source if isinstance(source, dict) else {}
+        rows.append({
+            "evidence_id": "E" + str(index),
+            "finding": row.get("finding", "") if isinstance(row, dict) else "",
+            "source_title": source.get("title", ""),
+            "source_url": source.get("url", ""),
+            "source_excerpt": source.get("snippet", ""),
+        })
+    prompt = {
+        "goal": goal,
+        "worker_output": str(output or "")[:12000],
+        "supplied_evidence_only": rows,
+        "instructions": [
+            "Act as a skeptical reviewer of the worker output, not as its co-author.",
+            "Do not use outside knowledge or claim to have opened URLs; judge only the supplied output and excerpts.",
+            "Extract material claims and label each supported, partially_supported, unsupported, or not_testable from supplied evidence.",
+            "A media/editorial article is secondary analysis, not original user testimony.",
+            "A search snippet is not a full original review and cannot establish prevalence or representativeness.",
+            "Identify counterarguments, contradictions, assumptions, missing data and the smallest useful next verification.",
+            "Do not invent sample sizes, prices, costs, quotations or citations.",
+            "Return one JSON object with keys summary, claims (array of claim/status/evidence_ids/reason), unsupported_claims, counterarguments, unknowns, next_verification, adoption (ADOPT/CONDITIONAL/NEEDS_VALIDATION/REJECT/BLOCKED).",
+            "This review is not independent factual verification; truth_verified must remain false.",
+        ],
+    }
+    try:
+        raw = client.complete(
+            "You are the Digital Twin's skeptical quality reviewer. Evaluate whether the worker's conclusions follow from the supplied evidence. Be strict, traceable and explicit about uncertainty. Return valid JSON only.",
+            json.dumps(prompt, ensure_ascii=False),
+        )
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, dict):
+                raise ValueError("review response is not a JSON object")
+        except Exception:
+            return {
+                "status": "invalid_response",
+                "message": "审核模型未返回可解析的结构化 JSON；不能将本次语义审核视为完成。",
+                "raw_response": str(raw)[:6000],
+                "truth_verified": False,
+            }
+        parsed["status"] = "completed_review_required"
+        parsed["truth_verified"] = False
+        parsed["message"] = "这是基于员工输出与所提供摘录的批判性审查，不是独立事实核验。"
+        return parsed
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "message": "语义审核调用失败：" + type(exc).__name__,
+            "truth_verified": False,
+        }
+
+
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
@@ -251,6 +317,8 @@ def _execute_run(goal: str):
                 agent = STATE["agents"][idx]
                 worker_evidence = [item.__dict__ for item in items]
                 twin_review = _audit_worker_result(output, result_data, worker_evidence)
+                review_client = getattr(WORKER_EXECUTOR, "client", None) if isinstance(WORKER_EXECUTOR, (LLMWorkerExecutor, HybridWorkerExecutor)) else None
+                twin_review["semantic_review"] = _llm_review_worker_result(goal, output, worker_evidence, review_client)
                 agent.update({"progress": 100, "output": output, "execution": result_data,
                               "evidence": worker_evidence, "twin_review": twin_review, "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
