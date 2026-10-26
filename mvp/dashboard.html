@@ -473,8 +473,9 @@ function renderExplainableReport(data){
  const realResearch=researchOk&&!sources.every(s=>s.simulated===true)&&research.status==="completed";
  const truthVerified=quality.truth_verified===true;
  const isGame=Boolean(feas.contract||feas.status!=="not_started");
- const genericAccepted=allWorkersDone&&realResearch&&Number(quality.accepted||0)>0&&decision.recommendation&&decision.recommendation!=="HOLD_FOR_EVIDENCE"&&agents.every(a=>!(a.execution||{}).simulated);
- const gameAccepted=feas.status==="evaluated"&&evaluation.decision==="GO_TO_PROTOTYPE"&&scored.length===8&&sourceCountKnown&&sourceCount>=3&&hasPrototype&&costComplete&&counterRefs.length>0&&failedChecks.length===0;
+ const semanticReviewClear=agents.length>0&&agents.every(a=>{const r=((a.twin_review||{}).semantic_review)||{};const claims=Array.isArray(r.claims)?r.claims:[];const unsupported=Array.isArray(r.unsupported_claims)?r.unsupported_claims:[];return r.status==="completed_review_required"&&unsupported.length===0&&!claims.some(c=>["unsupported","not_testable"].includes(String(c.status||"").toLowerCase()));});
+ const genericAccepted=allWorkersDone&&realResearch&&Number(quality.accepted||0)>0&&decision.recommendation&&decision.recommendation!=="HOLD_FOR_EVIDENCE"&&semanticReviewClear&&agents.every(a=>!(a.execution||{}).simulated);
+ const gameAccepted=feas.status==="evaluated"&&evaluation.decision==="GO_TO_PROTOTYPE"&&scored.length===8&&sourceCountKnown&&sourceCount>=3&&hasPrototype&&costComplete&&counterRefs.length>0&&failedChecks.length===0&&semanticReviewClear&&Number(quality.accepted_user_demand_records||0)>=3;
  let adoption="NEEDS_VALIDATION",adoptionLabel="需继续验证";
  if(["failed","blocked"].includes(phase)||research.status==="provider_unconfigured"||research.status==="provider_error") {adoption="BLOCKED";adoptionLabel="流程受阻";}
  else if(isGame&&feas.status==="evaluated"&&evaluation.decision==="NO_GO"){adoption="REJECT";adoptionLabel="当前不建议采纳";}
@@ -512,10 +513,12 @@ function renderExplainableReport(data){
   ["反证审查",counterRefs.length+" 条已提交引用"],
   ["原型证据",hasPrototype?"已提供引用；内容真实性仍待核验":"未提供"],
   ["成本情景",costComplete?"三种情景字段完整":"三种情景字段不完整"],
+  ["员工语义审查",semanticReviewClear?"结构化审查已完成且未列出未支持主张":"审查未完成或仍有未支持主张"],
+  ["原始用户评价",esc(text(quality.accepted_user_demand_records,0))+" 条（游戏任务要求至少 3 条；仍需代表性审查）"],
   ["事实核验",truthVerified?"后端有核验标记":"未记录核验程序/结果"]
  ];
  const acceptancePassed=isGame?gameAccepted:genericAccepted;
- put("reportAcceptance",'<div><b>总状态：</b><span class="report-chip">'+(acceptancePassed?"通过当前验收门禁":"未通过 / 未完成验收")+'</span></div>'+list(acceptanceItems.map(x=>x[0]+"： "+x[1]))+'<div class="fv-blockers"><b>验收规则：</b>游戏可行性只有在八维度均有有效评分/理由/证据引用、至少 3 个独立来源、反证引用、原型证据、完整三情景成本且后端决策为 GO 时才通过。通用任务须完成员工执行、真实研究与证据门禁；模拟执行不能判为真实任务通过。此界面不会将阶段结束等同于验收通过。</div>');
+ put("reportAcceptance",'<div><b>总状态：</b><span class="report-chip">'+(acceptancePassed?"通过当前验收门禁":"未通过 / 未完成验收")+'</span></div>'+list(acceptanceItems.map(x=>x[0]+"： "+x[1]))+'<div class="fv-blockers"><b>验收规则：</b>游戏可行性只有在八维度均有有效评分/理由/证据引用、至少 3 个独立来源、至少 3 条合格原始用户评价、反证引用、原型证据、完整三情景成本、员工语义审查通过且后端决策为 GO 时才通过。通用任务须完成员工执行、真实研究、证据门禁和结构化语义审查；存在未支持/无法测试的关键主张或模拟执行时不能判为通过。模型审查不等于独立事实核验。此界面不会将阶段结束等同于验收通过。</div>');
 }
 
 function renderTwinChat(data){
