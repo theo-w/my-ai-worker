@@ -1,7 +1,7 @@
 """Regression tests for evidence role classification and conservative readiness."""
 import unittest
 
-from mvp.quality import classify_source_role, evaluate_evidence
+from mvp.quality import classify_source_role, classify_evidence_use, evaluate_evidence
 from mvp.commercial_feasibility import build_feasibility_draft
 
 
@@ -104,6 +104,38 @@ class EvidenceRoleTests(unittest.TestCase):
         self.assertEqual(draft["report"]["original_user_review_record_count"], 0)
         self.assertEqual(draft["report"]["user_demand_evidence_status"], "missing_original_user_reviews")
         self.assertTrue(any("原始用户评价" in blocker for blocker in draft["completion"]["blockers"]))
+
+    def test_media_article_is_auxiliary_not_direct_evidence(self):
+        result = classify_evidence_use({
+            "url": "https://www.pcgamer.com/example-review/",
+            "title": "Editorial review",
+            "snippet": "Players may dislike the loop.",
+        })
+        self.assertEqual(result["evidence_use"], "auxiliary_only")
+        self.assertIn("不可单独", result["evidence_use_label"])
+
+    def test_raw_user_review_is_only_a_direct_signal_candidate(self):
+        result = classify_evidence_use({
+            "url": "https://store.steampowered.com/appreviews/123?reviewid=456",
+            "title": "Raw Steam review",
+            "snippet": "The loop is repetitive.",
+            "raw_review_text": "The loop is repetitive.",
+            "review_id": "456",
+            "review_created_at": "2026-10-20T12:00:00Z",
+            "collection_method": "Steam Store Reviews API",
+            "provider": "steam_store_reviews_api",
+            "source_role": "primary_user_signal",
+        })
+        self.assertEqual(result["evidence_use"], "direct_user_signal_candidate")
+        self.assertIn("真实性", result["evidence_use_reason"])
+
+    def test_unknown_source_is_lead_only(self):
+        result = classify_evidence_use({
+            "url": "https://example.org/something",
+            "title": "Unknown",
+            "snippet": "Unclear source",
+        })
+        self.assertEqual(result["evidence_use"], "lead_only")
 
     def test_quality_pass_does_not_claim_truth(self):
         result = evaluate_evidence([{
