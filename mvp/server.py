@@ -284,6 +284,48 @@ def _llm_review_worker_result(goal: str, output: str, evidence: list, client) ->
         }
 
 
+
+def _revise_worker_result(goal: str, output: str, review: dict, evidence: list, client) -> dict:
+    """Ask a worker to revise against the Twin's critique; never manufacture missing evidence."""
+    if client is None:
+        return {"ok": False, "status": "not_configured", "message": "未配置可用 LLM，无法执行自动修订。"}
+    rows = []
+    for index, item in enumerate(evidence if isinstance(evidence, list) else [], start=1):
+        row = item if isinstance(item, dict) else getattr(item, "__dict__", {})
+        source = row.get("source") if isinstance(row, dict) else {}
+        source = source if isinstance(source, dict) else {}
+        rows.append({"evidence_id": "E" + str(index), "title": source.get("title", ""),
+                     "url": source.get("url", ""),
+                     "excerpt": source.get("raw_review_text") or source.get("snippet") or source.get("description", ""),
+                     "source_role": source.get("source_role", ""), "provider": source.get("provider", "")})
+    prompt = {
+        "goal": goal, "previous_worker_output": str(output or "")[:10000],
+        "Digital_Twin_critique": review, "available_evidence_only": rows,
+        "instructions": [
+            "Revise the worker result in response to the Digital Twin critique.",
+            "Do not merely persuade the reviewer or weaken acceptance criteria.",
+            "Do not invent facts, sources, quotes, sample sizes, costs, URLs, or claim that a URL was opened.",
+            "Use only the supplied evidence and cite evidence IDs for each factual claim.",
+            "Separate direct evidence, auxiliary articles, inference, assumptions, and unknowns.",
+            "If evidence is missing, say so explicitly and propose specific follow-up research; do not pretend the gap is solved.",
+            "Preserve counterarguments and change the conclusion if the evidence warrants it.",
+            "Return valid JSON with keys revised_output, changes_made, unresolved_gaps, follow_up_queries, recommended_status (READY_FOR_REVIEW or NEEDS_MORE_EVIDENCE).",
+        ],
+    }
+    try:
+        raw = client.complete(
+            "You are a worker revising a deliverable under a skeptical Digital Twin reviewer. Improve correctness and traceability, not persuasiveness. Return valid JSON only.",
+            json.dumps(prompt, ensure_ascii=False),
+        )
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict) or not str(parsed.get("revised_output", "")).strip():
+            return {"ok": False, "status": "invalid_response", "message": "员工修订没有返回有效的 revised_output。"}
+        parsed["ok"] = True
+        parsed["status"] = "revised"
+        return parsed
+    except Exception as exc:
+        return {"ok": False, "status": "failed", "message": "员工自动修订失败：" + type(exc).__name__}
+
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
@@ -460,17 +502,66 @@ def _execute_run(goal: str):
             semantic_review = _llm_review_worker_result(goal, output_text, research_evidence_for_review, review_client)
         except Exception as review_exc:
             semantic_review = {"status": "failed", "message": "员工结果语义审查失败：" + type(review_exc).__name__, "truth_verified": False}
+        revision_history = []
+        current_output = output_text
+        # Bounded critique -> revise -> re-review loop. Missing evidence remains a blocker.
+        for revision_round in range(1, 3):
+            adoption = str(semantic_review.get("adoption", "")).upper()
+            unsupported = semantic_review.get("unsupported_claims") if isinstance(semantic_review.get("unsupported_claims"), list) else []
+            claims = semantic_review.get("claims") if isinstance(semantic_review.get("claims"), list) else []
+            needs_revision = (
+                semantic_review.get("status") == "completed_review_required"
+                and (adoption in {"NEEDS_VALIDATION", "REJECT", "BLOCKED"} or unsupported
+                     or any(str(c.get("status", "")).lower() in {"unsupported", "not_testable"} for c in claims if isinstance(c, dict)))
+            )
+            if not needs_revision:
+                break
+            revision = _revise_worker_result(goal, current_output, semantic_review, research_evidence_for_review, review_client)
+            revision_history.append({
+                "round": revision_round, "review_before_revision": semantic_review,
+                "revision_status": revision.get("status", "unknown"),
+                "changes_made": revision.get("changes_made", []),
+                "unresolved_gaps": revision.get("unresolved_gaps", []),
+                "message": revision.get("message", ""),
+            })
+            if not revision.get("ok"):
+                break
+            current_output = str(revision.get("revised_output", "")).strip()
+            try:
+                semantic_review = _llm_review_worker_result(goal, current_output, research_evidence_for_review, review_client)
+            except Exception as review_exc:
+                semantic_review = {"status": "failed", "message": "修订后复审失败：" + type(review_exc).__name__, "truth_verified": False}
+            with LOCK:
+                STATE["conversation"].append({
+                    "id": str(int(time.time() * 1000)) + "-revision-" + str(idx) + "-" + str(revision_round),
+                    "at": time.time(), "kind": "revision", "from": review_agent.get("worker", "数字员工"),
+                    "to": "Digital Twin", "worker": review_agent.get("worker", ""),
+                    "text": "员工按分身意见完成第 " + str(revision_round) + " 轮修订；变更摘要="
+                        + str(revision.get("changes_made", [])) + "；未解决缺口="
+                        + str(revision.get("unresolved_gaps", [])) + "；修订后审查="
+                        + str(semantic_review.get("adoption", semantic_review.get("status", "unknown")))
+                        + "。缺少证据不会因改写文本而视为解决。",
+                })
+        semantic_review["revision_rounds"] = len(revision_history)
+        semantic_review["revision_history"] = revision_history
+        semantic_review["final_output_after_revision"] = current_output if revision_history else output_text
+        semantic_review["truth_verified"] = False
         with LOCK:
             if idx < len(STATE.get("agents") or []):
                 current = STATE["agents"][idx]
+                if revision_history:
+                    current["output"] = current_output
                 twin_review = current.setdefault("twin_review", {})
                 twin_review["semantic_review"] = semantic_review
+                twin_review["revision_history"] = revision_history
                 STATE["conversation"].append({
                     "id": str(int(time.time() * 1000)) + "-semantic-review-" + str(idx),
                     "at": time.time(), "kind": "review", "from": "Digital Twin",
                     "to": current.get("worker", "数字员工"), "worker": current.get("worker", ""),
                     "text": "员工结果语义审查：" + str(semantic_review.get("status", "unknown")) + "；"
                         + str(semantic_review.get("summary") or semantic_review.get("message") or "未提供审查摘要")
+                        + "；自动修订轮数=" + str(len(revision_history))
+                        + "；最终采纳建议=" + str(semantic_review.get("adoption", "未给出"))
                         + "；事实核验标记=" + str(semantic_review.get("truth_verified", False)) + "。",
                     "simulated": bool((current.get("execution") or {}).get("simulated", False)),
                 })
