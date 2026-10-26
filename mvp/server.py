@@ -170,6 +170,54 @@ def reset(goal: str):
         STATE["prototype"] = None
         STATE["twin"] = TWIN.snapshot(goal, team)
 
+def _audit_worker_result(output: str, result_data: dict, evidence: list) -> dict:
+    """Deterministic first-pass audit; explicitly does not claim semantic fact verification."""
+    output_text = str(output or "").strip()
+    execution = result_data if isinstance(result_data, dict) else {}
+    metadata = execution.get("metadata", {}) if isinstance(execution.get("metadata", {}), dict) else {}
+    simulated = bool(execution.get("simulated", False) or execution.get("mode") == "simulation")
+    urls_in_output = "https://" in output_text or "http://" in output_text
+    source_backed_items = []
+    for item in evidence if isinstance(evidence, list) else []:
+        row = item if isinstance(item, dict) else getattr(item, "__dict__", {})
+        source = row.get("source") if isinstance(row, dict) else None
+        if isinstance(source, dict) and source.get("url"):
+            source_backed_items.append(source)
+    if simulated:
+        verdict = "SIMULATION_ONLY"
+        verdict_text = "模拟输出，不得作为真实证据或已验证结论。"
+    elif not output_text:
+        verdict = "INCOMPLETE_OUTPUT"
+        verdict_text = "员工未返回可审查的实质输出，任务不能据此验收。"
+    elif not source_backed_items and not urls_in_output:
+        verdict = "NEEDS_INDEPENDENT_EVIDENCE"
+        verdict_text = "输出尚未附带可追溯来源；目前只能视为员工分析/假设，不能当作事实结论。"
+    else:
+        verdict = "TRACEABLE_BUT_UNVERIFIED"
+        verdict_text = "发现来源线索，但尚未验证来源是否支持具体主张，也未证明来源真实、独立或有代表性。"
+    checks = [
+        {"name": "输出非空", "passed": bool(output_text), "detail": "检查输出是否存在，不评价语义正确性。"},
+        {"name": "模拟模式检查", "passed": not simulated, "detail": "模拟输出不能作为真实证据。"},
+        {"name": "附带来源记录", "passed": bool(source_backed_items) or urls_in_output, "detail": "有 URL 不等于来源内容支持结论。"},
+        {"name": "语义支持核验", "passed": False, "detail": "当前确定性审核尚未逐条核对主张与原文；需要独立语义审查。"},
+    ]
+    return {
+        "verdict": verdict,
+        "summary": verdict_text,
+        "output_length": len(output_text),
+        "attached_source_count": len(source_backed_items),
+        "urls_in_output": urls_in_output,
+        "executor_claimed_verified": bool(execution.get("output_is_verified_evidence", False) or metadata.get("verified", False)),
+        "external_tools_used": metadata.get("external_tools_used", execution.get("external_tools_used", "unknown")),
+        "checks": checks,
+        "limitations": [
+            "本轮审核是确定性初筛，不是对自然语言结论的完整语义验证。",
+            "来源链接、员工置信度和任务完成状态均不能单独证明事实正确。",
+        ],
+        "adoption": "不得直接作为已核实事实采纳" if verdict != "TRACEABLE_BUT_UNVERIFIED" else "仅可作为待核验分析线索",
+    }
+
+
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
@@ -201,8 +249,10 @@ def _execute_run(goal: str):
                 output, result_data, items = result.output, result.to_dict(), []
             with LOCK:
                 agent = STATE["agents"][idx]
+                worker_evidence = [item.__dict__ for item in items]
+                twin_review = _audit_worker_result(output, result_data, worker_evidence)
                 agent.update({"progress": 100, "output": output, "execution": result_data,
-                              "evidence": [item.__dict__ for item in items], "status": "completed"})
+                              "evidence": worker_evidence, "twin_review": twin_review, "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
                 STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-reply-" + str(idx), "at": time.time(), "kind": "reply", "from": worker, "to": "Digital Twin", "worker": worker, "text": output, "simulated": bool(result_data.get("simulated", False))})
                 execution_meta = result_data.get("metadata", {}) if isinstance(result_data, dict) else {}
@@ -210,13 +260,11 @@ def _execute_run(goal: str):
                 external_tools = execution_meta.get("external_tools_used", False if result_data.get("simulated") else "未记录")
                 accepted_count = execution_meta.get("quality_accepted_count", 0)
                 review_text = (
-                    "分身回执核验：员工任务状态=" + str(agent.get("status", "unknown"))
-                    + "；执行模式=" + str(execution_mode)
-                    + "；外部工具调用=" + str(external_tools)
-                    + "；员工直接附带证据=" + str(len(agent.get("evidence", [])))
-                    + " 条；执行器报告通过门禁的证据=" + str(accepted_count) + " 条。"
-                    + ("当前输出为模拟内容，不作为真实证据。" if result_data.get("simulated") else
-                       "模型生成的文字不等于已核验事实；来源证据以调研记录和证据门禁为准。")
+                    "数字分身结果初审：" + str(twin_review.get("verdict"))
+                    + "；" + str(twin_review.get("summary"))
+                    + "；可追溯来源线索=" + str(twin_review.get("attached_source_count"))
+                    + "；语义支持核验=未完成。"
+                    + " 该审核是确定性初筛，不代表已经验证员工结论。"
                 )
                 STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-twin-review-" + str(idx), "at": time.time(), "kind": "review", "from": "Digital Twin", "to": worker, "worker": worker, "text": review_text, "simulated": bool(result_data.get("simulated", False))})
         except Exception as exc:
