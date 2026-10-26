@@ -233,12 +233,22 @@ def _llm_review_worker_result(goal: str, output: str, evidence: list, client) ->
         row = item if isinstance(item, dict) else getattr(item, "__dict__", {})
         source = row.get("source") if isinstance(row, dict) else {}
         source = source if isinstance(source, dict) else {}
+        try:
+            from .quality import classify_source_role, classify_evidence_use
+        except ImportError:
+            from quality import classify_source_role, classify_evidence_use
+        source_role = classify_source_role(source)
+        evidence_use = classify_evidence_use(source)
         rows.append({
             "evidence_id": "E" + str(index),
             "finding": row.get("finding", "") if isinstance(row, dict) else "",
             "source_title": source.get("title", ""),
             "source_url": source.get("url", ""),
-            "source_excerpt": source.get("snippet", ""),
+            "source_excerpt": source.get("raw_review_text") or source.get("snippet", ""),
+            "source_role": source_role.get("source_role", "unclassified"),
+            "evidence_use": evidence_use.get("evidence_use", "lead_only"),
+            "evidence_use_label": evidence_use.get("evidence_use_label", "用途未确认"),
+            "evidence_use_reason": evidence_use.get("evidence_use_reason", ""),
         })
     prompt = {
         "goal": goal,
