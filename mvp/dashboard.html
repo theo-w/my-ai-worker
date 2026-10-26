@@ -665,7 +665,7 @@ function renderRunOutputs(data){
   const dimensionLabels={player_value:"玩家价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与重复游玩",risk_and_compliance:"风险与合规"};
   const dimensionCards=Object.entries(dimensionLabels).map(([key,label])=>{const item=dims[key]||{};const valid=Number.isFinite(Number(item.score))&&Number(item.score)>=1&&Number(item.score)<=5&&Array.isArray(item.evidence_refs)&&item.evidence_refs.length>0&&String(item.rationale||"").trim();const score=valid?Number(item.score):null;const reason=item.rationale||item.reason||"系统尚未返回该维度的评分理由。";const refs=Array.isArray(item.evidence_refs)?item.evidence_refs:[];return '<div class="fv-dimension"><div class="fv-dimension-head"><span>'+label+'</span><b>'+(score===null?'暂无有效评分':score+'/5')+'</b></div><div class="fv-track"><i style="width:'+(score===null?0:score*20)+'%"></i></div><div class="fv-note">'+(valid?'已提供评分与证据引用，仍需独立核验':(!item.score?'缺少评分':'评分缺少理由或证据引用'))+'</div><details><summary>查看依据与缺口</summary><div class="fv-note">'+esc(reason)+'</div><div class="fv-note">证据引用：'+(refs.length?refs.map(x=>esc(typeof x==="string"?x:JSON.stringify(x))).join("；"):"暂无")+'</div></details></div>';}).join("");
   const visualEstimate=feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.pricing_estimate;
-  feasibilityResultEl.innerHTML='<div class="outcome"><div class="kicker">本轮评估 · 尚未达标</div><div class="big">'+esc(verdict)+'</div><div class="sub">未满足完整验收条件；不得据此直接立项。</div></div><div class="feasibility-visual"><div class="fv-card"><div class="fv-label">维度覆盖</div><div class="fv-value">'+Object.keys(dims).filter(k=>dimensionLabels[k]&&dims[k]&&Number.isFinite(Number(dims[k].score))&&Array.isArray(dims[k].evidence_refs)&&dims[k].evidence_refs.length&&String(dims[k].rationale||"").trim()).length+'/8</div></div><div class="fv-card"><div class="fv-label">独立来源</div><div class="fv-value">'+esc(String((feasibility.report&&feasibility.report.independent_source_count)??'未知'))+'</div></div><div class="fv-card"><div class="fv-label">原型证据</div><div class="fv-value">'+((feasibility.report&&Array.isArray(feasibility.report.prototype_evidence_refs)&&feasibility.report.prototype_evidence_refs.length)?'已提供引用':'缺失')+'</div></div><div class="fv-card"><div class="fv-label">成本模型</div><div class="fv-value">'+((feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.scenarios)?'待核验':'缺失')+'</div></div></div><details class="content-fold"><summary>八维度检查（展开查看每项评分、依据与缺口）</summary><div class="fv-dimensions"><div class="fv-note">评分仅在有理由与证据引用时展示；引用本身不代表真实性已验证。</div><div class="fv-note">完整报告仍可在下方高级 JSON 区域查看与编辑。</div></details>'+costSummary;
+  feasibilityResultEl.innerHTML='<div class="outcome"><div class="kicker">本轮评估 · 尚未达标</div><div class="big">'+esc(verdict)+'</div><div class="sub">未满足完整验收条件；不得据此直接立项。</div></div><div class="feasibility-visual"><div class="fv-card"><div class="fv-label">维度覆盖</div><div class="fv-value">'+Object.keys(dims).filter(k=>dimensionLabels[k]&&dims[k]&&Number.isFinite(Number(dims[k].score))&&Array.isArray(dims[k].evidence_refs)&&dims[k].evidence_refs.length&&String(dims[k].rationale||"").trim()).length+'/8</div></div><div class="fv-card"><div class="fv-label">独立来源</div><div class="fv-value">'+esc(String((feasibility.report&&feasibility.report.independent_source_count)??'未知'))+'</div></div><div class="fv-card"><div class="fv-label">原型证据</div><div class="fv-value">'+((feasibility.report&&Array.isArray(feasibility.report.prototype_evidence_refs)&&feasibility.report.prototype_evidence_refs.length)?'已提供引用':'缺失')+'</div></div><div class="fv-card"><div class="fv-label">成本模型</div><div class="fv-value">'+((feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.scenarios)?'待核验':'缺失')+'</div></div></div><details class="content-fold" open><summary>八维度检查（逐项查看评分、依据与缺口）</summary><div class="fv-note">评分仅在有理由与证据引用时展示；引用本身不代表真实性已验证。缺少证据时会明确显示未评分。</div><div class="fv-dimensions">'+dimensionCards+'</div><div class="fv-note">完整报告仍可在下方高级 JSON 区域查看与编辑。</div></details>'+costSummary;
   const currentRun=String(data.run_id||"");
   if(feasibilityReportEl&&currentRun&&feasibilityReportEl.dataset.runId!==currentRun){
    feasibilityReportEl.value=JSON.stringify(feasibility.report||{},null,2);
@@ -756,15 +756,23 @@ function renderRunOutputs(data){
   else if(researchStatus==="completed") designButton.textContent="证据不足，暂不可生成";
   else designButton.textContent="等待本轮有效调研证据";
  }
- if(design.status==="completed"&&design.brief){
-  const b=design.brief, concept=b.original_concept||{};
-  document.getElementById("designResult").innerHTML='<div class="outcome"><div class="kicker">本轮生成 · '+esc(design.status)+'</div><div class="big">'+esc(concept.title||"本轮原创概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="sub">'+esc(design.reason||"")+" · 市场可行性尚未验证</div></div>";
- }else if(researchStatus==="completed"&&!hasCurrentEvidence){
-  document.getElementById("designResult").textContent="调研已返回，但没有足够的可接受来源证据（当前接受 "+accepted+" 条）；请补充调研或检查证据门禁。";
- }else if(researchStatus==="failed"||researchStatus==="provider_error"||researchStatus==="provider_unconfigured"){
-  document.getElementById("designResult").textContent="本轮调研未成功："+(research.error||design.reason||"请检查搜索服务配置后重试。");
- }else{
-  document.getElementById("designResult").textContent=design.reason||"等待本轮真实调研与有效证据；不会提前展示旧版创意作为本轮结果。";
+ const designResultEl=document.getElementById("designResult");
+ const activeRunId=String(data.run_id||"");
+ if(designResultEl.dataset.generatedRunId && designResultEl.dataset.generatedRunId!==activeRunId){
+  designResultEl.dataset.generatedRunId="";
+  designResultEl.dataset.manualGenerated="";
+ }
+ if(!(designResultEl.dataset.manualGenerated==="true" && designResultEl.dataset.generatedRunId===activeRunId)){
+  if(design.status==="completed"&&design.brief){
+   const b=design.brief, concept=b.original_concept||{};
+   designResultEl.innerHTML='<div class="outcome"><div class="kicker">本轮生成 · '+esc(design.status)+'</div><div class="big">'+esc(concept.title||"本轮原创概念")+'</div><div>'+esc(concept.one_line||"")+'</div><div class="sub">'+esc(design.reason||"")+" · 市场可行性尚未验证</div></div>";
+  }else if(researchStatus==="completed"&&!hasCurrentEvidence){
+   designResultEl.textContent="调研已返回，但没有足够的可接受来源证据（当前接受 "+accepted+" 条）；请补充调研或检查证据门禁。";
+  }else if(researchStatus==="failed"||researchStatus==="provider_error"||researchStatus==="provider_unconfigured"){
+   designResultEl.textContent="本轮调研未成功："+(research.error||design.reason||"请检查搜索服务配置后重试。");
+  }else{
+   designResultEl.textContent=design.reason||"等待本轮真实调研与有效证据；不会提前展示旧版创意作为本轮结果。";
+  }
  }
 }
 let runInFlight=false,activeRunGoal="",activeRunGame=false;
@@ -938,6 +946,7 @@ document.getElementById("designRun").onclick=async function(){
   const principles=list(b.transferable_principles,s=>'<li>'+esc(s)+'</li>');
   const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
   const plan=concept.prototype_plan||b.prototype_plan||{};
+  out.dataset.manualGenerated="true";out.dataset.generatedRunId=String(window.currentRunId||document.getElementById("runProgressSummary")?.dataset.runId||"");
   out.innerHTML='<div class="outcome"><div class="kicker">快速阅读 · 新游戏概念</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div class="summary-copy">'+esc(concept.one_line||"暂无一句话概述。")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"待补充")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"待补充")+'</div><b>验证状态</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div><details class="content-fold"><summary>展开完整设计分析（机制、玩家假设、原型计划）</summary><h3>从参考游戏提炼的机制</h3>'+mechanisms+'<h3>可迁移原则</h3>'+principles+'<h3>新游戏核心系统</h3>'+systems+'<h3>核心循环</h3>'+loop+'<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+'<h3>可证伪假设</h3>'+hypotheses+'<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+'<div class="fv-note">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div></details>';
  }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
