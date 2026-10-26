@@ -947,7 +947,7 @@ document.getElementById("designRun").onclick=async function(){
   const principles=list(b.transferable_principles,s=>'<li>'+esc(s)+'</li>');
   const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
   const plan=concept.prototype_plan||b.prototype_plan||{};
-  out.dataset.manualGenerated="true";out.dataset.generatedRunId=String(window.currentRunId||document.getElementById("runProgressSummary")?.dataset.runId||"");
+  out.dataset.manualGenerated="true";out.dataset.generatedRunId=String((typeof state!=="undefined"&&state&&state.run_id)||"");
   out.innerHTML='<div class="outcome"><div class="kicker">快速阅读 · 新游戏概念</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div class="summary-copy">'+esc(concept.one_line||"暂无一句话概述。")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"待补充")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"待补充")+'</div><b>验证状态</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div><details class="content-fold"><summary>展开完整设计分析（机制、玩家假设、原型计划）</summary><h3>从参考游戏提炼的机制</h3>'+mechanisms+'<h3>可迁移原则</h3>'+principles+'<h3>新游戏核心系统</h3>'+systems+'<h3>核心循环</h3>'+loop+'<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+'<h3>可证伪假设</h3>'+hypotheses+'<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+'<div class="fv-note">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div></details>';
  }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
