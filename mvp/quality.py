@@ -76,6 +76,44 @@ def classify_source_role(source: dict | None) -> dict:
     }
 
 
+def assess_user_demand_source(source: dict | None) -> dict:
+    """Distinguish actual collected user-originated records from articles and search snippets."""
+    source = source if isinstance(source, dict) else {}
+    role = classify_source_role(source)
+    parsed = urlparse(str(source.get("url", "")).strip())
+    host = (parsed.hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    path = parsed.path.lower()
+    raw_text = str(source.get("raw_review_text", source.get("review_text", ""))).strip()
+    explicit_raw_record = bool(
+        raw_text and source.get("review_id")
+        and (source.get("review_created_at") or source.get("published_at"))
+        and source.get("collection_method")
+    )
+    known_user_content = False
+    if host in {"reddit.com", "old.reddit.com"} or host.endswith(".reddit.com"):
+        known_user_content = "/comments/" in path
+    elif host == "store.steampowered.com":
+        known_user_content = "/reviews/" in path
+    elif host == "steamcommunity.com":
+        known_user_content = "/app/" in path and ("/discussions/" in path or "/comment/" in path)
+
+    eligible = bool(role["source_role"] == "primary_user_signal" and known_user_content and explicit_raw_record)
+    if role["source_role"] == "secondary_analysis":
+        reason = "二手媒体/作者分析；只能作为背景材料，不能计作玩家原始评价"
+    elif not known_user_content:
+        reason = "URL 未定位到可识别的用户原帖/评论页面"
+    elif not explicit_raw_record:
+        reason = "缺少原始评价正文、评价 ID、时间与采集方式；搜索摘要不算原始评价数据"
+    else:
+        reason = "具备原始评价记录字段；仍需检查重复、抽样偏差与真实性"
+    return {
+        "user_demand_eligible": eligible,
+        "raw_user_content_available": explicit_raw_record,
+        "user_demand_eligibility_reason": reason,
+    }
+
+
 def score_evidence(evidence: dict) -> EvidenceQuality:
     """Score provenance completeness; acceptance does not mean factual truth."""
     reasons: list[str] = []
@@ -105,20 +143,20 @@ def score_evidence(evidence: dict) -> EvidenceQuality:
         reasons.append("missing source excerpt")
 
     role = classify_source_role(source)
+    demand = assess_user_demand_source(source)
     if role["source_role"] == "unclassified":
         reasons.append("source role unclassified; cannot count as direct user-demand evidence")
+    if not demand["user_demand_eligible"]:
+        reasons.append(demand["user_demand_eligibility_reason"])
 
     if evidence.get("simulated", False):
         reasons.append("simulated evidence cannot pass the real-research gate")
         return EvidenceQuality(round(score, 1), False, reasons)
-
     if confidence < 0.6:
         reasons.append("confidence below 0.60")
-
     accepted = score >= 70 and confidence >= 0.6 and source_valid
     if accepted:
         reasons.append("mechanical provenance threshold passed; truth and claim relevance remain unverified")
-
     return EvidenceQuality(round(score, 1), accepted, reasons)
 
 
@@ -138,6 +176,7 @@ def evaluate_evidence(evidence: list[dict]) -> dict:
         quality = score_evidence(item)
         row = dict(item)
         row.update(role)
+        row.update(assess_user_demand_source(source))
         row["quality_score"] = quality.score
         row["quality_accepted"] = quality.accepted
         row["quality_reasons"] = quality.reasons
@@ -147,9 +186,8 @@ def evaluate_evidence(evidence: list[dict]) -> dict:
             accepted += 1
             accepted_role_counts[role["source_role"]] = accepted_role_counts.get(role["source_role"], 0) + 1
 
-    user_signal_count = accepted_role_counts["primary_user_signal"]
-    secondary_count = accepted_role_counts["secondary_analysis"]
-    official_count = accepted_role_counts["official_or_industry_data"]
+    user_signal_count = sum(1 for row in results if row.get("quality_accepted") and row.get("user_demand_eligible"))
+    raw_user_record_count = sum(1 for row in results if row.get("raw_user_content_available"))
     # This is an evidence sufficiency warning, not a claim that the evidence is true.
     if user_signal_count == 0:
         decision_readiness = "insufficient_user_demand_evidence"
@@ -167,9 +205,11 @@ def evaluate_evidence(evidence: list[dict]) -> dict:
         "coverage": round(accepted / len(results), 2) if results else 0.0,
         "source_role_counts": role_counts,
         "accepted_source_role_counts": accepted_role_counts,
+        "accepted_user_demand_records": user_signal_count,
+        "raw_user_content_records": raw_user_record_count,
         "decision_readiness": decision_readiness,
         "readiness_reasons": readiness_reasons,
         "truth_verified": False,
-        "note": "quality_accepted means mechanical provenance checks passed only; it does not prove truth, objectivity, representativeness, or claim relevance.",
+        "note": "quality_accepted means mechanical provenance checks passed only. Media analysis and search snippets are not original user reviews; direct user-demand eligibility requires identifiable raw review text, a review ID, a timestamp and collection-method metadata. This still does not prove truth, objectivity or representativeness.",
         "items": results,
     }
