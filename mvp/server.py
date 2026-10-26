@@ -543,6 +543,12 @@ def _execute_run(goal: str):
                         current_sources = current_research.get("sources") if isinstance(current_research.get("sources"), list) else []
                         known_source_urls = {str(row.get("url", "")) for row in current_sources if isinstance(row, dict)}
                         current_research["sources"] = (current_sources + [row for row in new_sources if isinstance(row, dict) and str(row.get("url", "")) not in known_source_urls])[:40]
+                        current_research["evidence"] = list(research_evidence_for_review)
+                        try:
+                            from .quality import evaluate_evidence
+                        except ImportError:
+                            from quality import evaluate_evidence
+                        current_research["quality"] = evaluate_evidence(research_evidence_for_review)
                         current_research.setdefault("follow_up_batches", []).append({
                             "round": revision_round, "queries": follow_up_queries,
                             "status": follow_up_result.get("status", "unknown"),
