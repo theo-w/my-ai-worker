@@ -262,6 +262,74 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
 
 
 
+def collect_steam_raw_reviews(sources: list[dict], max_reviews_per_app: int = 30) -> tuple[list[dict], list[dict]]:
+    """Collect public raw Steam review records for app IDs found in research URLs.
+
+    This collector only runs when a public Steam app ID is discoverable from a
+    Steam store URL. It does not infer reviews from media articles or snippets.
+    """
+    import json
+    import re
+    from datetime import datetime, timezone
+    from urllib.parse import urlparse, urlencode
+    from urllib.request import Request, urlopen
+
+    app_ids = []
+    for source in sources:
+        url = str(source.get("url", ""))
+        parsed = urlparse(url)
+        if (parsed.hostname or "").lower().removeprefix("www.") != "store.steampowered.com":
+            continue
+        match = re.match(r"/app/(\d+)(?:/|$)", parsed.path)
+        if match and match.group(1) not in app_ids:
+            app_ids.append(match.group(1))
+    reviews = []
+    errors = []
+    for app_id in app_ids[:5]:
+        endpoint = "https://store.steampowered.com/appreviews/" + app_id + "?" + urlencode({
+            "json": 1, "language": "all", "review_type": "all",
+            "purchase_type": "all", "num_per_page": min(100, max(1, int(max_reviews_per_app))),
+            "filter": "recent",
+        })
+        try:
+            request = Request(endpoint, headers={
+                "Accept": "application/json",
+                "User-Agent": "JARVIS-ResearchAdapter/1.0",
+            })
+            with urlopen(request, timeout=12) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            for row in payload.get("reviews", [])[:max_reviews_per_app]:
+                if not isinstance(row, dict):
+                    continue
+                raw_text = str(row.get("review", "")).strip()
+                review_id = str(row.get("recommendationid", "")).strip()
+                if not raw_text or not review_id:
+                    continue
+                created = row.get("timestamp_created")
+                created_iso = datetime.fromtimestamp(int(created), timezone.utc).isoformat() if created else None
+                reviews.append({
+                    "title": "Steam 原始玩家评价 · App " + app_id,
+                    "url": endpoint + "&reviewid=" + review_id,
+                    "snippet": raw_text[:1200],
+                    "raw_review_text": raw_text,
+                    "review_id": review_id,
+                    "review_created_at": created_iso,
+                    "published_at": created_iso,
+                    "collection_method": "Steam Store Reviews API",
+                    "source_role": "primary_user_signal",
+                    "provider": "steam_store_reviews_api",
+                    "app_id": app_id,
+                    "language": row.get("language"),
+                    "recommended": row.get("voted_up"),
+                    "votes_up": row.get("votes_up"),
+                    "weighted_vote_score": row.get("weighted_vote_score"),
+                    "simulated": False,
+                })
+        except Exception as exc:
+            errors.append({"app_id": app_id, "provider": "steam_store_reviews_api", "error": type(exc).__name__})
+    return reviews, errors
+
+
 def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progress_callback: Callable[[dict], None] | None = None) -> dict:
     """Run a bounded multi-angle search, deduplicate sources, then synthesize once.
 
@@ -362,6 +430,9 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
                 pass
 
     sources = list(source_rows.values())[:20]
+    raw_user_reviews, review_collection_errors = collect_steam_raw_reviews(sources)
+    # Keep article/search-result sources and individual original reviews separate.
+    sources.extend(raw_user_reviews)
     evidence = [{
         "worker": "Live Research Adapter",
         "finding": source.get("snippet", ""),
@@ -386,6 +457,12 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
     return {
         "ok": ok, "status": status, "query": joined_query, "queries": normalized,
         "query_errors": query_errors, "sources": sources, "evidence": quality["items"],
+        "review_collection": {
+            "provider": "steam_store_reviews_api",
+            "raw_review_records": len(raw_user_reviews),
+            "errors": review_collection_errors,
+            "note": "Raw Steam review collection only runs when a Steam app ID is found in search results; no records means no original reviews were collected from this adapter.",
+        },
         "quality": quality, "synthesis": deterministic.to_dict(),
         "llm_synthesis": llm_synthesis,
         "coverage": {
