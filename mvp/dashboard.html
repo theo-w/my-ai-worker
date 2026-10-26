@@ -102,6 +102,14 @@
 .signal-muted{font-size:12px;color:var(--muted);margin:0}
 .signal-event-fold{margin-top:12px}
 @media(max-width:650px){.signal-flow-parallel{grid-template-columns:minmax(0,1fr)}.signal-flow-map .signal-node{padding:10px}.signal-facts{grid-template-columns:minmax(0,1fr)}}
+/* Make the homepage decision summary readable and action-oriented. */
+.decision-summary-card{border:1px solid var(--line);border-left:4px solid #8290a8;border-radius:10px;padding:12px;background:rgba(7,15,27,.6)}
+.decision-summary-card.good{border-left-color:var(--good)}.decision-summary-card.warn{border-left-color:var(--warn)}.decision-summary-card.bad{border-left-color:#ff8585}
+.decision-summary-label{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.decision-summary-title{font-size:16px;font-weight:850;margin:4px 0 7px;color:var(--text)}
+.decision-summary-detail{font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.decision-summary-foot{font-size:11px;color:var(--muted);margin-top:9px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+.decision-summary-empty{font-size:12px;color:var(--muted);line-height:1.6}
 </style>
 </head>
 <body><div class="app">
@@ -267,8 +275,8 @@
  <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
  <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
  <div class="input">
-  <input id="sourceGame" value="塞尔达传说：王国之泪" aria-label="Reference game">
-  <input id="conceptName" value="潮痕档案馆" aria-label="New game concept name">
+  <input id="sourceGame" value="" placeholder="参考游戏（选填，勿当作已调研竞品）" aria-label="Reference game">
+  <input id="conceptName" value="" placeholder="新玩法名称（生成前为空）" aria-label="New game concept name">
   <button id="designRun" class="btn" disabled>等待调研完成</button>
  </div>
  <div id="designResult" class="sub" style="margin-top:12px">当前轮次尚无已验收的调研证据。完成真实搜索并获得可接受来源后，才开放创意生成。</div>
@@ -548,6 +556,7 @@ async function loadRunHistory(){
 }
 function renderHistoryDetail(r){
  const detail=document.getElementById("historyDetail");if(!detail||!r)return;
+ const openFolds=new Set(Array.from(detail.querySelectorAll("details.content-fold[open]")).map((el)=>el.dataset.foldKey||el.querySelector("summary")?.textContent||""));
  const research=r.research||{},sources=Array.isArray(research.sources)?research.sources:[];
  const events=Array.isArray(r.conversation)?r.conversation:[];
  const agents=Array.isArray(r.agents)?r.agents:[];
@@ -575,7 +584,8 @@ function renderHistoryDetail(r){
  '<details class="content-fold"><summary>调研查询、观点与来源（'+sources.length+' 条来源）</summary><div class="sub">查询词：'+(queries.length?queries.map(esc).join("；"):"未记录")+'</div><div class="sub">调研综合：'+esc(research.synthesis||research.llm_synthesis||"本轮未返回综合摘要；可根据下方原始来源和证据逐条核查。")+'</div><div class="sub">查询错误：'+esc((research.query_errors||[]).map(x=>typeof x==="string"?x:JSON.stringify(x)).join("；")||"无")+'</div><ul>'+sourceHtml+'</ul><div class="sub">调研状态：'+esc(research.status||"unknown")+' · 错误：'+esc(research.error||"无")+'</div></details>'+
  '<details class="content-fold"><summary>员工输入输出（'+agents.length+' 人）</summary><ul>'+agentHtml+'</ul></details>'+
  '<details class="content-fold"><summary>证据与观点（'+evidence.length+' 条）</summary><div class="sub">系统按实际记录展示支持或反对的材料，不把未核验的模型观点自动当成事实。</div><ul>'+evidenceHtml+'</ul></details>'+
- '<details class="content-fold"><summary>决策与评估详情</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></details>';
+ '<details class="content-fold" data-fold-key="decision"><summary>决策与评估详情</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(JSON.stringify({decision,feasibility:r.feasibility||{},design:r.design||{},run_recovery:r.run_recovery||null},null,2))+'</pre></details>';
+ detail.querySelectorAll("details.content-fold").forEach((el,index)=>{if(!el.dataset.foldKey)el.dataset.foldKey=String(index);const key=el.dataset.foldKey||el.querySelector("summary")?.textContent||"";if(openFolds.has(key))el.open=true;});
 }
 document.getElementById("historyRefresh")?.addEventListener("click",loadRunHistory);
 document.getElementById("historyList")?.addEventListener("click",event=>{
@@ -984,7 +994,7 @@ setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProvide
 </script>
 <script>
 // Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.
-(function(){const source=document.getElementById("decision"),target=document.getElementById("decisionSummaryText");if(!source||!target)return;const sync=()=>{const value=(source.innerText||source.textContent||"").trim();target.textContent=value||"等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。";};sync();new MutationObserver(sync).observe(source,{subtree:true,childList:true,characterData:true,attributes:true});})();
+(function(){const source=document.getElementById("decision"),target=document.getElementById("decisionSummaryText");if(!source||!target)return;const sync=()=>{const title=source.querySelector("h2"),text=(source.innerText||source.textContent||"").trim();if(!text||text==="等待数字分身完成判断…"){target.innerHTML='<div class="decision-summary-empty">尚无可用结论。先完成真实调研、玩法假设和证据验收；未验证前不显示为 GO。</div>';return;}const recommendation=(title?.textContent||"阶段性判断").trim();const raw=text.replace(recommendation,"").trim();const map={"GO_TO_PROTOTYPE":["建议进入原型验证","good"],"DEMO_GO_TO_PROTOTYPE":["建议进入原型验证（演示级）","good"],"HOLD_FOR_EVIDENCE":["暂缓：证据不足","warn"],"NO_GO":["不建议继续投入","bad"],"NO-GO":["不建议继续投入","bad"]};const status=map[recommendation]||[recommendation,"neutral"];target.innerHTML='<div class="decision-summary-card '+status[1]+'"><div class="decision-summary-label">本轮建议</div><div class="decision-summary-title">'+esc(status[0])+'</div><div class="decision-summary-detail">'+esc(raw||"尚无风险与下一步说明。")+'</div><div class="decision-summary-foot">注意：这是系统建议，不是已被市场验证的结论；需结合来源、反证、成本和原型测试结果判断。</div></div>';};sync();new MutationObserver(sync).observe(source,{subtree:true,childList:true,characterData:true,attributes:true});})();
 </script>
 
 <script>
