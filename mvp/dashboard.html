@@ -5,8 +5,8 @@
 <title>JARVIS · Digital Twin / Digital Workforce</title>
 <style>
 :root{--bg:#080d18;--panel:#101827;--panel2:#141f32;--line:#263650;--text:#edf4ff;--muted:#a8b8d0;--accent:#65d9ff;--good:#58e39b;--warn:#ffd166}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#1a2c52 0,#080d18 40%);color:var(--text);font:15px/1.6 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:1480px;margin:auto;padding:24px;display:flex;flex-direction:column}.app>.top{order:0}#identityIntro{order:1}#goalPanel{order:2}#journeyPanel{order:3}#journeyPanel{order:3}#feasibilityPanel{order:4}#twinChatPanel{order:5}.signal-panel{order:6}#advancedDiagnostics{order:7}#supportingTools{order:8}.footer{order:9}#journeyPanel>#feasibilityPanel{margin-top:12px!important;box-shadow:none;background:rgba(8,14,25,.45)}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.brand{font-size:21px;font-weight:850;letter-spacing:.07em}.tagline{margin-top:4px;color:var(--muted)}.status{color:var(--accent);font:12px ui-monospace,monospace}.panel{background:rgba(16,24,39,.93);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 35px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.grid{display:grid;grid-template-columns:1.05fr 1.55fr 1.05fr;gap:14px;margin-top:14px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;font-weight:800}.sub{color:var(--muted);font-size:12px}.input{display:flex;gap:8px}.input input{flex:1;background:#0a1221;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:12px}.btn{background:var(--accent);color:#06101a;border:0;border-radius:9px;padding:0 17px;font-weight:850;cursor:pointer}.btn:disabled{opacity:.45}.hero{display:grid;grid-template-columns:1fr 1fr;gap:14px}.kicker{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.big{font-size:19px;font-weight:850;margin:5px 0}.kv{display:grid;grid-template-columns:88px 1fr;gap:6px;margin:8px 0}.kv b{color:var(--muted);font-size:12px}.kv div{font-size:13px}.flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.node{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0b1323;color:var(--muted);font-size:13px;transition:border-color .2s,color .2s}.node.active{border-color:var(--accent);color:var(--text);box-shadow:0 0 0 1px rgba(101,217,255,.12)}.node.done{border-color:rgba(88,227,155,.55);color:var(--good)}.node.blocked{border-color:rgba(255,209,102,.75);color:var(--warn)}.arrow{color:#51617f}.agents{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.agent{padding:12px;border:1px solid var(--line);border-radius:10px;background:#0b1323;cursor:pointer}.agent.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(101,217,255,.2)}.agent.completed{border-color:rgba(88,227,155,.72)}.agent.blocked{border-color:rgba(255,209,102,.72)}.agent.running,.agent.in_progress,.agent.working{border-color:var(--accent);box-shadow:0 0 14px rgba(101,217,255,.13)}.agent.queued,.agent.ready{border-style:dashed}.agent .pill.blocked{color:var(--warn)}.agent .pill.completed{color:var(--good)}.agent-head{display:flex;justify-content:space-between;font-weight:750}.pill{font-size:11px;padding:2px 7px;border-radius:999px;background:#1b2742;color:var(--muted)}.running{color:var(--accent)}.completed{color:var(--good)}.bar{height:4px;background:#202b45;border-radius:4px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.evidence{max-height:260px;overflow:auto}.conversation{max-height:280px;overflow-y:auto;overscroll-behavior:contain;padding:4px 6px 4px 0;scrollbar-width:thin;scrollbar-color:#38516f transparent}.chat-msg{width:fit-content;max-width:88%;padding:10px 12px;margin:9px 0;border:1px solid var(--line);border-radius:13px;background:#0b1323;overflow-wrap:anywhere;white-space:pre-wrap;box-shadow:0 3px 12px rgba(0,0,0,.12)}.chat-msg.user{margin-left:auto;border-color:rgba(101,217,255,.42);border-radius:13px 13px 3px 13px;background:rgba(22,57,79,.72)}.chat-msg.worker{margin-right:auto;border-color:rgba(88,227,155,.35);border-radius:13px 13px 13px 3px;background:rgba(14,40,38,.62)}.chat-msg.meta{max-width:100%;width:100%;padding:6px 9px;margin:6px 0;border-style:dashed;border-color:rgba(255,209,102,.32);border-radius:8px;background:rgba(39,34,22,.3);color:var(--muted)}.chat-label{font-size:11px;color:var(--muted);margin-bottom:5px}.chat-body{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.chat-body.clamped{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.chat-actions{display:flex;justify-content:flex-end;margin-top:5px}.chat-actions button{background:transparent;color:var(--accent);border:0;cursor:pointer;font-size:12px}.detail-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ev{padding:9px 0;border-bottom:1px solid #202a42}.confidence{color:var(--good);font:12px ui-monospace,monospace}.decision{border-left:3px solid var(--good);padding-left:12px}.decision h2{margin:0 0 4px;color:var(--good)}.risk{color:var(--warn);margin:5px 0}.outcome{border:1px solid #2a4860;background:#0b1726;border-radius:10px;padding:12px}.footer{margin-top:14px;color:var(--muted);font-size:11px;text-align:center}@media(max-width:1000px){.grid,.hero{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:600px){.agents{grid-template-columns:1fr}.app{padding:12px}.input{flex-direction:column;align-items:stretch}.input>input,.input>.btn{width:100%;min-width:0;max-width:100%;box-sizing:border-box}.btn{height:auto;min-height:42px;white-space:normal;overflow-wrap:anywhere}.grid>.panel,.grid>.panel:nth-child(n){grid-column:1/-1!important;min-width:0;width:100%;box-sizing:border-box}.panel,.section-title,.section-title>*{min-width:0;max-width:100%;overflow-wrap:anywhere}.section-title{flex-wrap:wrap;align-items:flex-start;gap:8px}.section-title>span,.section-title>div{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.status,.sub,.agent,.worker,.metric,.fv-card,.fv-dimension{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}.flow,.signal-panel,.twin-chat-log{min-width:0;max-width:100%;overflow-x:hidden}.feasibility-visual{grid-template-columns:repeat(2,minmax(0,1fr))}.run-inline-status{display:block;width:100%;font-size:12px;line-height:1.5;white-space:normal}.twin-chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto}.twin-chat-compose input{min-width:0;width:100%;box-sizing:border-box}.signal-legend{gap:8px}.signal-legend span{min-width:0;overflow-wrap:anywhere}}
-.feasibility-visual{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0}.fv-card{border:1px solid var(--line);background:#0b1323;border-radius:10px;padding:11px;min-width:0}.fv-label{font-size:10px;color:var(--muted)}.fv-value{font-size:18px;font-weight:850;margin-top:4px;overflow-wrap:anywhere}.fv-track{height:6px;border-radius:99px;background:#263650;overflow:hidden;margin:7px 0 4px}.fv-track i{display:block;height:100%;background:var(--accent)}.fv-dimensions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}.fv-dimension{border:1px solid var(--line);border-radius:9px;padding:9px}.fv-dimension details{margin-top:7px}.fv-dimension summary,.content-fold summary{cursor:pointer;color:var(--accent);font-size:12px}.content-fold{margin-top:10px;border:1px solid var(--line);border-radius:9px;padding:10px;background:rgba(11,19,35,.55)}.content-fold summary{font-weight:750}.content-fold[open] summary{margin-bottom:8px}.summary-copy{line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}.fv-dimension-head{display:flex;justify-content:space-between;gap:8px;font-size:11px}.fv-note{color:var(--muted);font-size:12px;margin-top:10px}.fv-note{color:var(--muted);font-size:12px;margin-top:10px}.fv-blockers{border:1px solid var(--line);border-left:3px solid var(--warn);padding:8px 11px;background:rgba(255,209,102,.03);margin-top:10px;border-radius:6px}@media(max-width:650px){.feasibility-visual{grid-template-columns:repeat(2,minmax(0,1fr))}.fv-dimensions{grid-template-columns:1fr}}.workflow-hint{color:var(--muted);font-size:12px;margin:-3px 0 12px}.workflow-panel{scroll-margin-top:16px}.grid{align-items:start}.grid>.panel{min-width:0}.grid>.panel:nth-child(4),.grid>.panel:nth-child(5),.grid>.panel:nth-child(6){align-self:stretch}.grid>.panel:nth-child(4){grid-column:1}.grid>.panel:nth-child(5){grid-column:2}.grid>.panel:nth-child(6){grid-column:3}.grid>.panel:nth-child(7),.grid>.panel:nth-child(8){grid-column:1/-1}.signal-panel{overflow:hidden}.signal-legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin:0 0 12px}.signal-legend span{display:flex;align-items:center;gap:6px}.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block}.twin-dot{background:#65d9ff}.worker-dot{background:#58e39b}.evidence-dot{background:#ffd166}.signal-office{position:relative;display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,1.5fr) minmax(120px,1fr);gap:12px;align-items:center;min-height:180px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);isolation:isolate}.signal-lane{display:flex;flex-direction:column;gap:10px;z-index:2;min-width:0}.signal-node{position:relative;padding:10px;border:1px solid var(--line);border-radius:10px;background:rgba(10,18,33,.94);min-width:0;transition:border-color .2s}.signal-node strong{display:block;font-size:13px;overflow-wrap:anywhere}.signal-node small{display:block;color:var(--muted);font-size:12px;margin-top:3px;overflow-wrap:anywhere}.signal-node.is-active{border-color:var(--accent)}.signal-node.is-running{border-color:var(--good)}.signal-node.is-blocked{border-color:var(--warn);border-left-width:3px}.signal-node.is-queued{border-style:dashed;opacity:.82}.signal-core{width:100%;text-align:center;border-color:var(--line);background:var(--panel2);padding:14px 10px}.signal-core strong{font-size:14px}.signal-lines{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}.signal-lines path{fill:none;stroke:#365475;stroke-width:1.4;stroke-dasharray:5 7;opacity:.5}@media(max-width:700px){.signal-office{grid-template-columns:1fr;min-height:0;padding:10px}.signal-lines{opacity:.2}.signal-lane{gap:7px}.signal-core{order:0}}.twin-chat-log{height:230px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:10px;background:rgba(4,10,20,.35);border:1px solid var(--line);border-radius:10px}.twin-bubble{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.twin-bubble.user{align-self:flex-end;background:#15344b}.twin-bubble.assistant{align-self:flex-start;background:#152238}.twin-bubble .bubble-meta{font-size:10px;color:var(--muted);margin-bottom:4px}.twin-chat-compose{display:flex;gap:8px}.twin-chat-compose input{flex:1;min-width:0}.twin-chat-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.voice-note{font-size:11px;color:var(--muted)}.twin-chat-launch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.twin-chat-mini{min-height:30px;padding:0 10px;font-size:11px}.twin-chat-close{background:#1b2742;color:var(--text);border:1px solid var(--line)}#twinChatContent[hidden]{display:none}@media(max-width:720px){.twin-chat-log{height:200px}.twin-chat-compose{flex-wrap:wrap}.twin-chat-compose input{flex-basis:100%}}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0,#1a2c52 0,#080d18 40%);color:var(--text);font:15px/1.6 Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:1480px;margin:auto;padding:24px;display:flex;flex-direction:column}.app>.top{order:0}#identityIntro{order:1}#goalPanel{order:2}#journeyPanel{order:3}#journeyPanel{order:3}#feasibilityPanel{order:4}#twinChatPanel{order:5}.signal-panel{order:6}#advancedDiagnostics{order:7}#supportingTools{order:8}.footer{order:9}#journeyPanel>#feasibilityPanel{margin-top:12px!important;box-shadow:none;background:rgba(8,14,25,.45)}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.brand{font-size:21px;font-weight:850;letter-spacing:.07em}.tagline{margin-top:4px;color:var(--muted)}.status{color:var(--accent);font:12px ui-monospace,monospace}.panel{background:rgba(16,24,39,.93);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 35px rgba(0,0,0,.18)}.wide{grid-column:1/-1}.grid{display:grid;grid-template-columns:1.05fr 1.55fr 1.05fr;gap:14px;margin-top:14px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px;font-weight:800}.sub{color:var(--muted);font-size:12px}.input{display:flex;gap:8px}.input input{flex:1;background:#0a1221;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:12px}.btn{background:var(--accent);color:#06101a;border:0;border-radius:9px;padding:0 17px;font-weight:850;cursor:pointer}.btn:disabled{opacity:.45}.hero{display:grid;grid-template-columns:1fr 1fr;gap:14px}.kicker{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.big{font-size:19px;font-weight:850;margin:5px 0}.kv{display:grid;grid-template-columns:88px 1fr;gap:6px;margin:8px 0}.kv b{color:var(--muted);font-size:12px}.kv div{font-size:13px}.flow{display:flex;gap:0;align-items:stretch;flex-wrap:nowrap;overflow-x:auto;padding:4px 0}.flow::-webkit-scrollbar{height:4px}.flow::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}.node{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:0;font-size:13px;color:var(--muted);transition:all .2s;white-space:nowrap;background:#0b1323;position:relative;min-width:100px;justify-content:center}.node:first-child{border-radius:8px 0 0 8px}.node:last-child{border-radius:0 8px 8px 0}.node.active{border-color:var(--accent);color:var(--text);box-shadow:0 0 0 1px rgba(101,217,255,.12),inset 0 0 0 1px rgba(101,217,255,.06)}.node.active::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);border-radius:8px 8px 0 0}.node.done{border-color:rgba(88,227,155,.55);color:var(--good)}.node.done::before{content:"✓";position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--good);background:#0b1323;padding:0 4px}.node.blocked{border-color:rgba(255,209,102,.75);color:var(--warn)}.node.blocked::before{content:"✗";position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--warn);background:#0b1323;padding:0 4px}.node .node-status{font-size:10px;opacity:.7}.arrow{color:#365475;font-size:16px;padding:0 2px;flex-shrink:0}.agents{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.agent{padding:12px;border:1px solid var(--line);border-radius:10px;background:#0b1323;cursor:pointer}.agent.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(101,217,255,.2)}.agent.completed{border-color:rgba(88,227,155,.72)}.agent.blocked{border-color:rgba(255,209,102,.72)}.agent.running,.agent.in_progress,.agent.working{border-color:var(--accent);box-shadow:0 0 14px rgba(101,217,255,.13)}.agent.queued,.agent.ready{border-style:dashed}.agent .pill.blocked{color:var(--warn)}.agent .pill.completed{color:var(--good)}.agent-head{display:flex;justify-content:space-between;font-weight:750}.pill{font-size:11px;padding:2px 7px;border-radius:999px;background:#1b2742;color:var(--muted)}.running{color:var(--accent)}.completed{color:var(--good)}.bar{height:4px;background:#202b45;border-radius:4px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}.evidence{max-height:260px;overflow:auto}.conversation{max-height:280px;overflow-y:auto;overscroll-behavior:contain;padding:4px 6px 4px 0;scrollbar-width:thin;scrollbar-color:#38516f transparent}.chat-msg{width:fit-content;max-width:88%;padding:10px 12px;margin:9px 0;border:1px solid var(--line);border-radius:13px;background:#0b1323;overflow-wrap:anywhere;white-space:pre-wrap;box-shadow:0 3px 12px rgba(0,0,0,.12)}.chat-msg.user{margin-left:auto;border-color:rgba(101,217,255,.42);border-radius:13px 13px 3px 13px;background:rgba(22,57,79,.72)}.chat-msg.worker{margin-right:auto;border-color:rgba(88,227,155,.35);border-radius:13px 13px 13px 3px;background:rgba(14,40,38,.62)}.chat-msg.meta{max-width:100%;width:100%;padding:6px 9px;margin:6px 0;border-style:dashed;border-color:rgba(255,209,102,.32);border-radius:8px;background:rgba(39,34,22,.3);color:var(--muted)}.chat-label{font-size:11px;color:var(--muted);margin-bottom:5px}.chat-body{font-size:13px;line-height:1.6;overflow-wrap:anywhere}.chat-body.clamped{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}.chat-actions{display:flex;justify-content:flex-end;margin-top:5px}.chat-actions button{background:transparent;color:var(--accent);border:0;cursor:pointer;font-size:12px}.detail-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ev{padding:9px 0;border-bottom:1px solid #202a42}.confidence{color:var(--good);font:12px ui-monospace,monospace}.decision{border-left:3px solid var(--good);padding-left:12px}.decision h2{margin:0 0 4px;color:var(--good)}.risk{color:var(--warn);margin:5px 0}.outcome{border:1px solid #2a4860;background:#0b1726;border-radius:10px;padding:12px}.footer{margin-top:14px;color:var(--muted);font-size:11px;text-align:center}@media(max-width:1000px){.grid,.hero{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:600px){.agents{grid-template-columns:1fr}.app{padding:12px}.input{flex-direction:column;align-items:stretch}.input>input,.input>.btn{width:100%;min-width:0;max-width:100%;box-sizing:border-box}.btn{height:auto;min-height:42px;white-space:normal;overflow-wrap:anywhere}.grid>.panel,.grid>.panel:nth-child(n){grid-column:1/-1!important;min-width:0;width:100%;box-sizing:border-box}.panel,.section-title,.section-title>*{min-width:0;max-width:100%;overflow-wrap:anywhere}.section-title{flex-wrap:wrap;align-items:flex-start;gap:8px}.section-title>span,.section-title>div{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.status,.sub,.agent,.worker,.metric,.fv-card,.fv-dimension{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}.flow,.signal-panel,.twin-chat-log{min-width:0;max-width:100%;overflow-x:hidden}.feasibility-visual{grid-template-columns:repeat(2,minmax(0,1fr))}.run-inline-status{display:block;width:100%;font-size:12px;line-height:1.5;white-space:normal}.twin-chat-compose{display:grid;grid-template-columns:minmax(0,1fr) auto}.twin-chat-compose input{min-width:0;width:100%;box-sizing:border-box}.signal-legend{gap:8px}.signal-legend span{min-width:0;overflow-wrap:anywhere}}
+.feasibility-visual{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0}.fv-card{border:1px solid var(--line);background:#0b1323;border-radius:10px;padding:11px;min-width:0}.fv-label{font-size:10px;color:var(--muted)}.fv-value{font-size:18px;font-weight:850;margin-top:4px;overflow-wrap:anywhere}.fv-track{height:6px;border-radius:99px;background:#263650;overflow:hidden;margin:7px 0 4px}.fv-track i{display:block;height:100%;background:var(--accent)}.fv-dimensions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}.fv-dimension{border:1px solid var(--line);border-radius:9px;padding:9px}.fv-dimension details{margin-top:7px}.fv-dimension summary,.content-fold summary{cursor:pointer;color:var(--accent);font-size:12px}.content-fold{margin-top:10px;border:1px solid var(--line);border-radius:9px;padding:10px;background:rgba(11,19,35,.55)}.content-fold summary{font-weight:750}.content-fold[open] summary{margin-bottom:8px}.summary-copy{line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}.fv-dimension-head{display:flex;justify-content:space-between;gap:8px;font-size:11px}.fv-note{color:var(--muted);font-size:12px;margin-top:10px}.fv-note{color:var(--muted);font-size:12px;margin-top:10px}.fv-blockers{border:1px solid var(--line);border-left:3px solid var(--warn);padding:8px 11px;background:rgba(255,209,102,.03);margin-top:10px;border-radius:6px}@media(max-width:650px){.feasibility-visual{grid-template-columns:repeat(2,minmax(0,1fr))}.fv-dimensions{grid-template-columns:1fr}.status-summary{grid-template-columns:1fr}}.workflow-hint{color:var(--muted);font-size:12px;margin:-3px 0 12px}.workflow-panel{scroll-margin-top:16px}.grid{align-items:start}.grid>.panel{min-width:0}.grid>.panel:nth-child(4),.grid>.panel:nth-child(5),.grid>.panel:nth-child(6){align-self:stretch}.grid>.panel:nth-child(4){grid-column:1}.grid>.panel:nth-child(5){grid-column:2}.grid>.panel:nth-child(6){grid-column:3}.grid>.panel:nth-child(7),.grid>.panel:nth-child(8){grid-column:1/-1}.signal-panel{overflow:hidden}.signal-legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin:0 0 12px}.signal-legend span{display:flex;align-items:center;gap:6px}.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block}.twin-dot{background:#65d9ff}.worker-dot{background:#58e39b}.evidence-dot{background:#ffd166}.signal-office{position:relative;display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,1.5fr) minmax(120px,1fr);gap:12px;align-items:center;min-height:180px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);isolation:isolate}.signal-lane{display:flex;flex-direction:column;gap:10px;z-index:2;min-width:0}.signal-node{position:relative;padding:10px;border:1px solid var(--line);border-radius:10px;background:rgba(10,18,33,.94);min-width:0;transition:border-color .2s}.signal-node strong{display:block;font-size:13px;overflow-wrap:anywhere}.signal-node small{display:block;color:var(--muted);font-size:12px;margin-top:3px;overflow-wrap:anywhere}.signal-node.is-active{border-color:var(--accent)}.signal-node.is-running{border-color:var(--good)}.signal-node.is-blocked{border-color:var(--warn);border-left-width:3px}.signal-node.is-queued{border-style:dashed;opacity:.82}.signal-core{width:100%;text-align:center;border-color:var(--line);background:var(--panel2);padding:14px 10px}.signal-core strong{font-size:14px}.signal-lines{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}.signal-lines path{fill:none;stroke:#365475;stroke-width:1.4;stroke-dasharray:5 7;opacity:.5}@media(max-width:700px){.signal-office{grid-template-columns:1fr;min-height:0;padding:10px}.signal-lines{opacity:.2}.signal-lane{gap:7px}.signal-core{order:0}}.twin-chat-log{height:230px;overflow:auto;display:flex;flex-direction:column;gap:9px;padding:10px;background:rgba(4,10,20,.35);border:1px solid var(--line);border-radius:10px}.twin-bubble{max-width:88%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.twin-bubble.user{align-self:flex-end;background:#15344b}.twin-bubble.assistant{align-self:flex-start;background:#152238}.twin-bubble .bubble-meta{font-size:10px;color:var(--muted);margin-bottom:4px}.twin-chat-compose{display:flex;gap:8px}.twin-chat-compose input{flex:1;min-width:0}.twin-chat-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.voice-note{font-size:11px;color:var(--muted)}.twin-chat-launch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.twin-chat-mini{min-height:30px;padding:0 10px;font-size:11px}.twin-chat-close{background:#1b2742;color:var(--text);border:1px solid var(--line)}#twinChatContent[hidden]{display:none}@media(max-width:720px){.twin-chat-log{height:200px}.twin-chat-compose{flex-wrap:wrap}.twin-chat-compose input{flex-basis:100%}}
 /* Mobile layout hardening: prevent narrow-screen overflow and keep the status animation stable. */
 @media(max-width:700px){
  body{font-size:15px;background:#080d18}
@@ -25,7 +25,7 @@
  .input{display:flex;flex-direction:column;align-items:stretch;min-width:0}
  .input input,.input .btn,.input button{width:100%;min-width:0;min-height:42px}
  .btn{min-height:42px;padding:9px 12px;white-space:normal;line-height:1.3}
- .flow{gap:5px}
+ .flow{gap:0;padding:2px 0}.node{font-size:11px;padding:6px 10px;min-width:80px}
  .node{font-size:12px;padding:6px 8px}
  .signal-office{grid-template-columns:minmax(0,1fr);gap:8px;padding:10px;min-height:0}
  .signal-lane{gap:7px}
@@ -111,6 +111,69 @@
 .decision-summary-foot{font-size:12px;color:var(--muted);margin-top:9px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
 .decision-summary-empty{font-size:13px;color:var(--muted);line-height:1.6}
 
+/* Primary decision card — the single most important element on the page */
+.primary-decision{border:2px solid var(--line);border-radius:14px;padding:16px;background:linear-gradient(145deg,rgba(17,37,57,.95),rgba(16,24,39,.93));margin-top:12px;cursor:pointer;transition:border-color .3s,box-shadow .3s}
+.primary-decision:hover{box-shadow:0 0 0 1px rgba(101,217,255,.15)}
+.primary-decision.good{border-color:var(--good)}.primary-decision.warn{border-color:var(--warn)}.primary-decision.bad{border-color:#ff8585}.primary-decision.neutral{border-color:var(--line)}
+.primary-decision-label{font-size:10px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.primary-decision-title{font-size:20px;font-weight:850;margin:0 0 8px;color:var(--text)}
+.primary-decision-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.primary-decision-meta span{font-size:12px;color:var(--muted)}
+.primary-decision-meta b{color:var(--text)}
+.primary-decision-body{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.primary-decision-foot{font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+
+/* Decision ring — progressive disclosure: color + confidence → expand details */
+.decision-ring-wrap{display:flex;align-items:center;gap:18px;margin-bottom:8px}
+.decision-ring{position:relative;width:72px;height:72px;flex-shrink:0}
+.decision-ring svg{width:72px;height:72px;transform:rotate(-90deg)}
+.decision-ring .ring-bg{fill:none;stroke:var(--line);stroke-width:5}
+.decision-ring .ring-fill{fill:none;stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+.decision-ring .ring-fill.good{stroke:var(--good)}.decision-ring .ring-fill.warn{stroke:var(--warn)}.decision-ring .ring-fill.bad{stroke:#ff8585}.decision-ring .ring-fill.neutral{stroke:var(--line)}
+.decision-ring .ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:850;color:var(--text)}
+.decision-ring-hint{font-size:11px;color:var(--muted);margin-top:2px}
+.decision-ring-detail{display:none;margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.primary-decision.expanded .decision-ring-detail{display:block}
+.primary-decision.expanded .decision-ring-hint{display:none}
+.decision-ring-hint::after{content:' · 点击展开详情';font-style:italic}
+.primary-decision.expanded .decision-ring-hint::after{content:' · 点击收起详情'}
+
+/* HOLD action buttons — structured choices */
+.hold-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.hold-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border:1px solid var(--line);border-radius:8px;background:rgba(11,19,35,.7);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s}
+.hold-btn:hover{background:var(--accent);color:#0a0f1a;border-color:var(--accent)}
+.hold-btn .icon{font-size:14px}
+.hold-btn-desc{font-size:10px;color:var(--muted);display:block;margin-top:2px}
+.hold-btn:hover .hold-btn-desc{color:rgba(10,15,26,.7)}
+
+/* Status summary — 3 compact data cards */
+.status-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.status-card{border:1px solid var(--line);border-radius:10px;padding:12px;background:rgba(11,19,35,.6);text-align:center}
+.status-card-label{font-size:11px;color:var(--muted);margin-bottom:6px}
+.status-card-value{font-size:16px;font-weight:850;margin-bottom:4px}
+.status-card-value.good{color:var(--good)}.status-card-value.warn{color:var(--warn)}.status-card-value.accent{color:var(--accent)}
+.status-card-note{font-size:11px;color:var(--muted)}
+
+/* Compact evidence summary bar */
+.evidence-summary{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(11,19,35,.4)}
+.evidence-summary-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.evidence-chip{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.evidence-chip b{color:var(--text);font-weight:700}
+
+/* Evidence stamp row — visual trust signal per source */
+.evidence-stamp-row{display:flex;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid rgba(255,255,255,.05)}
+.evidence-stamp{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);background:rgba(11,19,35,.6)}
+.evidence-stamp.reliable{border-color:rgba(88,227,155,.4);color:var(--good)}
+.evidence-stamp.questionable{border-color:rgba(255,209,102,.4);color:var(--warn)}
+.evidence-stamp.unreliable{border-color:rgba(255,133,133,.4);color:#ff8585}
+.evidence-stamp .stamp-icon{font-size:12px}
+
+/* Simplified signal bar — no more complex grid */
+.signal-bar{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.signal-bar-item{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(11,19,35,.5);font-size:12px}
+.signal-bar-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.signal-bar-dot.twin{background:var(--accent)}.signal-bar-dot.worker{background:var(--good)}.signal-bar-dot.evidence{background:var(--warn)}.signal-bar-dot.idle{background:#51617f}
+
 /* Compact evidence display: truncate URLs, collapse per-source details */
 .evidence-url{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 .evidence-url:hover{text-overflow:clip;overflow:visible;white-space:normal;max-width:none;position:relative;z-index:2;background:var(--panel);padding:3px 6px;border-radius:5px}
@@ -140,17 +203,45 @@
 .workflow-body.clamped{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .workflow-expand{font-size:12px;color:var(--accent);cursor:pointer;margin-top:4px;background:0;border:0;padding:0}
 .workflow-expand:hover{text-decoration:underline}
+/* Stage summary panel */
+.node.filter-active{border-color:var(--warn)!important;box-shadow:0 0 0 1px rgba(255,209,102,.25);color:var(--text)}
+.node{cursor:pointer}
+.stage-summary-panel{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:rgba(11,19,35,.6)}
+.stage-summary-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px}
+.stage-summary-row{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.stage-summary-row span:first-child{color:var(--muted)}
+.stage-summary-row span:last-child{color:var(--text);font-weight:600}
+/* Trust badges for timeline events */
+.trust-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:1px 5px;border-radius:999px;margin-left:6px;white-space:nowrap}
+.trust-badge.simulated{background:rgba(255,209,102,.15);color:var(--warn);border:1px solid rgba(255,209,102,.3)}
+.trust-badge.real{background:rgba(88,227,155,.12);color:var(--good);border:1px solid rgba(88,227,155,.3)}
+.trust-badge.pending{background:rgba(255,209,102,.08);color:#c9a84c;border:1px solid rgba(255,209,102,.2)}
+.trust-badge.no-source{background:rgba(81,97,127,.15);color:#7a8fa8;border:1px solid rgba(81,97,127,.3)}
+/* Twin decision quality indicator */
+.decision-quality{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:rgba(11,19,35,.4)}
+.dq-item{font-size:11px;padding:3px 7px;border-radius:999px;border:1px solid var(--line)}
+.dq-item.ok{color:var(--good);border-color:rgba(88,227,155,.3)}
+.dq-item.warn{color:var(--warn);border-color:rgba(255,209,102,.3)}
+.dq-item.bad{color:#ff8585;border-color:rgba(255,133,133,.3)}
+/* Quick query buttons for Twin Chat */
+.quick-queries{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.quick-query-btn{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(11,19,35,.6);color:var(--muted);cursor:pointer;transition:all .15s;white-space:normal}
+.quick-query-btn:hover{background:var(--accent);color:#0a0f1a;border-color:var(--accent)}
 </style>
 </head>
 <body><div class="app">
 <div class="top"><div><div class="brand">JARVIS · DIGITAL WORKFORCE</div><div class="tagline">Your Digital Twin. Your AI Workforce. Your Business Execution.</div></div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input id="adminToken" type="password" autocomplete="off" placeholder="管理员 Token（认证模式）" aria-label="管理员 Token" style="max-width:220px;background:#0a1221;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px"><label style="display:flex;align-items:center;gap:5px;color:var(--muted);font-size:11px;white-space:nowrap"><input id="rememberToken" type="checkbox" checked>在此设备记住</label><div id="status" class="status">IDLE</div></div></div>
 
-<div class="panel wide" id="identityIntro">
- <div class="hero">
-  <div><div class="kicker">01 · DIGITAL TWIN</div><div class="big">我的数字分身负责“我想做什么”</div><div class="sub">它代表业务目标、判断标准、授权边界与最终决策，而不是一个普通 Agent。</div></div>
-  <div><div class="kicker">02 · DIGITAL WORKFORCE</div><div class="big">数字员工负责“谁来把它做成”</div><div class="sub">Digital Twin 根据业务目标动态组建、分工和管理 Workers。</div></div>
+<details class="panel wide" id="identityIntro" style="padding:10px 16px;margin-top:0">
+<summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--accent);padding:0 0 4px">系统架构概览（点击折叠）</summary>
+ <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-top:8px">
+ <div style="display:flex;align-items:center;gap:8px"><span class="legend-dot twin-dot"></span><span style="font-size:13px;font-weight:700">数字分身</span><span style="font-size:12px;color:var(--muted)">· 目标、决策、调度</span></div>
+ <span style="color:#51617f">→</span>
+ <div style="display:flex;align-items:center;gap:8px"><span class="legend-dot worker-dot"></span><span style="font-size:13px;font-weight:700">数字员工</span><span style="font-size:12px;color:var(--muted)">· 执行、调研、反馈</span></div>
+ <span style="color:#51617f">→</span>
+ <div style="display:flex;align-items:center;gap:8px"><span class="legend-dot evidence-dot"></span><span style="font-size:13px;font-weight:700">证据与决策</span><span style="font-size:12px;color:var(--muted)">· 门禁、验收、结论</span></div>
  </div>
-</div>
+</details>
 
 <div class="panel wide" id="goalPanel" style="margin-top:14px">
  <div class="section-title"><span>Business Goal · 让数字分身替我完成什么业务</span><span class="sub">Natural Language</span></div>
@@ -203,7 +294,7 @@
     await new Promise(resolve=>setTimeout(resolve,1500));
    }
    if(lastState&&["planning","team","research","design","evaluation"].includes(lastState.phase)){
-    const stuck="本轮仍处于「"+lastState.phase+"」阶段，暂未返回最终结果。主页会继续显示可读取到的状态；请展开“流程记录”查看最后事件、员工反馈和调研来源。若阶段与事件长时间均无变化，说明后台执行可能卡住，不能视为完成。";
+    const stuck="本轮仍处于「"+lastState.phase+"」阶段，暂未返回最终结果。主页会继续显示可读取到的状态；请展开流程记录查看最后事件、员工反馈和调研来源。若阶段与事件长时间均无变化，说明后台执行可能卡住，不能视为完成。";
     if(hint)hint.textContent=stuck;
     if(status)status.textContent="任务疑似停滞 · "+lastState.phase;
    }else if(hint)hint.textContent="已读取本轮任务状态。员工输出和事件已更新到本页。";
@@ -217,10 +308,70 @@
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>首页 · 本轮任务执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div>
- <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、玩法方案、阻塞原因和验收结论。独立流程页已合并，不需要切换页面。</div>
+ <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、玩法方案、阻塞原因和验收结论。</div>
  <div id="flow" class="flow"></div>
- <div id="runProgressSummary" class="sub" style="margin-top:10px"><span id="runProgressText">尚未启动。启动后，本区域会显示真实运行阶段与状态。</span></div>
- <div id="decisionSummary" class="outcome" style="margin-top:10px"><strong>当前结论</strong><div id="decisionSummaryText" class="sub" style="margin-top:5px">等待本轮真实证据与员工输出；未完成验证前不自动判定 GO。</div></div>
+
+ <!-- Primary decision card — the single most important element -->
+ <div id="primaryDecision" class="primary-decision neutral" style="display:none" onclick="this.classList.toggle('expanded')">
+  <div class="primary-decision-label">本轮建议</div>
+  <div class="decision-ring-wrap">
+   <div class="decision-ring">
+    <svg viewBox="0 0 72 72">
+     <circle class="ring-bg" cx="36" cy="36" r="31"/>
+     <circle id="decisionRingFill" class="ring-fill neutral" cx="36" cy="36" r="31"
+      stroke-dasharray="194.78" stroke-dashoffset="194.78"/>
+    </svg>
+    <div id="decisionRingCenter" class="ring-center">—</div>
+   </div>
+   <div>
+    <div id="primaryDecisionTitle" class="primary-decision-title" style="margin:0">等待决策</div>
+    <div id="decisionRingHint" class="decision-ring-hint">点击展开详情</div>
+   </div>
+  </div>
+  <div id="primaryDecisionMeta" class="primary-decision-meta"></div>
+  <div id="primaryDecisionBody" class="primary-decision-body"></div>
+  <div id="holdActions" class="hold-actions" style="display:none"></div>
+  <!-- 分身决策质量：核验/推进/卡住 三个维度 -->
+  <div id="decisionQuality" class="decision-quality" style="display:none"></div>
+  <div class="decision-ring-detail">
+   <div id="primaryDecisionFoot" class="primary-decision-foot"></div>
+  </div>
+ </div>
+
+ <!-- Status summary — 3 compact data cards -->
+ <div id="statusSummary" class="status-summary" style="display:none">
+  <div class="status-card">
+   <div class="status-card-label">员工执行</div>
+   <div id="statusWorkerValue" class="status-card-value accent">0/0</div>
+   <div id="statusWorkerNote" class="status-card-note">等待启动</div>
+  </div>
+  <div class="status-card">
+   <div class="status-card-label">调研证据</div>
+   <div id="statusResearchValue" class="status-card-value accent">0 来源</div>
+   <div id="statusResearchNote" class="status-card-note">等待启动</div>
+  </div>
+  <div class="status-card">
+   <div class="status-card-label">验收状态</div>
+   <div id="statusFeasValue" class="status-card-value accent">等待验收</div>
+   <div id="statusFeasNote" class="status-card-note">等待启动</div>
+  </div>
+ </div>
+
+ <!-- Evidence summary bar — hybrid: summary + stamp row -->
+ <div id="evidenceSummaryBar" class="evidence-summary" style="display:none">
+  <div class="evidence-summary-bar">
+   <div class="evidence-chip">来源 <b id="evSourceCount">0</b></div>
+   <div class="evidence-chip">门禁通过 <b id="evAcceptedCount">0</b></div>
+   <div class="evidence-chip">原始用户评价 <b id="evUserCount">0</b></div>
+   <div class="evidence-chip">独立来源 <b id="evIndependentCount">0</b></div>
+  </div>
+  <div id="evStampRow" class="evidence-stamp-row"></div>
+ </div>
+
+ <!-- Stage summary panel (shown when a flow node is clicked) -->
+ <div id="stageSummaryPanel" class="stage-summary-panel" style="display:none;margin-top:10px"></div>
+
+ <!-- Workflow timeline -->
  <section id="workflowTimeline" class="panel" style="margin-top:12px;padding:12px;background:rgba(8,15,27,.72);display:none">
   <div class="section-title"><span>分身 ↔ 员工 · 工作流时间线</span><span id="timelineCount" class="status">0 条事件</span></div>
   <div class="sub" style="margin:-4px 0 8px">按时间顺序展示数字分身的调度决策和员工的执行反馈。点击事件可展开查看详情。</div>
@@ -228,16 +379,29 @@
    <div class="sub">启动任务后，这里会显示真实的工作流事件。</div>
   </div>
  </section>
- <section id="explainableReport" class="panel" style="margin-top:12px;padding:12px;background:rgba(8,15,27,.72)" aria-live="polite">
-  <div class="section-title"><span>数字分身结果汇报</span><span id="reportAdoption" class="status">等待任务</span></div>
-  <div class="report-grid">
-   <article class="report-section"><h3>1. 结论</h3><div id="reportConclusion" class="summary-copy">等待本轮任务数据。</div></article>
-   <details class="report-section"><summary>2. 推导过程与证据追溯</summary><div id="reportDerivation" class="summary-copy"></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><h3 style="font-size:13px;margin:0 0 7px;color:var(--accent)">证据追溯</h3><div id="reportEvidence" class="summary-copy"></div></details>
-   <article class="report-section"><h3>3. 客观性与反证</h3><div id="reportObjectivity" class="summary-copy"></div></article>
-   <details class="report-section"><summary>4. 采纳建议与验收状态</summary><div id="reportAdvice" class="summary-copy"></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><h3 style="font-size:13px;margin:0 0 7px;color:var(--accent)">验收状态</h3><div id="reportAcceptance" class="summary-copy"></div></details>
+
+ <!-- Simplified signal bar -->
+ <div id="signalBar" class="signal-bar" style="display:none">
+  <div class="signal-bar-item"><span class="signal-bar-dot twin"></span><span id="signalTwinStatus">等待启动</span></div>
+  <div class="signal-bar-item"><span class="signal-bar-dot worker"></span><span id="signalWorkerStatus">等待启动</span></div>
+  <div class="signal-bar-item"><span class="signal-bar-dot evidence"></span><span id="signalResearchStatus">等待启动</span></div>
+  <div class="signal-bar-item"><span class="signal-bar-dot idle"></span><span id="signalFeasStatus">等待启动</span></div>
+ </div>
+
+ <!-- Detailed report (expandable) -->
+ <details id="explainableReport" class="panel" style="margin-top:12px;padding:12px;background:rgba(8,15,27,.72)">
+  <summary style="cursor:pointer;font-weight:700;font-size:13px;color:var(--accent)">展开详细汇报与证据追溯</summary>
+  <div style="margin-top:10px">
+   <div class="section-title"><span>数字分身结果汇报</span><span id="reportAdoption" class="status">等待任务</span></div>
+   <div class="report-grid">
+    <article class="report-section" open><h3>1. 结论</h3><div id="reportConclusion" class="summary-copy">等待本轮任务数据。</div></article>
+    <details class="report-section" open><summary>2. 推导过程与证据追溯</summary><div id="reportDerivation" class="summary-copy"></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><h3 style="font-size:13px;margin:0 0 7px;color:var(--accent)">证据追溯</h3><div id="reportEvidence" class="summary-copy"></div></details>
+    <article class="report-section"><h3>3. 客观性与反证</h3><div id="reportObjectivity" class="summary-copy"></div></article>
+    <details class="report-section"><summary>4. 采纳建议与验收状态</summary><div id="reportAdvice" class="summary-copy"></div><div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px"><h3 style="font-size:13px;margin:0 0 7px;color:var(--accent)">验收状态</h3><div id="reportAcceptance" class="summary-copy"></div></details>
+   </div>
+   <div class="fv-note">数据口径：内容来自当前运行状态与后端评估字段。来源链接/模型置信度本身不证明事实；未执行的验证会标为未测试。</div>
   </div>
-  <div class="fv-note">数据口径：内容来自当前运行状态与后端评估字段。来源链接/模型置信度本身不证明事实；未执行的验证会标为未测试。</div>
- </section>
+ </details>
  <style>
  .report-grid{display:grid;grid-template-columns:1fr;gap:10px}
  .report-section{min-width:0;border:1px solid var(--line);border-radius:10px;padding:11px;background:rgba(11,19,35,.72);max-height:200px;overflow:auto;scrollbar-width:thin;scrollbar-color:#38516f transparent}
@@ -247,13 +411,10 @@
  .report-section[open]>summary{margin-bottom:8px}
  .report-section .summary-copy{font-size:13px;line-height:1.65;overflow-wrap:anywhere;word-break:normal}
  .report-list{margin:5px 0 0;padding-left:18px}.report-list li{margin:4px 0;overflow-wrap:anywhere}
- .report-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 7px;margin:2px 4px 2px 0;font-size:11px;color:var(--muted);cursor:pointer;transition:all .15s}.report-chip:hover{background:var(--accent);color:#0a0f1a;border-color:var(--accent)}.report-chip.active{background:var(--accent);color:#0a0f1a;border-color:var(--accent)}
+ .report-chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 7px;margin:2px 4px 2px 0;font-size:11px;color:var(--muted);cursor:pointer;transition:all .15s}.report-chip:hover{background:var(--accent);color:#0a0f1a;border-color:var(--accent)}.report-chip.active{background:var(--accent);color:#0a0f1a;border-color:var(--accent);font-weight:700;border-bottom:2px solid var(--accent)}
  .report-section:first-child{max-height:none}
  @media(max-width:650px){#explainableReport{padding:10px!important}.report-section{padding:10px}.report-section h3{font-size:13px}.report-section .summary-copy{font-size:13px;line-height:1.6}}
  </style>
- <div class="signal-legend" style="margin-top:14px"><span><i class="legend-dot twin-dot"></i>数字分身：目标与调度</span><span><i class="legend-dot worker-dot"></i>数字员工：执行中</span><span><i class="legend-dot evidence-dot"></i>证据与反馈</span><span id="signalSummary" class="status">WAITING FOR RUN</span></div>
- <div id="signalOffice" class="signal-office" aria-label="首页中的数字分身、员工协作、调研、玩法与验收输出"></div>
- <div id="signalCaption" class="sub" style="margin-top:8px">以上内容来自本轮后端状态；缺失数据会明确显示“暂无输出/受阻”，不会用旧模板伪装成本轮结果。</div>
 </div>
 
 <div class="panel wide" style="margin-top:14px" id="feasibilityPanel">
@@ -269,11 +430,40 @@
  </details>
 </div>
 
+<!-- 数字分身对话：随时追问信任相关的问题（证据是否真实、员工是否真执行、分身是否推进） -->
+<div class="panel wide" id="twinChatPanel" style="margin-top:14px">
+ <div class="section-title"><span>数字分身对话 · 随时追问</span><div class="twin-chat-launch">
+  <button id="twinChatOpenText" class="btn twin-chat-mini" type="button">文字对话</button>
+  <button id="twinChatOpenVoice" class="btn twin-chat-mini twin-chat-close" type="button">语音对话</button>
+  <button id="twinChatClose" class="btn twin-chat-mini twin-chat-close" type="button" hidden>收起</button>
+ </div></div>
+ <div class="sub" style="margin-bottom:8px">可以直接问：证据是否真的抓取过、员工是否真的执行、分身是否在推进。回答只依据当前运行状态，不会编造。</div>
+ <div id="twinChatContent" hidden>
+  <div class="quick-queries">
+   <button class="quick-query-btn" type="button" data-q="请确认：本轮证据是否真的抓取过？哪些来源是真实抓取、哪些是模拟？">溯源：证据是否真的抓取过？</button>
+   <button class="quick-query-btn" type="button" data-q="请确认：每个员工是否真的有执行？是否有调用外部工具？哪些员工只是模拟？">员工是否真的有执行？</button>
+   <button class="quick-query-btn" type="button" data-q="请说明：Digital Twin 是否真的在核验结果并推进？有没有卡住或随便给结论？">分身有没有真的在推进？</button>
+   <button class="quick-query-btn" type="button" data-q="上一轮做了什么？请总结历史轮次的执行与结论。">上一轮做了什么？</button>
+  </div>
+  <div id="twinChatLog" class="twin-chat-log"></div>
+  <div class="twin-chat-compose">
+   <input id="twinChatInput" placeholder="输入你想追问的内容…" aria-label="数字分身对话输入">
+   <button id="twinChatSend" class="btn" type="button">发送</button>
+  </div>
+  <div class="twin-chat-actions">
+   <button id="twinChatMic" class="btn twin-chat-mini twin-chat-close" type="button">🎤 麦克风</button>
+   <label class="voice-note"><input id="twinChatSpeak" type="checkbox"> 回复时朗读</label>
+   <span id="twinChatStatus" class="voice-note"></span>
+   <span id="twinVoiceNote" class="voice-note"></span>
+  </div>
+ </div>
+</div>
+
 <details class="panel wide" id="advancedDiagnostics"><summary style="cursor:pointer;font-weight:800">流程记录与高级诊断 · 本轮动作、观点、来源与员工输入输出</summary><div class="sub" style="margin:6px 0 12px">按需展开查询本轮发生了什么：分身调度、员工任务与反馈、真实搜索来源、支持/反对观点、证据质量、决策依据和阻塞原因。此处是详细记录，不重复展示主页结论。</div><div class="panel wide" id="runHistoryPanel" style="margin-bottom:14px">
  <div class="section-title"><span>历史流程记录</span><button id="historyRefresh" class="btn" type="button">刷新记录</button></div>
  <div class="sub">已结束轮次会保存执行摘要、动作时间线、员工输入输出、搜索查询与来源、证据和决策。点击一轮查看详情；如需跨重新部署保留历史，请将 JARVIS_RUN_HISTORY_PATH 指向 Render 持久磁盘。</div>
  <div class="grid" style="margin-top:10px">
-  <div class="panel"><div id="historyList" class="sub">点击“刷新记录”读取历史记录。</div></div>
+  <div class="panel"><div id="historyList" class="sub">点击"刷新记录"读取历史记录。</div></div>
   <div class="panel"><div id="historyDetail" class="sub">选择一轮历史记录查看过程。</div></div>
  </div>
 </div>
@@ -326,7 +516,7 @@
 
 <div class="panel wide workflow-panel" id="knowledgePanel" style="margin-top:14px">
  <div class="section-title"><span>游戏玩法知识库 · Prior Research Memory</span><span id="knowledgeSummary" class="status">LOADING KNOWLEDGE…</span></div>
- <div class="workflow-hint">每轮启动先检索过往来源，再执行本轮新搜索；本轮新来源会去重后收录。知识库中的搜索摘要默认标记为“来源可追溯、内容未独立核验”，过期或矛盾信息不会自动当成事实。</div>
+ <div class="workflow-hint">每轮启动先检索过往来源，再执行本轮新搜索；本轮新来源会去重后收录。知识库中的搜索摘要默认标记为"来源可追溯、内容未独立核验"，过期或矛盾信息不会自动当成事实。</div>
  <div class="input"><input id="knowledgeQuery" value="AI 原生游戏 NPC 记忆 留存 成本" aria-label="知识库搜索"><button id="knowledgeSearch" class="btn">检索知识库</button></div>
  <div id="knowledgeResult" class="sub" style="margin-top:12px">启动研究后，这里会显示本轮复用的旧知识与收录情况。</div>
 </div>
@@ -353,23 +543,291 @@ function apiFetch(url,options={}){
  const headers=new Headers(options.headers||{});
  const token=document.getElementById("adminToken").value.trim();
  if(token)headers.set("Authorization","Bearer "+token);
- return fetch(url,{...options,headers,cache:"no-store"});
+ return fetch("http://localhost:8765"+url,{...options,headers,cache:"no-store"});
 }
 const phases=["planning","team","evaluation","decision","prototype"];
 const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Business Execution"};
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
 const expandedMessages=new Set();
 function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el)return;const id=el.dataset.messageId;const collapsed=el.classList.toggle("clamped");if(collapsed)expandedMessages.delete(id);else expandedMessages.add(id);const btn=el.parentElement.querySelector("button");if(btn)btn.textContent=collapsed?"展开全文":"收起内容";}
+ // Stage keyword mapping for timeline filtering（中英关键词 + 动态员工名）
+ const stageKeywords={
+  "目标":["goal","planning","intent","objective","目标","业务"],
+  "分身规划":["team","planning","assign","dispatch","规划","组建","派发","拆分","团队"],
+  "员工执行":["worker","agent","employee","execut","员工","执行","任务"],
+  "真实调研":["research","search","source","evidence","query","调研","搜索","来源","证据","抓取"],
+  "玩法假设":["design","concept","gameplay","creative","mechanic","玩法","创意","概念","假设"],
+  "可行性验收":["feasibility","evaluation","assess","gate","accept","验收","评估","可行性"],
+  "决策 / 原型":["decision","prototype","recommendation","verdict","决策","建议","原型","结论","hold","go"]
+ };
+ // 取出某个阶段使用的匹配词（含实际员工名），提升点选后的事件命中率。
+ function stageMatchers(stage){
+  const kw=(stageKeywords[stage]||[]).slice();
+  const agents=state&&Array.isArray(state.agents)?state.agents:[];
+  if(stage==="员工执行"){
+   agents.forEach(a=>{if(a&&a.worker)kw.push(String(a.worker));});
+  }
+  if(stage==="目标"&&state&&state.goal)kw.push(String(state.goal).slice(0,40));
+  return kw.map(k=>String(k).toLowerCase()).filter(Boolean);
+ }
+ // Track active stage filter
+ let activeStageFilter=null;
+ function filterTimelineByStage(stage){
+  activeStageFilter=stage;
+  const el=document.getElementById("timelineList");
+  if(!el)return;
+  if(!state)return;
+  const allEvents=state.conversation?state.conversation.slice(-30).reverse():[];
+  if(!stage){
+   // Reset: show all events
+   renderWorkflowTimeline(state);
+   const sp=document.getElementById("stageSummaryPanel");
+   if(sp){sp.innerHTML="";sp.style.display="none";}
+   return;
+  }
+  const kw=stageMatchers(stage);
+  const filtered=allEvents.filter(e=>{
+   const who=(e.from||"")+(e.to||"")+(e.worker||"")+(e.text||"");
+   return kw.some(k=>who.toLowerCase().includes(k));
+  });
+  const countEl=document.getElementById("timelineCount");
+  if(countEl)countEl.textContent=filtered.length+" / "+allEvents.length+" 条事件";
+  if(!filtered.length){
+   el.innerHTML='<div class="sub">该阶段暂无事件记录。</div>';
+   const sp=document.getElementById("stageSummaryPanel");
+   if(sp){sp.innerHTML="";sp.style.display="none";}
+   return;
+  }
+  // Render filtered events
+  el.innerHTML=filtered.map(function(e,i){
+   var who=e.from||"系统";var to=e.to||"系统";
+   var cls=who==="Digital Twin"||who==="AI CEO"?"twin":who.indexOf("Worker")===0?"worker":"system";
+   var time=e.at?new Date(Number(e.at)*1000).toLocaleString("zh-CN",{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):"未知时间";
+   var body=String(e.text||"").replace(/\s+/g," ").trim();
+   var short=body.length>200?body.slice(0,200)+"…":body;
+   var id="tw-"+i;
+   var expandBtn=body.length>200?'<button class="workflow-expand" onclick="var b=this;var bd=document.getElementById(\''+id+'\');if(bd.classList.contains(\'clamped\')){bd.classList.remove(\'clamped\');b.textContent=\'收起内容\';}else{bd.classList.add(\'clamped\');b.textContent=\'展开全文\';}">展开全文</button>':'';
+   // 信任徽章：根据事件文本推断来源真实性
+   var badgeClass="no-source",badgeText="⚫ 无来源";
+   var hasUrl=body.indexOf("http")>=0;
+   var isSimulated=body.indexOf("SIMULATION")>=0||body.indexOf("模拟")>=0;
+   var hasEvidence=body.indexOf("证据")>=0||body.indexOf("evidence")>=0||body.indexOf("来源")>=0;
+   if(isSimulated){badgeClass="simulated";badgeText="🔴 模拟";}
+   else if(hasUrl&&hasEvidence){badgeClass="real";badgeText="🟢 有来源";}
+   else if(hasUrl){badgeClass="pending";badgeText="🟡 仅链接";}
+   return '<div class="workflow-event '+cls+'"><div class="workflow-time">'+time+'</div><div class="workflow-from">'+esc(who)+' → '+esc(to)+' <span class="trust-badge '+badgeClass+'">'+badgeText+'</span></div><div id="'+id+'" class="workflow-body clamped">'+esc(short)+'</div>'+expandBtn+'</div>';
+  }).join("");
+  // Show stage summary
+  showStageSummary(stage);
+ }
+ function showStageSummary(stage){
+  const panel=document.getElementById("stageSummaryPanel");
+  if(!panel||!state)return;
+  const allEvents=state.conversation?state.conversation:[];
+  const kw=stageMatchers(stage);
+  const stageEvents=allEvents.filter(e=>{
+   const who=(e.from||"")+(e.to||"")+(e.worker||"")+(e.text||"");
+   return kw.some(k=>who.toLowerCase().includes(k));
+  });
+  const agents=Array.isArray(state.agents)?state.agents:[];
+  let html='<div class="stage-summary"><div class="stage-summary-title">阶段摘要：'+esc(stage)+'</div>';
+  // Worker info for execution stage
+  if(stage==="员工执行"){
+   const agentNames=agents.map(a=>String(a.worker||"")).filter(Boolean);
+   const stageWorkers=stageEvents.filter(e=>{
+    const who=String(e.from||"")+String(e.worker||"");
+    return who.indexOf("Worker")===0||agentNames.some(n=>n&&who.indexOf(n)>=0);
+   });
+   const simulated=stageWorkers.filter(e=>/SIMULATION|模拟/.test(String(e.text||"")));
+   const simAgents=agents.filter(a=>{const ex=a.execution||{};return ex.simulated===true||ex.mode==="simulation";});
+   const realAgents=agents.filter(a=>{const ex=a.execution||{};return Boolean(ex.mode)&&ex.mode!=="simulation"&&ex.simulated!==true;});
+   html+='<div class="stage-summary-row"><span>员工执行</span><span>真实执行 '+realAgents.length+' 名 · 模拟 '+simAgents.length+' 名</span></div>';
+   html+='<div class="stage-summary-row"><span>相关事件</span><span>'+stageWorkers.length+' 条（含模拟 '+simulated.length+'）</span></div>';
+   html+='<div class="stage-summary-row"><span>完成员工</span><span>'+agents.filter(a=>a.status==="completed").length+'/'+agents.length+'</span></div>';
+   html+='<div class="stage-summary-row"><span>阻塞员工</span><span>'+agents.filter(a=>["blocked","failed"].includes(a.status)).length+'</span></div>';
+  }
+  // Research info
+  if(stage==="真实调研"){
+   const sources=state.research?state.research.sources||[]:[];
+   const realSources=sources.filter(s=>s.simulated!==true);
+   const simSources=sources.filter(s=>s.simulated===true);
+   html+='<div class="stage-summary-row"><span>来源总数</span><span>'+sources.length+'（真实 '+realSources.length+' · 模拟 '+simSources.length+'）</span></div>';
+   html+='<div class="stage-summary-row"><span>调研状态</span><span>'+(state.research?state.research.status:"待开始")+'</span></div>';
+   html+='<div class="stage-summary-row"><span>门禁通过</span><span>'+(state.research?state.research.quality?state.research.quality.accepted:0:0)+'</span></div>';
+  }
+  // Decision info
+  if(stage==="决策 / 原型"){
+   const dec=state.decision||{};
+   html+='<div class="stage-summary-row"><span>建议</span><span>'+(dec.recommendation||"未生成")+'</span></div>';
+   html+='<div class="stage-summary-row"><span>置信度</span><span>'+(dec.confidence!=null?dec.confidence+"%":"未记录")+'</span></div>';
+   html+='<div class="stage-summary-row"><span>下一步</span><span>'+(dec.next_step||"未记录")+'</span></div>';
+  }
+  // General event count
+  html+='<div class="stage-summary-row"><span>阶段事件</span><span>'+stageEvents.length+' 条</span></div>';
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.style.display="";
+ }
+
 function render(){
  if(!state)return;
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
  document.getElementById("phase").textContent=labels[state.phase]||"IDLE";
+
+  // === Primary decision card — progressive three-color ring ===
+ const pd=document.getElementById("primaryDecision");
+ const pdTitle=document.getElementById("primaryDecisionTitle");
+ const pdMeta=document.getElementById("primaryDecisionMeta");
+ const pdBody=document.getElementById("primaryDecisionBody");
+ const pdFoot=document.getElementById("primaryDecisionFoot");
+ const ringFill=document.getElementById("decisionRingFill");
+ const ringCenter=document.getElementById("decisionRingCenter");
+ const holdActions=document.getElementById("holdActions");
+ const decisionPD=state.decision||{};
+ const CIRCUMFERENCE=2*Math.PI*31; // ~194.78
+ const rec=decisionPD.recommendation||"";
+ const map=[[/GO[_ -]?TO[_ -]?PROTOTYPE/,"建议进入原型验证","good"],[/HOLD[_ -]?FOR[_ -]?EVIDENCE|HOLD/,"暂缓：证据不足","warn"],[/NO[_ -]?GO|不建议继续/,"不建议继续投入","bad"]];
+ const matched=map.find(([p])=>p.test(rec));
+ const label=matched?matched[1]:(state.phase==="idle"?"等待决策":rec);
+ const cls=matched?matched[2]:"neutral";
+ pd.style.display="";
+ pd.className="primary-decision "+cls;
+ pdTitle.textContent=label;
+
+ // Ring: confidence → dash offset
+ const conf=Number.isFinite(decisionPD.confidence)?Number(decisionPD.confidence):0;
+ const offset=CIRCUMFERENCE*(1-conf/100);
+ ringFill.style.strokeDasharray=CIRCUMFERENCE;
+ ringFill.style.strokeDashoffset=offset;
+ ringFill.className="ring-fill "+cls;
+ ringCenter.textContent=state.phase==="idle"?"—":conf+"%";
+
+ // Meta
+ const metaParts=[];
+ if(Number.isFinite(decisionPD.confidence))metaParts.push('<span>置信度 <b>'+decisionPD.confidence+'%</b></span>');
+ metaParts.push('<span>阶段 <b>'+labels[state.phase]||state.phase+'</b></span>');
+ metaParts.push('<span>运行 ID <b>'+String(state.run_id||"").slice(0,8)+'</b></span>');
+ pdMeta.innerHTML=metaParts.join("");
+
+ // Body
+ const bodyParts=[];
+ if(decisionPD.next_step)bodyParts.push(decisionPD.next_step);
+ if(decisionPD.risks&&decisionPD.risks.length)bodyParts.push(decisionPD.risks.map(r=>"⚠ "+r).join("\n"));
+ pdBody.innerHTML=bodyParts.join("\n")||(state.phase==="idle"?"输入业务目标并点击「启动 JARVIS」后，数字分身将在此给出建议。":"等待进一步证据。");
+
+ // HOLD action buttons
+ holdActions.style.display="none";
+ holdActions.innerHTML="";
+ if(rec.indexOf("HOLD")>=0||rec.indexOf("NO-GO")>=0||rec.indexOf("不建议")>=0){
+  const blockers=decisionPD.blockers||[];
+  const blockerHtml=blockers.length?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">卡点：'+blockers.map(b=>"• "+b).join("<br>")+'</div>':'';
+  holdActions.innerHTML=blockerHtml+
+   '<button class="hold-btn" onclick="event.stopPropagation();continueResearch()"><span class="icon">🔄</span><div><span>继续调研</span><span class="hold-btn-desc">补充缺口证据</span></div></button>'+
+   '<button class="hold-btn" onclick="event.stopPropagation();manualReview()"><span class="icon">✋</span><div><span>手动验收</span><span class="hold-btn-desc">用户自行判断</span></div></button>'+
+   '<button class="hold-btn" onclick="event.stopPropagation();skipStep()"><span class="icon">⏭️</span><div><span>跳过此步</span><span class="hold-btn-desc">推进到下一步</span></div></button>';
+  holdActions.style.display="flex";
+ }
+
+ // === Decision quality：核验 / 推进 / 未卡住 ===
+ const dq=document.getElementById("decisionQuality");
+ if(dq){
+  const supAll=state.twin_supervision||{};
+  const supNow=state.supervision||{};
+  const twinEvts=Array.isArray(supAll.events)?supAll.events:[];
+  const agentsAll=Array.isArray(state.agents)?state.agents:[];
+  const reviewed=agentsAll.filter(a=>{const r=a.twin_review||{};const s=r.semantic_review||{};return Boolean(r.verdict)||s.status==="completed_review_required";});
+  const acceptedEv=Number(((state.research||{}).quality||{}).accepted||0);
+  // 核验：是否对员工结果做过审查
+  let verifyCls="warn",verifyText="结果核验：未见审查记录";
+  if(reviewed.length){verifyCls="ok";verifyText="结果核验：已审查 "+reviewed.length+"/"+agentsAll.length+" 名员工";}
+  else if(acceptedEv>0){verifyCls="ok";verifyText="结果核验：门禁通过 "+acceptedEv+" 条证据";}
+  // 推进：分身是否有判断→行动记录
+  const lastDecision=String(supAll.last_decision||"");
+  const nextAction=String(supAll.next_action||"");
+  let pushCls="warn",pushText="主动推进：暂无判断记录";
+  if(twinEvts.length){pushCls="ok";pushText="主动推进："+twinEvts.length+" 次判断·行动";}
+  else if(lastDecision||nextAction){pushCls="ok";pushText="主动推进："+(lastDecision||nextAction);}
+  // 未卡住：监督状态是否停滞/阻塞
+  const stale=supNow.status==="attention_required"||supNow.status==="blocked"||Boolean(supAll.blocker);
+  let stuckCls=stale?"bad":"ok",stuckText=stale?("可能卡住："+(supAll.blocker||supNow.message||"流程无进展")):"未卡住：流程有进展";
+  if(state.phase==="idle"){stuckCls="";stuckText="未启动";}
+  dq.innerHTML='<span class="dq-item '+verifyCls+'">'+esc(verifyText)+'</span>'+
+   '<span class="dq-item '+pushCls+'">'+esc(pushText)+'</span>'+
+   '<span class="dq-item '+stuckCls+'">'+esc(stuckText)+'</span>';
+  dq.style.display="flex";
+ }
+
+ // Foot (in expanded detail)
+ pdFoot.innerHTML="注意：这是系统建议，不是已被市场验证的结论；需结合来源、反证、成本和原型测试结果判断。";
+
+// === Status summary cards ===
+ const ss=document.getElementById("statusSummary");
+ const agents=Array.isArray(state.agents)?state.agents:[];
+ const research=state.research||{};
+ const feasibility=state.feasibility||{};
+ const completed=agents.filter(a=>a.status==="completed").length;
+ const running=agents.filter(a=>["running","in_progress","working"].includes(a.status)).length;
+ const blocked=agents.filter(a=>["blocked","failed","error"].includes(a.status)).length;
+ const sources=Array.isArray(research.sources)?research.sources:[];
+ const quality=research.quality||{};
+ const accepted=Number(quality.accepted||0);
+ const rawUser=Number(quality.raw_user_content_records||0);
+ const evalDecision=feasibility.evaluation&&feasibility.evaluation.decision||"";
+ const statusLabel=evalDecision||feasibility.status==="incomplete"?"证据不足":feasibility.status==="evaluated"?"已出结论":state.phase==="idle"?"等待验收":state.phase==="decision"?"决策中":"执行中";
+ const statusCls=evalDecision==="GO_TO_PROTOTYPE"?"good":evalDecision==="NO_GO"?"warn":state.phase==="idle"?"accent":"accent";
+ ss.style.display="";
+ document.getElementById("statusWorkerValue").textContent=completed+"/"+agents.length+(running?" · "+running+" 执行中":"")+(blocked?" · "+blocked+" 受阻":"");
+ document.getElementById("statusWorkerValue").className="status-card-value "+(blocked?"warn":completed===agents.length&&agents.length>0?"good":"accent");
+ document.getElementById("statusWorkerNote").textContent=agents.length?"状态："+agents.filter(a=>a.status!=="completed").map(a=>a.worker+"("+a.status+")").join("、"):"等待员工组建";
+ document.getElementById("statusResearchValue").textContent=sources.length+" 来源 · "+accepted+" 通过";
+ document.getElementById("statusResearchValue").className="status-card-value "+(sources.length>0?"good":"warn");
+ document.getElementById("statusResearchNote").textContent=research.error?"阻塞："+research.error:research.status==="running"?"进行中":research.status==="completed"?"已完成":"待开始";
+ document.getElementById("statusFeasValue").textContent=statusLabel;
+ document.getElementById("statusFeasValue").className="status-card-value "+statusCls;
+ document.getElementById("statusFeasNote").textContent=feasibility.completion&&feasibility.completion.blockers&&feasibility.completion.blockers.length?"缺口："+feasibility.completion.blockers.slice(0,2).join("、"):"等待验收";
+
+ // === Evidence summary bar — hybrid: summary + stamp row ===
+ const esb=document.getElementById("evidenceSummaryBar");
+ const report=feasibility.report||{};
+ const indepCount=Number(report.independent_source_count||0);
+ const userDemand=Number(quality.accepted_user_demand_records||0);
+ esb.style.display="";
+ document.getElementById("evSourceCount").textContent=sources.length;
+ document.getElementById("evAcceptedCount").textContent=accepted;
+ document.getElementById("evUserCount").textContent=rawUser;
+ document.getElementById("evIndependentCount").textContent=indepCount||sources.length;
+
+ // Evidence stamp row — visual trust signal
+ const stampRow=document.getElementById("evStampRow");
+ if(sources.length){
+  const reliableCount=quality.accepted||0;
+  const questionableCount=Math.max(0,sources.length-reliableCount-(rawUser>0?1:0));
+  const unreliableCount=Math.max(0,sources.length-reliableCount-questionableCount-(rawUser>0?1:0));
+  const stamps=[];
+  if(reliableCount>0)stamps.push('<span class="evidence-stamp reliable"><span class="stamp-icon">✅</span> '+reliableCount+' 可靠</span>');
+  if(rawUser>0)stamps.push('<span class="evidence-stamp reliable"><span class="stamp-icon">👤</span> '+rawUser+' 原始评价</span>');
+  if(questionableCount>0)stamps.push('<span class="evidence-stamp questionable"><span class="stamp-icon">⚠️</span> '+questionableCount+' 待验证</span>');
+  if(unreliableCount>0)stamps.push('<span class="evidence-stamp unreliable"><span class="stamp-icon">❌</span> '+unreliableCount+' 不可靠</span>');
+  stampRow.innerHTML=stamps.join('');
+ }else{
+  stampRow.innerHTML='<span class="signal-muted">启动任务后显示证据印章</span>';
+ }
+
+ const workers=state.agents||[];
+ // === Simplified signal bar ===
+ const sb=document.getElementById("signalBar");
+ const live=workers.some(w=>["running","in_progress","working"].includes(String(w.status||"").toLowerCase()));
+ sb.style.display="";
+ document.getElementById("signalTwinStatus").textContent=state.phase==="idle"?"等待启动":"阶段："+(labels[state.phase]||state.phase);
+ document.getElementById("signalWorkerStatus").textContent=live?"执行中 · "+completed+"/"+agents.length+" 完成":"等待启动";
+ document.getElementById("signalResearchStatus").textContent=sources.length?"调研完成 · "+sources.length+" 来源":research.error?"受阻 · "+research.error:"等待启动";
+ document.getElementById("signalFeasStatus").textContent=evalDecision||feasibility.status==="not_started"?"等待启动":feasibility.status==="evaluated"?"已出结论 · "+evalDecision:"执行中";
+
  const runProgressText=document.getElementById("runProgressText");
  if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const agents=Array.isArray(state.agents)?state.agents:[];const sup=state.supervision||{};const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"运行 ID："+(state.run_id||"尚未创建"),"员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）","调研："+(rs.status||"待开始"),"玩法假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(sup.message)parts.push("分身监督："+sup.message);if(sup.status==="attention_required")parts.push("监督建议："+(sup.recommended_action||"检查阻塞原因"));if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("玩法阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);const messages=Array.isArray(state.conversation)?state.conversation.slice(-4):[];const activity=messages.map(m=>{const who=m.from||m.worker||"系统";const msg=String(m.text||"").replace(/\s+/g," ").trim();return who+"："+msg;}).filter(Boolean);const outputs=agents.filter(a=>a.output&&String(a.output).trim()).slice(-3).map(a=>(a.worker||"员工")+" 输出："+String(a.output).slice(0,240));runProgressText.textContent=parts.join(" · ")+(activity.length?"\n\n最新执行记录：\n"+activity.join("\n"):"")+(outputs.length?"\n\n员工输出：\n"+outputs.join("\n"):"");}
  const researchState=state.research||{};
  const designState=state.design||{};
  const feasibilityState=state.feasibility||{};
- const workers=state.agents||[];
  const decisionState=state.decision||null;
  const currentIndex=({planning:1,team:2,research:3,design:4,evaluation:5,decision:6,prototype:7})[state.phase]||0;
  const stepDefs=[
@@ -381,21 +839,22 @@ function render(){
   {name:"可行性验收",index:5,done:feasibilityState.status==="evaluated"&&feasibilityState.evaluation&&feasibilityState.evaluation.decision==="GO_TO_PROTOTYPE",blocked:feasibilityState.status==="incomplete",status:"auto"},
   {name:"决策 / 原型",index:6,done:Boolean(state.prototype),blocked:Boolean(decisionState&&decisionState.recommendation==="HOLD_FOR_EVIDENCE"),status:"auto"}
  ];
- document.getElementById("flow").innerHTML=stepDefs.map((step,i)=>{
+ document.getElementById("flow").innerHTML='<span class="node'+(activeStageFilter?"":" filter-active")+'" style="cursor:pointer" onclick="filterTimelineByStage(null)" title="显示全部事件">全部</span>'+(stepDefs.length>0?'<span class="arrow">›</span>':'')+stepDefs.map((step,i)=>{
   let cls="";
   if(step.blocked)cls="blocked";
   else if(step.done)cls="done";
   else if(currentIndex===step.index||(!currentIndex&&step.index===0))cls="active";
-  const detail=step.blocked?" · 受阻":step.done?" · 完成":cls==="active"?" · 进行中":"";
-  return '<span class="node '+cls+'" title="'+esc(step.name+detail)+'">'+step.name+detail+'</span>'+((i<stepDefs.length-1)?'<span class="arrow">→</span>':'');
+  if(activeStageFilter===step.name)cls+=" filter-active";
+  const detail=step.blocked?" 受阻":step.done?" 完成":cls.indexOf("active")>=0?" 进行中":"";
+  return '<span class="node '+cls+'" style="cursor:pointer" onclick="filterTimelineByStage(\''+esc(step.name)+'\')" title="'+esc(step.name+detail)+'">'+step.name+'</span>'+(i<stepDefs.length-1?'<span class="arrow">›</span>':'');
  }).join("");
  const t=state.twin;
- const live=workers.some(w=>["running","in_progress","working"].includes(String(w.status||"").toLowerCase()));
+ const live2=workers.some(w=>["running","in_progress","working"].includes(String(w.status||"").toLowerCase()));
  const hasRun=Boolean(state.goal||workers.length||state.phase&&state.phase!=="idle");
  const decision=state.decision;
  const evidence=state.evidence||[];
- document.getElementById("signalSummary").textContent=!hasRun?"WAITING FOR RUN":live?"WORKERS ACTIVE":decision?"DECISION READY":evidence.length?"EVIDENCE RETURNED":"FLOW IN PROGRESS";
- const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};document.getElementById("signalCaption").textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、玩法假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/玩法/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续玩法与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在玩法假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
+ const ss2=document.getElementById("signalSummary");if(ss2)ss2.textContent=!hasRun?"WAITING FOR RUN":live?"WORKERS ACTIVE":decision?"DECISION READY":evidence.length?"EVIDENCE RETURNED":"FLOW IN PROGRESS";
+ const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};const sc=document.getElementById("signalCaption");if(sc)sc.textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、玩法假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/玩法/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续玩法与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在玩法假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
  const node=(title,detail,cls="")=>'<div class="signal-node '+cls+'"><strong>'+esc(title)+'</strong><small>'+esc(detail)+'</small></div>';
  const workerNodes=workers.length?workers.map(w=>{const s=String(w.status||"").toLowerCase();const cls=["running","in_progress","working"].includes(s)?"is-running":s==="completed"?"is-active":["blocked","failed","error"].includes(s)?"is-blocked":["queued","ready","pending"].includes(s)?"is-queued":"";return node(w.worker,w.status+" · "+(w.progress||0)+"%",cls)}).join(""):node("等待员工组建","启动后按目标动态分工");
  const signalMarkup=
@@ -481,14 +940,21 @@ function render(){
   const auditPanel=audit?'<div class="outcome" style="margin-top:10px"><b>数字分身 · 员工结果初审</b><div style="margin-top:5px"><span class="report-chip">'+esc(audit.verdict||"未判定")+'</span></div><div>'+esc(audit.summary||"未记录审核结论")+'</div><div class="sub">来源线索：'+esc(audit.attached_source_count??0)+' · 输出中的 URL：'+(audit.urls_in_output?"有":"无")+' · 语义支持核验：未完成</div><ul class="report-list">'+(audit.checks||[]).map(c=>'<li>'+esc(c.name||"检查项")+'：'+(c.passed?"通过":"未通过/未完成")+' — '+esc(c.detail||"")+'</li>').join("")+'</ul><div class="fv-note">'+esc((audit.limitations||[]).join("；"))+'</div><b>采纳建议：</b>'+esc(audit.adoption||"需进一步核验")+semanticHtml+'</div>':'<div class="outcome" style="margin-top:10px"><b>数字分身结果初审</b><div>当前运行记录没有结构化初审结果；不能据此声称已经完成员工结论核验。</div></div>';
   detail.innerHTML=execPanel+auditPanel+'<div class="detail-meta"><span>'+esc(a.worker)+'</span><span>'+esc(a.status)+'</span><span>'+esc(workerEvidence.length)+' 条证据</span><span>事件记录</span></div>'+msgs.map((m,i)=>{const id=m.id||String(i);const long=m.body.length>300;const expanded=expandedMessages.has(id);return '<div class="chat-msg '+m.kind+'"><div class="chat-label">'+esc(m.label)+'</div><div id="chatbody-'+i+'" data-message-id="'+esc(id)+'" class="chat-body '+(long&&!expanded?'clamped':'')+'">'+esc(m.body)+'</div>'+(long?'<div class="chat-actions"><button onclick="toggleMessage('+i+')">'+(expanded?'收起内容':'展开全文')+'</button></div>':'')+'</div>';}).join("");
  }else detail.innerHTML='<div class="sub">暂无数字员工</div>';
- document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>{const src=e.source||e;const url=src.url||"";const snippet=src.snippet||"";const shortSnippet=snippet.length>140?snippet.slice(0,140)+"…":snippet;return '<div class="ev"><b>'+esc(e.worker||"未知员工")+'</b> · '+esc(e.finding||e.title||"未命名证据")+' <span class="confidence">'+(Number.isFinite(Number(e.confidence))?Math.round(Number(e.confidence)*100)+"%":"置信度未记录")+'</span>'+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'<div class="sub">来源链接：未记录</div>')+(shortSnippet?'<details class="evidence-detail"><summary>查看摘要</summary><pre>'+esc(shortSnippet)+'</pre></details>':'')+(e.quality_accepted!==undefined?'<div class="evidence-meta">门禁：'+(e.quality_accepted?"接受":"未接受")+(e.quality_reasons&&e.quality_reasons.length?" · "+esc(e.quality_reasons.join("；")):"")+'</div>':'')+'</div>';}).join("")||'<span class="sub">暂无员工证据记录；这不等于已经完成真实搜索。</span>';
+ document.getElementById("evidence").innerHTML=(state.evidence||[]).map(e=>{const src=e.source||e;const url=src.url||"";const snippet=src.snippet||"";const shortSnippet=snippet.length>140?snippet.slice(0,140)+"…":snippet;const stamp=e.quality_accepted===true?'<span class="evidence-stamp reliable" style="margin-left:6px"><span class="stamp-icon">✅</span></span>':e.quality_accepted===false?'<span class="evidence-stamp unreliable" style="margin-left:6px"><span class="stamp-icon">❌</span></span>':e.simulated?'<span class="evidence-stamp questionable" style="margin-left:6px"><span class="stamp-icon">⚠️</span> 模拟</span>':'';return '<div class="ev"><b>'+esc(e.worker||"未知员工")+'</b> · '+esc(e.finding||e.title||"未命名证据")+' <span class="confidence">'+(Number.isFinite(Number(e.confidence))?Math.round(Number(e.confidence)*100)+"%":"置信度未记录")+'</span>'+stamp+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'<div class="sub">来源链接：未记录</div>')+(shortSnippet?'<details class="evidence-detail"><summary>查看摘要</summary><pre>'+esc(shortSnippet)+'</pre></details>':'')+(e.quality_accepted!==undefined?'<div class="evidence-meta">门禁：'+(e.quality_accepted?"接受":"未接受")+(e.quality_reasons&&e.quality_reasons.length?" · "+esc(e.quality_reasons.join("；")):"")+'</div>':'')+'</div>';}).join("")||'<span class="sub">暂无员工证据记录；这不等于已经完成真实搜索。</span>';
  const d=state.decision;
  document.getElementById("decision").innerHTML=d?'<div class="decision"><h2>'+esc(d.recommendation)+'</h2><div>Confidence '+d.confidence+'%</div><p>Next: '+esc(d.next_step)+'</p>'+d.risks.map(r=>'<div class="risk">⚠ '+esc(r)+'</div>').join("")+'</div>':'等待数字分身完成判断…';
  const p=state.prototype;
  document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
  renderExplainableReport(state);
  renderWorkflowTimeline(state);
+ // 轮询重渲染后保持当前阶段筛选
+ if(activeStageFilter){try{filterTimelineByStage(activeStageFilter);}catch(_){}}
 }
+
+// HOLD action handlers
+function continueResearch(){alert("继续调研：将缺口证据需求发送给数字分身，补充独立来源。")}
+function manualReview(){alert("手动验收：用户自行判断当前证据是否充分。")}
+function skipStep(){alert("跳过此步：推进到下一阶段，但决策标记为跳过。")}
 
 function renderExplainableReport(data){
  const put=(id,value)=>{const el=document.getElementById(id);if(el)el.innerHTML=value;};
@@ -531,7 +997,7 @@ function renderExplainableReport(data){
  const checkReasons=checks.map(c=>text(c.name,"检查项")+"："+(c.passed===true?"通过":c.passed===false?"未通过":"未判定")+"；"+text(c.reason,"后端未提供原因"));
  put("reportDerivation",list(steps)+(scored.length?'<details class="content-fold"><summary>八维评分推导与引用</summary>'+list(dimensionReasons)+'</details>':"")+(checkReasons.length?'<details class="content-fold"><summary>验收检查的通过/失败原因</summary>'+list(checkReasons)+'</details>':"")+(Array.isArray(data.conversation)&&data.conversation.length?'<details class="content-fold"><summary>查看最近执行记录</summary>'+list(data.conversation.slice(-5).map(m=>text(m.from,"系统")+"："+text(m.text,"无正文")))+"</details>":""));
  const qualityItems=Array.isArray(quality.items)?quality.items:[];
- const sourceRows=sources.map((s,i)=>{const q=qualityItems.find(item=>(item.source||{}).url===s.url)||{};const role=q.source_role||s.source_role||"unclassified";const gate=q.quality_accepted===true?"来源完整性初筛通过（不代表证据有效）":q.quality_accepted===false?"来源完整性初筛未通过":"完整性初筛状态未记录";const useLabel=q.evidence_use_label||"用途未判定：仅作为待核验线索";const useReason=q.evidence_use_reason||q.user_demand_eligibility_reason||"尚未完成用途分类与主张匹配判断";const demandEligible=q.user_demand_eligible===true;const isMedia=String(q.evidence_use||"")==="auxiliary_only";const snippet=text(s.snippet,"来源摘要未记录");const shortSnippet=snippet.length>160?snippet.slice(0,160)+"…":snippet;const url=s.url||"";return '<li style="margin:4px 0"><b>[S'+(i+1)+'] '+esc(text(s.title,"未命名来源"))+'</b><div class="evidence-meta">'+esc(text(s.provider,"来源渠道未记录"))+' · 角色：'+esc(role)+'</div><div class="evidence-meta">用途：'+esc(useLabel)+'</div>'+(isMedia?'<div class="evidence-meta">文章仅辅助假设/背景，不能单独证明需求</div>':'')+'<details class="evidence-detail"><summary>查看分类理由与完整性检查</summary><div class="evidence-meta">分类理由：'+esc(useReason)+'</div><div class="evidence-meta">原始用户证据：'+(demandEligible?'具备候选字段（仍需核验）':'不符合原始用户评价记录要求')+'</div><div class="evidence-meta">完整性检查：'+esc(gate)+'</div></details>'+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'<span class="evidence-meta">URL 未记录</span>')+'<details class="evidence-detail"><summary>查看来源摘要</summary><pre>'+esc(shortSnippet)+'</pre></details></li>'}).join("");
+ const sourceRows=sources.map((s,i)=>{const q=qualityItems.find(item=>(item.source||{}).url===s.url)||{};const role=q.source_role||s.source_role||"unclassified";const gate=q.quality_accepted===true?"来源完整性初筛通过（不代表证据有效）":q.quality_accepted===false?"来源完整性初筛未通过":"完整性初筛状态未记录";const useLabel=q.evidence_use_label||"用途未判定：仅作为待核验线索";const useReason=q.evidence_use_reason||q.user_demand_eligibility_reason||"尚未完成用途分类与主张匹配判断";const demandEligible=q.user_demand_eligible===true;const isMedia=String(q.evidence_use||"")==="auxiliary_only";const snippet=text(s.snippet,"来源摘要未记录");const shortSnippet=snippet.length>160?snippet.slice(0,160)+"…":snippet;const url=s.url||"";const stamp=q.quality_accepted===true?"<span class=\"evidence-stamp reliable\" style=\"margin-left:4px\"><span class=\"stamp-icon\">✅</span></span>":q.quality_accepted===false?"<span class=\"evidence-stamp unreliable\" style=\"margin-left:4px\"><span class=\"stamp-icon\">❌</span></span>":s.simulated?"<span class=\"evidence-stamp questionable\" style=\"margin-left:4px\"><span class=\"stamp-icon\">⚠️</span> 模拟</span>":"";return '<li style="margin:4px 0"><b>[S'+(i+1)+'] '+esc(text(s.title,"未命名来源"))+'</b><div class="evidence-meta">'+esc(text(s.provider,"来源渠道未记录"))+' · 角色：'+esc(role)+'</div><div class="evidence-meta">用途：'+esc(useLabel)+'</div>'+(isMedia?'<div class="evidence-meta">文章仅辅助假设/背景，不能单独证明需求</div>':'')+'<details class="evidence-detail"><summary>查看分类理由与完整性检查</summary><div class="evidence-meta">分类理由：'+esc(useReason)+'</div><div class="evidence-meta">原始用户证据：'+(demandEligible?'具备候选字段（仍需核验）':'不符合原始用户评价记录要求')+'</div><div class="evidence-meta">完整性检查：'+esc(gate)+'</div></details>'+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'<span class="evidence-meta">URL 未记录</span>')+'<details class="evidence-detail"><summary>查看来源摘要</summary><pre>'+esc(shortSnippet)+'</pre></details></li>'}).join("");
  put("reportEvidence",'<div id="reportEvidenceChips"><span class="report-chip active" data-filter="all">研究来源 '+sources.length+'</span><span class="report-chip" data-filter="primary">原始用户评价 '+esc(text(quality.raw_user_content_records,0))+'</span><span class="report-chip" data-filter="secondary">二手文章 '+esc(text(quality.accepted_source_role_counts?.secondary_analysis||0,0))+'</span><span class="report-chip" data-filter="accepted">门禁通过 '+esc(text(quality.accepted,0))+'</span><span class="report-chip" data-filter="unverified">事实已核实：'+(truthVerified?"是":"否")+'</span></div><div id="reportEvidenceList" class="report-list-container"></div><div id="reportEvidenceDetail" class="content-fold" style="display:none"></div>'+(evidence.length?'<details class="content-fold"><summary>员工/证据条目 '+evidence.length+' 条</summary>'+list(evidence.slice(0,20).map(e=>text(e.worker,"员工")+"："+text(e.finding,"无发现")+" · "+text((e.source||{}).url,"无来源 URL")))+'</details>':""));
  // Evidence chip filtering + summary display
  (function(){
@@ -588,11 +1054,13 @@ function renderWorkflowTimeline(data){
  const el=document.getElementById("timelineList");
  const countEl=document.getElementById("timelineCount");
  const section=document.getElementById("workflowTimeline");
- if(!el||!data.conversation||!data.conversation.length){
-  if(section)section.style.display="none";
+ if(!el||!section)return;
+ section.style.display="";
+ if(!data.conversation||!data.conversation.length){
+  countEl.textContent="0 条事件";
+  el.innerHTML='<div class="sub">启动任务后，这里会显示真实的工作流事件。</div>';
   return;
  }
- section.style.display="";
  const events=data.conversation.slice(-30).reverse();
  countEl.textContent=events.length+" 条事件";
  el.innerHTML=events.map(function(e,i){
@@ -603,7 +1071,15 @@ function renderWorkflowTimeline(data){
   var short=body.length>200?body.slice(0,200)+"…":body;
   var id="tw-"+i;
   var expandBtn=body.length>200?'<button class="workflow-expand" onclick="var b=this;var bd=document.getElementById(\''+id+'\');if(bd.classList.contains(\'clamped\')){bd.classList.remove(\'clamped\');b.textContent=\'收起内容\';}else{bd.classList.add(\'clamped\');b.textContent=\'展开全文\';}">展开全文</button>':'';
-  return '<div class="workflow-event '+cls+'"><div class="workflow-time">'+time+'</div><div class="workflow-from">'+esc(who)+' → '+esc(to)+'</div><div id="'+id+'" class="workflow-body clamped">'+esc(short)+'</div>'+expandBtn+'</div>';
+  // 信任徽章：根据事件文本推断来源真实性
+  var badgeClass="no-source",badgeText="⚫ 无来源";
+  var hasUrl=body.indexOf("http")>=0;
+  var isSimulated=body.indexOf("SIMULATION")>=0||body.indexOf("模拟")>=0;
+  var hasEvidence=body.indexOf("证据")>=0||body.indexOf("evidence")>=0||body.indexOf("来源")>=0;
+  if(isSimulated){badgeClass="simulated";badgeText="🔴 模拟";}
+  else if(hasUrl&&hasEvidence){badgeClass="real";badgeText="🟢 有来源";}
+  else if(hasUrl){badgeClass="pending";badgeText="🟡 仅链接";}
+  return '<div class="workflow-event '+cls+'"><div class="workflow-time">'+time+'</div><div class="workflow-from">'+esc(who)+' → '+esc(to)+' <span class="trust-badge '+badgeClass+'">'+badgeText+'</span></div><div id="'+id+'" class="workflow-body clamped">'+esc(short)+'</div>'+expandBtn+'</div>';
  }).join("");
 }
 
@@ -674,6 +1150,16 @@ document.getElementById("twinChatMic")?.addEventListener("click",()=>{
 });
 document.getElementById("twinChatSend")?.addEventListener("click",sendTwinMessage);
 document.getElementById("twinChatInput")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendTwinMessage();}});
+// 快捷追问：一键发送预设的信任核验问题
+document.querySelectorAll(".quick-query-btn").forEach(btn=>{
+ btn.addEventListener("click",()=>{
+  const content=document.getElementById("twinChatContent");
+  if(content&&content.hidden)setTwinChatExpanded("text");
+  const input=document.getElementById("twinChatInput");
+  if(input)input.value=btn.dataset.q||btn.textContent;
+  sendTwinMessage();
+ });
+});
 function setTwinChatExpanded(mode){
  const content=document.getElementById("twinChatContent");
  content.hidden=false;
@@ -829,9 +1315,9 @@ async function poll(){
   const openedDetails=[...document.querySelectorAll("#feasibilityResult details[open],#researchResult details[open],#knowledgeResult details[open],#detail details[open]")].map(d=>({container:d.closest("#feasibilityResult,#researchResult,#knowledgeResult")?.id,summary:d.querySelector("summary")?.textContent?.trim()}));
   const r=await apiFetch("/api/state");
   const data=await r.json();
-  if(!r.ok){state=null;const message=data.error||"访问受限";document.getElementById("status").textContent="API "+r.status+" · "+message;const progress=document.getElementById("runProgressText");if(progress)progress.textContent=r.status===401?"认证失败：主页管理员 Token 缺失或无效。请在页面顶部输入正确 Token；勾选“在此设备记住”后，同一设备后续无需重复输入。":"状态读取失败（HTTP "+r.status+"）："+message;const hint=document.getElementById("runInlineStatus");if(hint&&r.status===401)hint.textContent="未能读取运行状态：管理员 Token 未通过认证。请检查顶部 Token；无需在流程页重复输入。";return;}
-  state=data;try{render();}catch(renderError){const progress=document.getElementById("runProgressText");if(progress)progress.textContent="主视图渲染异常："+(renderError&&renderError.message?renderError.message:String(renderError))+"。已切换到独立流程输出，避免数字分身与下游阶段整块空白。";}renderCriticalFlow(data);renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
- }catch(e){document.getElementById("status").textContent="API unavailable";const progress=document.getElementById("runProgressText");if(progress)progress.textContent="无法读取本轮运行状态："+(e&&e.message?e.message:"API unavailable")+"。请检查管理员认证与服务连接；不能将“服务器已接收”视为任务已运行。";}
+  if(!r.ok){state=null;const message=data.error||"访问受限";document.getElementById("status").textContent="API "+r.status+" · "+message;const progress=document.getElementById("runProgressText");if(progress)progress.textContent=r.status===401?"认证失败：主页管理员 Token 缺失或无效。请在页面顶部输入正确 Token；勾选在此设备记住后，同一设备后续无需重复输入。":"状态读取失败（HTTP "+r.status+"）："+message;const hint=document.getElementById("runInlineStatus");if(hint&&r.status===401)hint.textContent="未能读取运行状态：管理员 Token 未通过认证。请检查顶部 Token；无需在流程页重复输入。";return;}
+  state=data;try{render();}catch(renderError){const progress=document.getElementById("runProgressText");if(progress)progress.textContent="主视图渲染异常："+(renderError&&renderError.message?renderError.message:String(renderError))+"。已切换到独立流程输出，避免数字分身与下游阶段整块空白。";}try{renderCriticalFlow(data);}catch(cfError){}renderRunOutputs(data);for(const saved of openedDetails){const container=document.getElementById(saved.container);if(!container)continue;const match=[...container.querySelectorAll("details")].find(d=>d.querySelector("summary")?.textContent?.trim()===saved.summary);if(match)match.open=true;}renderTwinChat(data);updateRunButton(data);
+ }catch(e){document.getElementById("status").textContent="API unavailable";const progress=document.getElementById("runProgressText");if(progress)progress.textContent="无法读取本轮运行状态："+(e&&e.message?e.message:"API unavailable")+"。请检查管理员认证与服务连接；不能将服务器已接收视为任务已运行。";}
 }
 function renderRunOutputs(data){
  const research=data.research||{};
@@ -886,7 +1372,7 @@ function renderRunOutputs(data){
  const researchOut=document.getElementById("researchResult");
  const phase=data.phase||"idle";
  const labels={planning:"正在规划",team:"员工执行中",research:"真实调研中",design:"创意生成中",evaluation:"独立评估中",decision:"阶段决策已形成",prototype:"原型阶段"};
- const supervision=data.supervision||{};document.getElementById("signalSummary").textContent=(labels[phase]||phase.toUpperCase())+" · "+(data.run_id||"无运行 ID")+(supervision.status==="attention_required"?" · 分身警报：执行停滞":supervision.status==="blocked"?" · 分身警报：流程受阻":supervision.status==="monitoring"?" · 分身监督中":"");
+ const supervision=data.supervision||{};const signalSummaryEl=document.getElementById("signalSummary");if(signalSummaryEl)signalSummaryEl.textContent=(labels[phase]||phase.toUpperCase())+" · "+(data.run_id||"无运行 ID")+(supervision.status==="attention_required"?" · 分身警报：执行停滞":supervision.status==="blocked"?" · 分身警报：流程受阻":supervision.status==="monitoring"?" · 分身监督中":"");
  if(research.status==="running"||research.status==="queued"){
   const progress=research.progress||{};
   if(research.status==="running"&&Number(progress.queries_total)>0){
@@ -1056,7 +1542,7 @@ async function refreshKnowledgeStatus(){
    "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
  }catch(e){document.getElementById("knowledgeSummary").textContent=(String(e.message||"").includes("401")||String(e.message||"").toLowerCase().includes("token"))?"认证失败 · 请检查主页顶部管理员 Token":"STORAGE STATUS UNAVAILABLE";}
 }
-refreshKnowledgeStatus();
+// 知识库状态在恢复管理员 Token 之后再刷新，避免首屏 401。
 // Share homepage authentication with the embedded read-only detail view in memory only.
 // Sync on iframe load and when the token changes; the iframe may load before auth is entered.
 const traceFrame=document.querySelector("#journeyPanel iframe");
@@ -1192,7 +1678,7 @@ rememberToken.addEventListener("change",()=>{try{if(rememberToken.checked&&token
 tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}poll();refreshKnowledgeStatus()});
 tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
 tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
-setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
 </script>
 <script>
 // Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.

@@ -695,6 +695,43 @@ def _run_history_path() -> Path:
     return ROOT / "data" / "jarvis-run-history.jsonl"
 
 
+def _recent_run_summaries(limit: int = 5) -> list[dict]:
+    """Recent finished runs as lightweight summaries for chat answers (no raw dump)."""
+    path = _run_history_path()
+    if not path.exists():
+        return []
+    try:
+        with RUN_HISTORY_LOCK:
+            lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    rows = []
+    for line in lines[-300:]:
+        try:
+            item = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(item, dict):
+            continue
+        research = item.get("research") if isinstance(item.get("research"), dict) else {}
+        sources = research.get("sources") if isinstance(research.get("sources"), list) else []
+        evidence = item.get("evidence") if isinstance(item.get("evidence"), list) else []
+        decision = item.get("decision") if isinstance(item.get("decision"), dict) else {}
+        rows.append({
+            "run_id": item.get("run_id"),
+            "goal": str(item.get("goal") or "")[:160],
+            "phase": item.get("phase"),
+            "finished_at": item.get("finished_at"),
+            "sources": len(sources),
+            "real_sources": len([s for s in sources if isinstance(s, dict) and not s.get("simulated")]),
+            "evidence": len(evidence),
+            "simulated_evidence": len([e for e in evidence if isinstance(e, dict) and e.get("simulated")]),
+            "decision": decision.get("recommendation"),
+        })
+    rows.sort(key=lambda r: float(r.get("finished_at") or 0), reverse=True)
+    return rows[:limit]
+
+
 def _persist_run_history():
     """Append a sanitized snapshot for later lookup; never persist credentials."""
     with LOCK:
@@ -1631,11 +1668,76 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(message, str) or not message.strip() or len(message) > 2000:
                 self._json({"ok": False, "error": "Please enter a message of 1–2000 characters."}, 400)
                 return
+            recent_runs = _recent_run_summaries(5)
             with LOCK:
-                status = {"goal": STATE.get("goal"), "phase": STATE.get("phase"),
-                          "agents": [{"worker": a.get("worker"), "status": a.get("status")} for a in STATE.get("agents", [])],
-                          "evidence_count": len(STATE.get("evidence") or []),
-                          "research": (STATE.get("research") or {}).get("status")}
+                agents_payload = []
+                for a in STATE.get("agents", []):
+                    execution = a.get("execution") if isinstance(a.get("execution"), dict) else {}
+                    meta = execution.get("metadata") if isinstance(execution.get("metadata"), dict) else {}
+                    agents_payload.append({
+                        "worker": a.get("worker"),
+                        "status": a.get("status"),
+                        "task": str(a.get("task") or "")[:200],
+                        "output_excerpt": str(a.get("output") or "")[:300],
+                        "execution_mode": execution.get("mode") or ("simulation" if execution.get("simulated") else None),
+                        "simulated": bool(execution.get("simulated")),
+                        "external_tools_used": meta.get("external_tools_used", execution.get("external_tools_used")),
+                        "evidence_count": len(a.get("evidence") or []),
+                        "review_verdict": ((a.get("twin_review") or {}).get("verdict")
+                                           or ((a.get("twin_review") or {}).get("semantic_review") or {}).get("status")),
+                    })
+                evidence_payload = []
+                for e in (STATE.get("evidence") or [])[:40]:
+                    src = e.get("source") if isinstance(e.get("source"), dict) else {}
+                    url = src.get("url") or e.get("source_url") or ""
+                    evidence_payload.append({
+                        "worker": e.get("worker"),
+                        "finding": str(e.get("finding") or e.get("title") or "")[:160],
+                        "source_url": url,
+                        "domain": url.split("/")[2] if "://" in url else None,
+                        "simulated": bool(e.get("simulated")),
+                        "quality_accepted": e.get("quality_accepted"),
+                        "confidence": e.get("confidence"),
+                    })
+                research_state = STATE.get("research") or {}
+                research_sources = []
+                for s in (research_state.get("sources") or [])[:40]:
+                    research_sources.append({
+                        "title": str(s.get("title") or "")[:160],
+                        "url": s.get("url"),
+                        "simulated": bool(s.get("simulated")),
+                        "provider": s.get("provider"),
+                    })
+                supervision = STATE.get("twin_supervision") or {}
+                status = {
+                    "goal": STATE.get("goal"),
+                    "phase": STATE.get("phase"),
+                    "run_id": STATE.get("run_id"),
+                    "agents": agents_payload,
+                    "evidence_count": len(STATE.get("evidence") or []),
+                    "evidence": evidence_payload,
+                    "research": {
+                        "status": research_state.get("status"),
+                        "error": research_state.get("error"),
+                        "sources": research_sources,
+                        "quality": research_state.get("quality") or {},
+                    },
+                    "decision": {
+                        "recommendation": (STATE.get("decision") or {}).get("recommendation"),
+                        "confidence": (STATE.get("decision") or {}).get("confidence"),
+                        "next_step": (STATE.get("decision") or {}).get("next_step"),
+                    },
+                    "twin_supervision": {
+                        "status": supervision.get("status"),
+                        "current_stage": supervision.get("current_stage"),
+                        "last_decision": supervision.get("last_decision"),
+                        "next_action": supervision.get("next_action"),
+                        "blocker": supervision.get("blocker"),
+                        "events": (supervision.get("events") or [])[-8:],
+                    },
+                    "recent_runs": recent_runs,
+                    "simulation_notice": "simulated=true 或 execution_mode=simulation 表示未调用外部工具，不能当作真实抓取。",
+                }
                 history = STATE.setdefault("chat_messages", [])
                 history.append({"role": "user", "text": message.strip(), "at": time.time()})
                 history[:] = history[-30:]
@@ -1648,6 +1750,36 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "direction_recorded"
             else:
                 client = getattr(WORKER_EXECUTOR, "client", None)
+                # 无 LLM 时的确定性信任摘要：如实区分真实抓取与模拟，不编造。
+                real_sources = [s for s in status["research"]["sources"] if not s.get("simulated")]
+                sim_sources = [s for s in status["research"]["sources"] if s.get("simulated")]
+                real_evidence = [e for e in status["evidence"] if not e.get("simulated") and e.get("source_url")]
+                sim_evidence = [e for e in status["evidence"] if e.get("simulated")]
+                real_agents = [a for a in status["agents"] if a.get("execution_mode") and a.get("execution_mode") != "simulation" and not a.get("simulated")]
+                sim_agents = [a for a in status["agents"] if a.get("simulated") or a.get("execution_mode") == "simulation"]
+                sup = status["twin_supervision"]
+                fallback_lines = [
+                    "当前目标：" + str(status["goal"] or "尚未设置"),
+                    "阶段：" + str(status["phase"] or "未启动") + ("（运行 ID：" + str(status["run_id"]) + "）" if status.get("run_id") else ""),
+                    "证据溯源：共 " + str(status["evidence_count"]) + " 条；其中带真实来源 URL " + str(len(real_evidence)) + " 条，模拟 " + str(len(sim_evidence)) + " 条。",
+                    "调研来源：共 " + str(len(status["research"]["sources"])) + " 个；真实抓取 " + str(len(real_sources)) + " 个，模拟 " + str(len(sim_sources)) + " 个；调研状态 " + str(status["research"]["status"] or "尚未开始") + ("（" + str(status["research"]["error"]) + "）" if status["research"].get("error") else "") + "。",
+                    "员工执行：" + str(len(status["agents"])) + " 名；有非模拟执行记录 " + str(len(real_agents)) + " 名，模拟 " + str(len(sim_agents)) + " 名。",
+                    "分身推进：监督状态 " + str(sup.get("status") or "无") + "；最近判断 " + str(sup.get("last_decision") or "无") + "；下一步 " + str(sup.get("next_action") or "无") + ("；当前阻塞 " + str(sup.get("blocker")) if sup.get("blocker") else "") + "。",
+                ]
+                if status["decision"].get("recommendation"):
+                    fallback_lines.append("当前建议：" + str(status["decision"]["recommendation"]) + "（置信度 " + str(status["decision"].get("confidence")) + "%）。")
+                if status.get("recent_runs"):
+                    fallback_lines.append("最近历史轮次：")
+                    for run in status["recent_runs"][:3]:
+                        fallback_lines.append(
+                            "· " + str(run.get("run_id")) + "｜" + str(run.get("goal"))[:60]
+                            + "｜阶段 " + str(run.get("phase"))
+                            + "｜来源 " + str(run.get("sources")) + "（真实 " + str(run.get("real_sources")) + "）"
+                            + "｜证据 " + str(run.get("evidence")) + "（模拟 " + str(run.get("simulated_evidence")) + "）"
+                            + "｜决策 " + str(run.get("decision") or "无")
+                        )
+                fallback_lines.append("注意：模拟结果不等于真实抓取；没有来源 URL 的证据不能视为已核验。")
+                fallback_reply = "\n".join(fallback_lines)
                 if client is not None:
                     try:
                         dialogue = "\\n".join(
@@ -1660,10 +1792,10 @@ class Handler(BaseHTTPRequestHandler):
                         )
                         mode = "llm"
                     except Exception:
-                        reply = "暂时无法连接语言模型。当前目标：" + str(status["goal"]) + "；阶段：" + str(status["phase"]) + "；证据条目：" + str(status["evidence_count"]) + "。"
+                        reply = "暂时无法连接语言模型。以下为确定性状态摘要：\n" + fallback_reply
                         mode = "status_fallback"
                 else:
-                    reply = "当前目标：" + str(status["goal"]) + "；阶段：" + str(status["phase"]) + "；调研状态：" + str(status["research"]) + "；证据条目：" + str(status["evidence_count"]) + "。目前没有配置语言模型，所以暂时只能提供状态摘要。"
+                    reply = "目前没有配置语言模型，以下为确定性状态摘要：\n" + fallback_reply
                     mode = "status_fallback"
             with LOCK:
                 STATE["chat_messages"].append({"role": "assistant", "text": reply, "at": time.time(), "mode": mode})
