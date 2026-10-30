@@ -10,3 +10,5 @@ data/
 mvp/data/
 *.log
 .DS_Store
+# 本地运行配置（launch.json 可能含明文管理员/Worker Token），不纳入版本库
+.claude/

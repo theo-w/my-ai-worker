@@ -59,6 +59,7 @@ def test_live_research_deduplicates_sources_and_llm_synthesis_uses_accepted_evid
 
     env = {
         "JARVIS_SEARCH_ENDPOINT": "https://search.example/api",
+        "JARVIS_LLM_ENABLED": "true",
         "JARVIS_LLM_BASE_URL": "https://llm.example/v1",
         "JARVIS_LLM_API_KEY": "test-key",
         "JARVIS_LLM_MODEL": "test-model",
@@ -84,9 +85,10 @@ def test_live_research_deduplicates_sources_and_llm_synthesis_uses_accepted_evid
     assert result["llm_synthesis"]["source_urls"] == ["https://example.com/report#section"]
 
 
-def test_llm_research_synthesis_skips_when_no_accepted_evidence():
+def test_llm_research_synthesis_skips_when_no_accepted_evidence(monkeypatch):
     from mvp.research import _synthesize_with_llm
 
+    monkeypatch.setenv("JARVIS_LLM_ENABLED", "true")
     result = _synthesize_with_llm("AI native games", [])
     assert result["status"] == "skipped_no_accepted_evidence"
     assert result["text"] is None

@@ -61,7 +61,8 @@ def test_invalid_and_out_of_range_environment_values_are_bounded(
         assert client.timeout == expected
 
 
-def test_complete_sends_max_tokens_and_configured_timeout():
+def test_complete_sends_max_tokens_and_configured_timeout(monkeypatch):
+    monkeypatch.setenv("JARVIS_LLM_ENABLED", "true")
     client = OpenAICompatibleLLM(
         "https://example.test/v1", "not-a-real-key", "test-model",
         timeout=12, max_tokens=256,
@@ -76,7 +77,8 @@ def test_complete_sends_max_tokens_and_configured_timeout():
     assert mocked.call_args.kwargs["timeout"] == 12
 
 
-def test_complete_can_use_lower_per_call_token_cap_for_smoke_test():
+def test_complete_can_use_lower_per_call_token_cap_for_smoke_test(monkeypatch):
+    monkeypatch.setenv("JARVIS_LLM_ENABLED", "true")
     client = OpenAICompatibleLLM(
         "https://example.test/v1", "not-a-real-key", "test-model",
         timeout=12, max_tokens=768,

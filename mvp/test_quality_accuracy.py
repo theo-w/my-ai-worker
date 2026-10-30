@@ -7,7 +7,9 @@ def test_valid_https_source_can_pass_mechanical_gate_but_not_claim_truth():
         "source": {"title": "Example", "url": "https://example.com/report", "snippet": "Relevant excerpt"},
     })
     assert result.accepted is True
-    assert not any("truth" in reason.lower() for reason in result.reasons)
+    # 门禁通过不代表事实已核验：允许出现 "truth ... remain unverified"，
+    # 但不允许任何理由声称 truth 已被验证。
+    assert not any("truth verified" in reason.lower() for reason in result.reasons)
 
 def test_http_or_missing_source_metadata_cannot_pass_gate():
     for source in [
