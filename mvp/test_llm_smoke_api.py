@@ -40,6 +40,7 @@ def request_json(base, path, token=None, payload=None):
 
 
 def serve(monkeypatch, client):
+    monkeypatch.setenv("JARVIS_LLM_ENABLED", "true")
     monkeypatch.delenv("JARVIS_PUBLIC_DEMO", raising=False)
     monkeypatch.setenv("JARVIS_ADMIN_TOKEN", ADMIN)
     monkeypatch.delenv("JARVIS_WORKER_TOKENS", raising=False)

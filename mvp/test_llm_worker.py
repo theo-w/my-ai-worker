@@ -39,7 +39,8 @@ def test_llm_rejects_non_https_endpoint():
         OpenAICompatibleLLM("http://localhost:8000/v1", "key", "model")
 
 
-def test_llm_parses_chat_completion_response():
+def test_llm_parses_chat_completion_response(monkeypatch):
+    monkeypatch.setenv("JARVIS_LLM_ENABLED", "true")
     class Response:
         status = 200
         def __enter__(self):

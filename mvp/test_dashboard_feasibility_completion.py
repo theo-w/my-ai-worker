@@ -33,5 +33,7 @@ def test_dashboard_exposes_authenticated_low_cost_llm_smoke_test():
 def test_dashboard_shows_inference_cost_ranges_and_model_warnings():
     assert "AI 推理成本粗估" in DASHBOARD
     assert "model_warning" in DASHBOARD
-    assert "保守：" in DASHBOARD
+    assert 'costScenario("保守"' in DASHBOARD
+    assert 'costScenario("基准"' in DASHBOARD
+    assert 'costScenario("乐观"' in DASHBOARD
     assert "价格依据：" in DASHBOARD
