@@ -543,7 +543,8 @@ function apiFetch(url,options={}){
  const headers=new Headers(options.headers||{});
  const token=document.getElementById("adminToken").value.trim();
  if(token)headers.set("Authorization","Bearer "+token);
- return fetch("http://localhost:8765"+url,{...options,headers,cache:"no-store"});
+ // 同源相对路径：本地与 Render 部署都访问当前服务，避免硬编码 localhost 在 HTTPS 下被浏览器拦截
+ return fetch(url,{...options,headers,cache:"no-store"});
 }
 const phases=["planning","team","evaluation","decision","prototype"];
 const labels={planning:"Planning",team:"Team Formation",evaluation:"Evaluation",decision:"Decision",prototype:"Business Execution"};
