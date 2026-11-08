@@ -30,6 +30,8 @@ class WorkforceRegistry:
         self.tasks: dict[str, dict] = {}
         self.events: list[dict] = []
         self.workers: dict[str, dict] = {}
+        # 幂键缓存：Idempotency-Key → {body, status}，用于重放返回缓存结果。
+        self.idempotency: dict[str, dict] = {}
         self.load()
 
     def _event(self, event_type: str, **details):
@@ -37,19 +39,36 @@ class WorkforceRegistry:
         self.events = self.events[-2000:]
 
     def record_twin_decision(self, goal: str, decision: str, reason: str,
-                             llm_used: bool = False, task_id: str | None = None):
-        """Persist an auditable Digital Twin orchestration decision."""
+                             llm_used: bool = False, task_id: str | None = None,
+                             evidence_ids: list[str] | None = None,
+                             ignored_evidence: list[dict] | None = None,
+                             uncertainty: str | None = None):
+        """Persist an auditable Digital Twin orchestration decision.
+
+        Phase-2 evidence chain: optional ``evidence_ids``, ``ignored_evidence``,
+        and ``uncertainty`` fields let the twin record which evidence supported
+        the decision, what was ignored and why, and any uncertainty statements.
+        """
         if not isinstance(goal, str) or not goal.strip() or len(goal) > 2000:
             raise ValueError("goal must be between 1 and 2000 characters")
         if not isinstance(decision, str) or not decision.strip() or len(decision) > 100:
             raise ValueError("decision must be between 1 and 100 characters")
         if not isinstance(reason, str) or len(reason) > 1000:
             raise ValueError("reason must be at most 1000 characters")
+        if evidence_ids is not None and not isinstance(evidence_ids, list):
+            raise ValueError("evidence_ids must be a list or null")
+        if ignored_evidence is not None and not isinstance(ignored_evidence, list):
+            raise ValueError("ignored_evidence must be a list or null")
+        if uncertainty is not None and not isinstance(uncertainty, str):
+            raise ValueError("uncertainty must be a string or null")
         with self.lock:
             self._event(
                 "twin_decision", goal=goal, decision=decision, reason=reason,
                 planner="llm" if llm_used else "deterministic_rules",
                 llm_used=bool(llm_used), task_id=task_id,
+                evidence_ids=evidence_ids,
+                ignored_evidence=ignored_evidence,
+                uncertainty=uncertainty,
             )
             self.save()
 
@@ -60,16 +79,36 @@ class WorkforceRegistry:
                 self.tasks = data.get("tasks", {})
                 self.events = data.get("events", [])
                 self.workers = data.get("workers", {})
+                self.idempotency = data.get("idempotency", {})
             except FileNotFoundError:
                 return
             except (OSError, ValueError, TypeError):
                 self.tasks, self.events, self.workers = {}, [], {}
+                self.idempotency = {}
                 self._event("state_recovered", reason="invalid_or_unreadable_store")
+
+    def check_idempotency(self, key: str) -> dict | None:
+        """按幂键返回缓存响应；未见过该键时返回 None。"""
+        with self.lock:
+            cached = self.idempotency.get(key)
+            return dict(cached) if isinstance(cached, dict) else None
+
+    def store_idempotency(self, key: str, response: dict) -> None:
+        """按幂键缓存响应；只保留最近 200 个键。"""
+        with self.lock:
+            if key in self.idempotency:
+                return
+            if len(self.idempotency) >= 200:
+                oldest = next(iter(self.idempotency))
+                del self.idempotency[oldest]
+            self.idempotency[key] = response
+            self.save()
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps({"tasks": self.tasks, "events": self.events, "workers": self.workers},
+        tmp.write_text(json.dumps({"tasks": self.tasks, "events": self.events, "workers": self.workers,
+                                   "idempotency": self.idempotency},
                                   ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.path)
 
@@ -157,11 +196,50 @@ class WorkforceRegistry:
             return claimed
 
     def report(self, task_id: str, worker_id: str, status: str,
-               output: str = "", blocker: str = "", lease_token: str | None = None) -> dict:
+               output: str = "", blocker: str = "", lease_token: str | None = None,
+               evidence: list[dict] | None = None,
+               provenance: dict | None = None) -> dict:
+        """Submit a task result or blocker.
+
+        Phase-2 evidence chain: optional ``evidence`` and ``provenance`` fields
+        let employees attach traceable source records and executor metadata.
+        Existing callers that omit these fields continue to work (backward
+        compatible).
+
+        Args:
+            evidence: list of source records, each with at least ``source_url``.
+            provenance: executor metadata (executor_type, tools_used, timestamp).
+        """
         if status not in {"completed", "blocked", "failed", "in_progress"}:
             raise ValueError("status must be completed, blocked, failed, or in_progress")
         if len(output) > 20000 or len(blocker) > 3000:
             raise ValueError("output or blocker is too long")
+        # Validate evidence chain fields (phase 2).
+        if evidence is not None:
+            if not isinstance(evidence, list):
+                raise ValueError("evidence must be a list or null")
+            for item in evidence:
+                if not isinstance(item, dict):
+                    raise ValueError("each evidence item must be an object")
+                url = item.get("source_url")
+                if not isinstance(url, str) or not url.startswith("https://"):
+                    raise ValueError("evidence.source_url must be an HTTPS URL")
+                if "excerpt" in item and not isinstance(item["excerpt"], str):
+                    raise ValueError("evidence.excerpt must be a string")
+                if "confidence" in item:
+                    c = item["confidence"]
+                    if not isinstance(c, (int, float)) or isinstance(c, bool):
+                        raise ValueError("evidence.confidence must be a number 0-1")
+                    if c < 0 or c > 1:
+                        raise ValueError("evidence.confidence must be between 0 and 1")
+                if "simulated" in item and not isinstance(item["simulated"], bool):
+                    raise ValueError("evidence.simulated must be a boolean")
+        if provenance is not None:
+            if not isinstance(provenance, dict):
+                raise ValueError("provenance must be an object or null")
+            if "executor_type" in provenance:
+                if provenance["executor_type"] not in {"simulated", "llm", "live_search"}:
+                    raise ValueError("provenance.executor_type must be simulated, llm, or live_search")
         with self.lock:
             # A worker must not be able to submit a late result after its lease
             # expired merely because the background supervisor has not ticked yet.
@@ -173,6 +251,11 @@ class WorkforceRegistry:
                 raise ValueError("lease token is missing or stale")
             task["output"] = output
             task["blocker"] = blocker
+            # Persist evidence chain fields (phase 2).
+            if evidence is not None:
+                task["evidence"] = evidence
+            if provenance is not None:
+                task["provenance"] = provenance
             task["updated_at"] = _stamp()
             if status == "in_progress":
                 task["lease_until"] = _stamp(_now() + timedelta(seconds=self.lease_seconds))
@@ -197,7 +280,11 @@ class WorkforceRegistry:
             self._event("worker_reported", task_id=task_id, worker_id=worker_id,
                         status=status, blocker=blocker)
             self.save()
-            return {key: value for key, value in task.items() if key != "_lease_token"}
+            result = {key: value for key, value in task.items() if key != "_lease_token"}
+            # Always surface evidence/provenance even when the caller omitted them.
+            result.setdefault("evidence", task.get("evidence", []))
+            result.setdefault("provenance", task.get("provenance", {}))
+            return result
 
 
     def renew_lease(self, task_id: str, worker_id: str,

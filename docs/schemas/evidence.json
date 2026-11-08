@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/evidence",
+  "title": "EvidenceChain",
+  "description": "证据链模型。阶段二 §2.5 定义。员工提交结果时必须附带，分身收到后必须论证来源可靠性。",
+  "type": "object",
+  "properties": {
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "description": "来源 URL，必须为 HTTPS"
+    },
+    "source_title": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "来源标题"
+    },
+    "excerpt": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "原始摘录，不得用自己的转述替代"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["primary", "secondary", "media", "user_review"],
+      "description": "来源类型：一手数据/二手分析/媒体报道/用户评论"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "证据置信度"
+    },
+    "simulated": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为模拟输出。模拟输出不得进入证据链。"
+    },
+    "provider": {
+      "type": "string",
+      "description": "来源提供商（如 tavily）"
+    },
+    "source_role": {
+      "type": "string",
+      "description": "来源角色（primary/secondary/media/user_review）"
+    },
+    "evidence_use": {
+      "type": "string",
+      "description": "证据用途"
+    },
+    "evidence_use_label": {
+      "type": "string",
+      "description": "证据用途标签"
+    },
+    "evidence_use_reason": {
+      "type": "string",
+      "description": "证据用途说明"
+    }
+  },
+  "required": ["source_url"]
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/twin-decision",
+  "title": "TwinDecision",
+  "description": "分身决策模型。对应 workforce.py:WorkforceRegistry.record_twin_decision()。阶段二 §2.5 要求每个决策记录依据的证据 ID。",
+  "type": "object",
+  "required": ["goal", "decision", "reason"],
+  "properties": {
+    "goal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "decision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "llm_used": {
+      "type": "boolean",
+      "description": "是否使用了 LLM 做出此决策"
+    },
+    "task_id": {
+      "type": ["string", "null"]
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "阶段二新增：此决策依据的证据 ID 列表"
+    },
+    "ignored_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      },
+      "description": "阶段二新增：被忽略的证据及原因"
+    },
+    "uncertainty": {
+      "type": "string",
+      "description": "阶段二新增：不确定性声明"
+    }
+  }
+}

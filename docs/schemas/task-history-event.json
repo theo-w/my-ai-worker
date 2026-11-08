@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/task-history-event",
+  "title": "TaskHistoryEvent",
+  "description": "任务历史事件模型。对应 workforce.py 中各操作的 history.append()。",
+  "type": "object",
+  "required": ["event", "at"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "description": "事件类型（assigned / worker_report / lease_expired / retry_approved / cancelled / tasks_merged / verification_recorded 等）"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "worker_id": {
+      "type": ["string", "null"]
+    },
+    "status": {
+      "type": ["string", "null"]
+    },
+    "blocker": {
+      "type": ["string", "null"]
+    },
+    "reason": {
+      "type": ["string", "null"]
+    },
+    "attempt": {
+      "type": ["integer", "null"]
+    },
+    "previous_status": {
+      "type": ["string", "null"]
+    },
+    "target_task_id": {
+      "type": ["string", "null"]
+    },
+    "source_task_ids": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "accepted": {
+      "type": ["boolean", "null"]
+    }
+  }
+}

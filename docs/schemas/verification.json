@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/verification",
+  "title": "Verification",
+  "description": "验证模型。对应 workforce.py:WorkforceRegistry.record_verification()。阶段二 §2.5 强制 verified_truth=false。",
+  "type": "object",
+  "required": ["accepted", "verified_truth"],
+  "properties": {
+    "accepted": {
+      "type": "boolean",
+      "description": "是否通过验证"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["accepted", "rejected", "pending"]
+    },
+    "verified_truth": {
+      "type": "boolean",
+      "const": false,
+      "description": "始终为 false。结构检查通过不等于事实证明。"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "note": { "type": "string" }
+        },
+        "required": ["name", "passed"]
+      }
+    },
+    "evidence_count": {
+      "type": ["integer", "null"],
+      "description": "通过门禁的证据数量"
+    },
+    "notes": {
+      "type": ["string", "null"]
+    },
+    "verification_note": {
+      "type": ["string", "null"],
+      "description": "验证说明"
+    }
+  }
+}

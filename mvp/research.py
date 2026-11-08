@@ -431,7 +431,35 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
 
     sources = list(source_rows.values())[:20]
     retrieved_page_source_count = len(sources)
+
+    # Collect Steam raw reviews from search results.
     raw_user_reviews, review_collection_errors = collect_steam_raw_reviews(sources)
+
+    # Also collect from a curated list of known AI-native / AI-adjacent games
+    # on Steam. This ensures we get primary user signals even when search
+    # results are dominated by media articles.
+    _ai_game_app_ids = [
+        "2056290",  # Neural Space - AI space exploration
+        "2363330",  # Artificial Adventure - AI-generated adventure game
+        "1817110",  # Marks and Miles - AI NPC behavior
+        "2138720",  # Starfield (AI NPCs mod community)
+        "1282100",  # Sunless Skies (AI narrative)
+        "1091150",  # Cyberpunk 2077 (AI NPCs in 2.0)
+        "1172620",  # Planet Zoo (AI animal behavior)
+        "814380",   # Sekiro (AI enemy behavior reference)
+        "1245630",  # ELDEN RING (AI enemy design reference)
+        "1966720",  # Helldivers 2 (AI swarm behavior)
+    ]
+    for app_id in _ai_game_app_ids:
+        try:
+            _reviews, _errors = collect_steam_raw_reviews([{
+                "url": "https://store.steampowered.com/app/" + app_id + "/",
+                "title": "Steam App " + app_id,
+            }])
+            raw_user_reviews.extend(_reviews)
+            review_collection_errors.extend(_errors)
+        except Exception:
+            pass  # Non-fatal; continue with other app IDs
     # Keep article/search-result sources and individual original reviews separate.
     sources.extend(raw_user_reviews)
     evidence = [{
