@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/task",
+  "title": "Task",
+  "description": "任务模型。对应 workforce.py:WorkforceRegistry.create_task() 和 DIGITAL_WORKFORCE_PROTOCOL.md §4 MVP 任务合同。",
+  "type": "object",
+  "required": ["id", "title", "description", "capability", "priority", "status", "created_at", "updated_at"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{12}$",
+      "description": "稳定唯一标识，格式为 uuid4 hex[:12]"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "任务标题"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "任务描述，包含项目目标和子任务说明"
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "所需能力，如 research / analysis / general"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "优先级 1=low … 5=urgent"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "approval_required",
+        "assigned",
+        "awaiting_validation",
+        "completed",
+        "blocked",
+        "failed",
+        "cancelled",
+        "superseded"
+      ],
+      "description": "任务生命周期状态。协议文档 §3 定义。"
+    },
+    "assigned_to": {
+      "type": ["string", "null"],
+      "maxLength": 120,
+      "description": "被分配的员工 ID"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "当前重试次数"
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "最大重试次数"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 创建时间"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 最后更新时间"
+    },
+    "lease_until": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "租约截止时间"
+    },
+    "output": {
+      "type": "string",
+      "maxLength": 20000,
+      "description": "员工提交的输出内容"
+    },
+    "blocker": {
+      "type": "string",
+      "maxLength": 3000,
+      "description": "阻塞原因"
+    },
+    "feedback": {
+      "type": "array",
+      "items": { "$ref": "feedback.json" }
+    },
+    "history": {
+      "type": "array",
+      "items": { "$ref": "task-history-event.json" }
+    },
+    "success_criteria": {
+      "type": "object",
+      "description": "成功标准，JSON 对象"
+    },
+    "evidence_required": {
+      "type": "boolean",
+      "description": "是否需要证据。research 能力默认 true。协议文档 §5.1 证据门禁。"
+    },
+    "verification": {
+      "$ref": "verification.json"
+    },
+    "verified_truth": {
+      "type": ["boolean", "null"],
+      "description": "始终为 false。结构检查通过不等于事实证明。协议文档 §5。"
+    }
+  }
+}

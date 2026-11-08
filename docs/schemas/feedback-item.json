@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/feedback-item",
+  "title": "FeedbackItem",
+  "description": "反馈项模型。对应 workforce.py:WorkforceRegistry.feedback()。",
+  "type": "object",
+  "required": ["actor", "message", "kind", "at"],
+  "properties": {
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["note", "question", "correction", "approval_request"]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

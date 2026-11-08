@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jarvis://schemas/event-record",
+  "title": "EventRecord",
+  "description": "事件记录模型。对应 workforce.py:WorkforceRegistry._event()。",
+  "type": "object",
+  "required": ["type", "at"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "事件类型（task_created / task_assigned / worker_reported / verification_recorded 等）"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": true
+}

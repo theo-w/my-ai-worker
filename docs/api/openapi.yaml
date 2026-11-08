@@ -1,0 +1,1760 @@
+openapi: 3.0.3
+info:
+  title: JARVIS Digital Workforce API
+  description: |
+    JARVIS 数字分身与数字员工通用执行底座 API。
+    以目标为中心动态组织员工、追踪执行状态、收集反馈，并对阻塞与结果验证保留审计记录。
+
+    规范来源：
+    - [DIGITAL_WORKFORCE_PROTOCOL.md](../DIGITAL_WORKFORCE_PROTOCOL.md) — 任务生命周期、合同、验收测试
+    - [DIGITAL_TWIN_EMPLOYEE_FLOW.md](../DIGITAL_TWIN_EMPLOYEE_FLOW.md) — 信息流与协作流程
+    - [GOAL_DRIVEN_ARCHITECTURE.md](../GOAL_DRIVEN_ARCHITECTURE.md) — 架构决策
+    - [OBSERVABILITY.md](../OBSERVABILITY.md) — 可观测性
+    - [SECURITY_AND_AUTH.md](../SECURITY_AND_AUTH.md) — 安全与认证
+
+    追溯矩阵见 [SPEC_TRACEABILITY.md](../SPEC_TRACEABILITY.md)。
+  version: 0.7.1
+  contact:
+    name: JARVIS Project
+
+servers:
+  - url: http://127.0.0.1:8765
+    description: 本地开发服务
+
+# ─── Security Schemes ───────────────────────────────────────────────
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Bearer Token 认证。管理员 Token 配置在 JARVIS_ADMIN_TOKEN，员工 Token 配置在 JARVIS_WORKER_TOKENS。未配置时 API fail-closed（返回 503）。"
+
+  schemas:
+    # ── Task ────────────────────────────────────────────────────────
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - capability
+        - priority
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: 稳定唯一标识，格式为 hex[:12]
+          example: "a1b2c3d4e5f6"
+        title:
+          type: string
+          maxLength: 200
+          description: 任务标题
+        description:
+          type: string
+          maxLength: 5000
+          description: 任务描述，包含项目目标和子任务说明
+        capability:
+          type: string
+          maxLength: 100
+          description: 所需能力，如 research / analysis / general
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 优先级 1=low … 5=urgent
+        status:
+          type: string
+          enum:
+            - queued
+            - approval_required
+            - assigned
+            - awaiting_validation
+            - completed
+            - blocked
+            - failed
+            - cancelled
+            - superseded
+          description: |
+            任务生命周期状态。
+            协议文档 §3 定义：queued → assigned → accepted → running → succeeded|blocked|failed|cancelled
+            代码中扩展了 approval_required / awaiting_validation / superseded。
+        assigned_to:
+          type: string
+          nullable: true
+          description: 被分配的员工 ID
+        attempts:
+          type: integer
+          minimum: 0
+          description: 当前重试次数
+        max_attempts:
+          type: integer
+          minimum: 1
+          description: 最大重试次数
+        created_at:
+          type: string
+          format: date-time
+          description: ISO 8601 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: ISO 8601 最后更新时间
+        lease_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: 租约截止时间，过期后任务可被重新分配
+        output:
+          type: string
+          maxLength: 20000
+          description: 员工提交的输出内容
+        blocker:
+          type: string
+          maxLength: 3000
+          description: 阻塞原因
+        feedback:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedbackItem'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskHistoryEvent'
+        success_criteria:
+          type: object
+          maxLength: 4000
+          description: 成功标准，JSON 对象
+        evidence_required:
+          type: boolean
+          description: |
+            是否需要证据。research 能力默认 true。
+            协议文档 §5.1 证据门禁。
+        verification:
+          $ref: '#/components/schemas/Verification'
+        verified_truth:
+          type: boolean
+          nullable: true
+          description: |
+            始终为 false。结构检查通过不等于事实证明。
+            协议文档 §5 可靠性要求。
+
+    # ── TaskClaim (Task + lease_token) ──────────────────────────────
+    TaskClaim:
+      allOf:
+        - $ref: '#/components/schemas/Task'
+        - type: object
+          required: [lease_token]
+          properties:
+            lease_token:
+              type: string
+              description: 租约 fencing token，用于防过期结果覆盖
+
+    # ── FeedbackItem ────────────────────────────────────────────────
+    FeedbackItem:
+      type: object
+      required: [actor, message, kind, at]
+      properties:
+        actor:
+          type: string
+          maxLength: 120
+        message:
+          type: string
+          maxLength: 5000
+        kind:
+          type: string
+          enum: [note, question, correction, approval_request]
+        at:
+          type: string
+          format: date-time
+
+    # ── TaskHistoryEvent ────────────────────────────────────────────
+    TaskHistoryEvent:
+      type: object
+      required: [event, at]
+      properties:
+        event:
+          type: string
+          description: 事件类型（assigned / worker_report / lease_expired / retry_approved 等）
+        at:
+          type: string
+          format: date-time
+        worker_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        blocker:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+        attempt:
+          type: integer
+          nullable: true
+
+    # ── Verification ────────────────────────────────────────────────
+    Verification:
+      type: object
+      required: [accepted, verified_truth]
+      properties:
+        accepted:
+          type: boolean
+          description: 是否通过验证
+        status:
+          type: string
+          enum: [accepted, rejected, pending]
+        verified_truth:
+          type: boolean
+          description: 始终为 false
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              passed:
+                type: boolean
+              note:
+                type: string
+        evidence_count:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        verification_note:
+          type: string
+          nullable: true
+
+    # ── EvidenceItem ────────────────────────────────────────────────
+    EvidenceItem:
+      type: object
+      properties:
+        finding:
+          type: string
+        confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        source:
+          $ref: '#/components/schemas/SourceRecord'
+        simulated:
+          type: boolean
+          description: 是否为模拟输出
+
+    # ── SourceRecord ────────────────────────────────────────────────
+    SourceRecord:
+      type: object
+      required: [url]
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: 必须为 HTTPS
+        snippet:
+          type: string
+          description: 原始摘录
+        description:
+          type: string
+        provider:
+          type: string
+          description: 来源提供商（tavily / 等）
+        source_role:
+          type: string
+          description: 来源角色（primary / secondary / media / user_review）
+        evidence_use:
+          type: string
+          description: 证据用途
+        evidence_use_label:
+          type: string
+          description: 证据用途标签
+        evidence_use_reason:
+          type: string
+          description: 证据用途说明
+
+    # ── WorkerInfo ──────────────────────────────────────────────────
+    WorkerInfo:
+      type: object
+      properties:
+        worker_id:
+          type: string
+          maxLength: 120
+        status:
+          type: string
+          enum: [idle, working, waiting_tool, blocked]
+        current_task_id:
+          type: string
+          nullable: true
+        progress:
+          type: string
+          maxLength: 500
+        last_error:
+          type: string
+          maxLength: 1000
+        last_heartbeat_at:
+          type: string
+          format: date-time
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    # ── WorkforceSnapshot ───────────────────────────────────────────
+    WorkforceSnapshot:
+      type: object
+      properties:
+        counts:
+          type: object
+          description: 各状态的任务计数
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        events:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/EventRecord'
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkerInfo'
+        lease_seconds:
+          type: integer
+
+    # ── EventRecord ─────────────────────────────────────────────────
+    EventRecord:
+      type: object
+      required: [type, at]
+      properties:
+        type:
+          type: string
+          description: 事件类型
+        at:
+          type: string
+          format: date-time
+        additionalProperties: true
+
+    # ── TwinDecision ────────────────────────────────────────────────
+    TwinDecision:
+      type: object
+      required: [goal, decision, reason]
+      properties:
+        goal:
+          type: string
+          maxLength: 2000
+        decision:
+          type: string
+          maxLength: 100
+        reason:
+          type: string
+          maxLength: 1000
+        llm_used:
+          type: boolean
+        task_id:
+          type: string
+          nullable: true
+
+    # ── RunHistoryRecord ────────────────────────────────────────────
+    RunHistoryRecord:
+      type: object
+      properties:
+        run_id:
+          type: string
+        goal:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+        phase:
+          type: string
+        research:
+          type: object
+        design:
+          type: object
+        agents:
+          type: array
+        conversation:
+          type: array
+        evidence:
+          type: array
+        decision:
+          type: object
+        feasibility:
+          type: object
+        knowledge:
+          type: object
+
+    # ── DesignBrief ─────────────────────────────────────────────────
+    DesignBrief:
+      type: object
+      properties:
+        concept_name:
+          type: string
+        source_game:
+          type: string
+        brief:
+          type: string
+        trust:
+          type: object
+          properties:
+            market_validated:
+              type: boolean
+              description: 始终为 false
+            playtested:
+              type: boolean
+              description: 始终为 false
+
+    # ── FeasibilityDraft ────────────────────────────────────────────
+    FeasibilityDraft:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [not_started, researching, completed, failed]
+        contract:
+          type: object
+        report:
+          type: object
+        evaluation:
+          type: object
+
+    # ── KnowledgeSummary ────────────────────────────────────────────
+    KnowledgeSummary:
+      type: object
+      properties:
+        total_records:
+          type: integer
+        matches:
+          type: array
+          items:
+            type: object
+
+    # ── LLMStatus ───────────────────────────────────────────────────
+    LLMStatus:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        llm_configured:
+          type: boolean
+        search_configured:
+          type: boolean
+        missing_llm_variables:
+          type: array
+          items:
+            type: string
+        llm_configuration_error:
+          type: boolean
+        mode:
+          type: string
+          enum: [simulated, llm, search_only, hybrid]
+        model:
+          type: string
+          nullable: true
+        model_warning:
+          type: string
+          nullable: true
+        recommended_models:
+          type: array
+          items:
+            type: string
+
+    # ── ResearchStatus ──────────────────────────────────────────────
+    ResearchStatus:
+      type: object
+      properties:
+        search_endpoint_configured:
+          type: boolean
+        search_api_key_configured:
+          type: boolean
+
+    # ── ImprovementReport ───────────────────────────────────────────
+    ImprovementReport:
+      type: object
+      properties:
+        sample_count:
+          type: integer
+        verified_successes:
+          type: integer
+        failure_categories:
+          type: object
+        recommendation:
+          type: string
+
+    # ── Common Response Wrappers ────────────────────────────────────
+    ApiResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+
+    PagedRunHistory:
+      type: object
+      required: [ok, count, runs]
+      properties:
+        ok:
+          type: boolean
+        count:
+          type: integer
+        runs:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/RunHistoryRecord'
+
+    # ── Error Responses ─────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: 错误描述
+
+  parameters:
+    TaskIdParam:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 任务 ID
+  responses:
+    BadRequest:
+      description: 请求参数无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: 需要 Bearer Token 认证
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: 权限不足（需要 admin/worker 角色）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: 服务不可用（未配置认证或外部依赖）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+# ─── Tags ──────────────────────────────────────────────────────────
+tags:
+  - name: workforce
+    description: 任务队列管理
+  - name: twin
+    description: 数字分身接口
+  - name: worker
+    description: 员工心跳与注册
+  - name: llm
+    description: LLM 状态与连通测试
+  - name: research
+    description: 搜索配置与执行
+  - name: knowledge
+    description: 知识库
+  - name: feasibility
+    description: 可行性评估
+  - name: improvement
+    description: 递归自我改进
+  - name: history
+    description: 运行历史
+  - name: state
+    description: 运行状态
+
+# ─── Paths ─────────────────────────────────────────────────────────
+paths:
+  # ═══════════════════════════════════════════════════════════════
+  # Workforce API
+  # ═══════════════════════════════════════════════════════════════
+  /api/workforce:
+    get:
+      tags: [workforce]
+      summary: 获取全量队列快照
+      description: |
+        读取任务、员工、事件的全局快照。需要管理员认证。
+        协议文档 §3 任务生命周期。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 队列快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    required: [ok, counts, tasks, events, workers]
+                    properties:
+                      counts:
+                        type: object
+                      tasks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EventRecord'
+                      workers:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkerInfo'
+                      lease_seconds:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/workforce/tasks:
+    post:
+      tags: [workforce]
+      summary: 创建任务
+      description: |
+        创建一个新的排队任务。需要管理员认证。
+        协议文档 §4 MVP 任务合同。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                description:
+                  type: string
+                  maxLength: 5000
+                  default: ""
+                capability:
+                  type: string
+                  maxLength: 100
+                  default: "general"
+                priority:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 3
+                assigned_to:
+                  type: string
+                  nullable: true
+                approval_required:
+                  type: boolean
+                  default: false
+                success_criteria:
+                  type: object
+                  maxLength: 4000
+                evidence_required:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: 任务已创建
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    required: [ok, task]
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/claim:
+    post:
+      tags: [worker]
+      summary: 员工领取任务
+      description: |
+        员工通过能力匹配领取一个排队任务。返回任务 + 租约令牌。
+        协议文档 §3 任务生命周期。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                capabilities:
+                  type: array
+                  items:
+                    type: string
+                  description: 员工声明的能力列表
+                task_id:
+                  type: string
+                  nullable: true
+                  description: 可选，指定领取特定任务
+      responses:
+        '200':
+          description: 领取结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/TaskClaim'
+                      message:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/report:
+    post:
+      tags: [worker]
+      summary: 员工提交结果
+      description: |
+        员工提交任务结果或阻塞原因。必须携带租约令牌。
+        协议文档 §4 Worker 反馈合同。
+        阶段二 §6 新增 evidence / provenance 字段。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, status]
+              properties:
+                task_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [completed, blocked, failed, in_progress]
+                lease_token:
+                  type: string
+                output:
+                  type: string
+                  maxLength: 20000
+                  default: ""
+                blocker:
+                  type: string
+                  maxLength: 3000
+                  default: ""
+                evidence:
+                  type: array
+                  description: |
+                    结构化证据列表。每个元素包含来源 URL、标题、摘录、来源类型、置信度。
+                    阶段二 §6 新增字段。
+                  items:
+                    type: object
+                    properties:
+                      source_url:
+                        type: string
+                        format: uri
+                      source_title:
+                        type: string
+                      excerpt:
+                        type: string
+                      source_type:
+                        type: string
+                        enum: [primary, secondary, media, user_review]
+                      confidence:
+                        type: number
+                        minimum: 0.0
+                        maximum: 1.0
+                      simulated:
+                        type: boolean
+                        default: false
+                provenance:
+                  type: object
+                  description: |
+                    执行器元数据。阶段二 §6 新增字段。
+                  properties:
+                    executor_type:
+                      type: string
+                      enum: [simulated, llm, live_search]
+                    tools_used:
+                      type: array
+                      items:
+                        type: string
+                    timestamp:
+                      type: string
+                      format: date-time
+      responses:
+        '200':
+          description: 结果已记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/verify:
+    post:
+      tags: [workforce]
+      summary: 记录验证结果
+      description: |
+        管理员记录任务的结构验证结果。验证前任务必须处于 awaiting_validation 状态。
+        协议文档 §5 证据门禁。
+        阶段二 §2.5 强制 verified_truth=false。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, verification]
+              properties:
+                task_id:
+                  type: string
+                verification:
+                  $ref: '#/components/schemas/Verification'
+      responses:
+        '200':
+          description: 验证已记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/retry:
+    post:
+      tags: [workforce]
+      summary: 重试阻塞/失败任务
+      description: |
+        管理员或分身策略批准重试。任务必须处于 blocked 或 failed 状态，且未达 max_attempts。
+        协议文档 §3 重试策略。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, reason]
+              properties:
+                task_id:
+                  type: string
+                reason:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 任务已重新入队
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/cancel:
+    post:
+      tags: [workforce]
+      summary: 取消任务
+      description: |
+        取消排队中或已分配的任务。保留审计痕迹。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, reason]
+              properties:
+                task_id:
+                  type: string
+                reason:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 任务已取消
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/merge:
+    post:
+      tags: [workforce]
+      summary: 合并重复任务
+      description: |
+        将多个排队中的同能力任务合并到一个目标任务。源任务标记为 superseded。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_task_id, source_task_ids, reason]
+              properties:
+                target_task_id:
+                  type: string
+                source_task_ids:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: string
+                reason:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 合并完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      target:
+                        $ref: '#/components/schemas/Task'
+                      sources:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/feedback:
+    post:
+      tags: [workforce]
+      summary: 提交反馈
+      description: |
+        向任务添加反馈（note / question / correction / approval_request）。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, actor, message]
+              properties:
+                task_id:
+                  type: string
+                actor:
+                  type: string
+                  maxLength: 120
+                message:
+                  type: string
+                  maxLength: 5000
+                kind:
+                  type: string
+                  enum: [note, question, correction, approval_request]
+                  default: note
+      responses:
+        '200':
+          description: 反馈已记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      feedback:
+                        $ref: '#/components/schemas/FeedbackItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/approve:
+    post:
+      tags: [workforce]
+      summary: 审批任务
+      description: |
+        将 approval_required 状态的任务转为 queued。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id]
+              properties:
+                task_id:
+                  type: string
+      responses:
+        '200':
+          description: 任务已审批
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      task:
+                        $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/workforce/maintain:
+    post:
+      tags: [workforce]
+      summary: 租约维护
+      description: |
+        回收过期租约，将超期任务重新入队或标记失败。
+        协议文档 §5 可靠性要求。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 维护完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      maintenance:
+                        type: object
+                        properties:
+                          requeued:
+                            type: array
+                            items:
+                              type: string
+                          failed:
+                            type: array
+                            items:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Digital Twin API
+  # ═══════════════════════════════════════════════════════════════
+  /api/twin/goal:
+    post:
+      tags: [twin]
+      summary: 提交目标
+      description: |
+        向数字分身提交一个目标，分身将分解任务并创建员工工作项。
+        协议文档 §2 Core responsibilities。
+        阶段二 §2.5 自动附加评估标准。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [goal]
+              properties:
+                goal:
+                  type: string
+                  maxLength: 4000
+                strategy:
+                  type: string
+                  enum: [single_agent, decompose]
+                  default: single_agent
+                template:
+                  type: string
+                  enum: [general, ai_game_feasibility]
+                  default: general
+                capability:
+                  type: string
+                  maxLength: 100
+      responses:
+        '201':
+          description: 目标已登记，任务已创建
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    required: [ok, project_id, goal, tasks]
+                    properties:
+                      project_id:
+                        type: string
+                      goal:
+                        type: string
+                      strategy:
+                        type: string
+                      template:
+                        type: string
+                      plan_mode:
+                        type: string
+                      warnings:
+                        type: array
+                        items:
+                          type: string
+                      tasks:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+                      next_step:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/twin/review:
+    post:
+      tags: [twin]
+      summary: 分身复核
+      description: |
+        请求分身复核一个项目的任务状态，返回决策和建议的下一步。
+        确定性规则完成，不调用 LLM。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: string
+                  maxLength: 80
+      responses:
+        '200':
+          description: 复核完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      project_id:
+                        type: string
+                      decision:
+                        type: string
+                        enum: [replan_required, awaiting_independent_validation, continue_monitoring, goal_completed, needs_twin_review]
+                      reason:
+                        type: string
+                      task_count:
+                        type: integer
+                      status_counts:
+                        type: object
+                      next_actions:
+                        type: array
+                      llm_used:
+                        type: boolean
+                      safety_note:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/twin/advance:
+    post:
+      tags: [twin]
+      summary: 分身推进
+      description: |
+        分身执行一次有界确定性推进：仅对已知的瞬态基础设施故障进行重试，
+        未知阻塞需要人工审查。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_id]
+              properties:
+                project_id:
+                  type: string
+                  maxLength: 80
+      responses:
+        '200':
+          description: 推进完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      project_id:
+                        type: string
+                      decision:
+                        type: string
+                      reason:
+                        type: string
+                      task_count:
+                        type: integer
+                      next_actions:
+                        type: array
+                      action_task_id:
+                        type: string
+                        nullable: true
+                      llm_used:
+                        type: boolean
+                      safety_note:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Worker Heartbeat
+  # ═══════════════════════════════════════════════════════════════
+  /api/workers/heartbeat:
+    post:
+      tags: [worker]
+      summary: 员工心跳
+      description: |
+        员工定期发送心跳以证明存活。working 状态必须携带 task_id 和 lease_token。
+        协议文档 §5 可靠性要求。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [idle, working, waiting_tool, blocked]
+                current_task_id:
+                  type: string
+                  nullable: true
+                lease_token:
+                  type: string
+                  nullable: true
+                progress:
+                  type: string
+                  maxLength: 500
+                last_error:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 心跳已记录
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      worker:
+                        $ref: '#/components/schemas/WorkerInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # LLM Status
+  # ═══════════════════════════════════════════════════════════════
+  /api/llm/status:
+    get:
+      tags: [llm]
+      summary: LLM 配置状态
+      description: |
+        检查 LLM 是否已配置、当前模式、模型 ID 和警告信息。
+        公开端点，不需要认证。
+      responses:
+        '200':
+          description: LLM 状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMStatus'
+
+  /api/llm/smoke-test:
+    post:
+      tags: [llm]
+      summary: LLM 连通测试
+      description: |
+        向 LLM 提供商发送一个 64-token 限制的单次请求，验证连通性。
+        需要管理员认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 测试结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  status:
+                    type: string
+                    enum: [connected, unexpected_response]
+                  model:
+                    type: string
+                  elapsed_ms:
+                    type: integer
+                  max_tokens:
+                    type: integer
+                    example: 64
+                  marker_matched:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Research
+  # ═══════════════════════════════════════════════════════════════
+  /api/research/status:
+    get:
+      tags: [research]
+      summary: 搜索配置状态
+      description: |
+        检查搜索端点和 API Key 是否已配置。公开端点。
+      responses:
+        '200':
+          description: 搜索配置状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchStatus'
+
+  /api/research:
+    post:
+      tags: [research]
+      summary: 执行搜索
+      description: |
+        对给定查询执行配置的搜索提供商调用。
+        需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  maxLength: 2000
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 5
+      responses:
+        '200':
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  sources:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SourceRecord'
+                  evidence:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EvidenceItem'
+                  quality:
+                    type: object
+                  synthesis:
+                    type: string
+                  error:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # State & History
+  # ═══════════════════════════════════════════════════════════════
+  /api/state:
+    get:
+      tags: [state]
+      summary: 运行状态
+      description: |
+        获取当前运行的完整状态快照，包括阶段、代理、证据、决策、监督信息。
+        需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 运行状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goal:
+                    type: string
+                  phase:
+                    type: string
+                  agents:
+                    type: array
+                  evidence:
+                    type: array
+                  decision:
+                    type: object
+                  feasibility:
+                    $ref: '#/components/schemas/FeasibilityDraft'
+                  knowledge:
+                    $ref: '#/components/schemas/KnowledgeSummary'
+                  research:
+                    type: object
+                  design:
+                    type: object
+                  conversation:
+                    type: array
+                  supervision:
+                    type: object
+                  run_id:
+                    type: string
+                  started_at:
+                    type: number
+                  last_progress_at:
+                    type: number
+                  history_error:
+                    type: string
+                  run_error:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/history:
+    get:
+      tags: [history]
+      summary: 运行历史
+      description: |
+        获取最近的运行历史记录（最多 50 条）。需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 运行历史
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedRunHistory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Knowledge
+  # ═══════════════════════════════════════════════════════════════
+  /api/knowledge:
+    get:
+      tags: [knowledge]
+      summary: 知识库摘要
+      description: |
+        获取知识库的总记录数和摘要。需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 知识库摘要
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      knowledge:
+                        $ref: '#/components/schemas/KnowledgeSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/knowledge/search:
+    post:
+      tags: [knowledge]
+      summary: 搜索知识库
+      description: |
+        在知识库中搜索与查询相关的记录。需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '200':
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  matches:
+                    type: array
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Feasibility
+  # ═══════════════════════════════════════════════════════════════
+  /api/feasibility:
+    get:
+      tags: [feasibility]
+      summary: 可行性状态
+      description: |
+        获取当前可行性评估的状态。需要管理员或 demo 认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 可行性状态
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      feasibility:
+                        $ref: '#/components/schemas/FeasibilityDraft'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Improvement
+  # ═══════════════════════════════════════════════════════════════
+  /api/improvement/report:
+    get:
+      tags: [improvement]
+      summary: 递归自我改进报告
+      description: |
+        基于执行记录生成改进评估报告。需要管理员认证。
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 改进报告
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      report:
+                        $ref: '#/components/schemas/ImprovementReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Pages (public)
+  # ═══════════════════════════════════════════════════════════════
+  /:
+    get:
+      tags: [pages]
+      summary: Dashboard 工作台
+      description: 主工作台页面。
+      responses:
+        '200':
+          description: HTML 页面
+          content:
+            text/html:
+              schema:
+                type: string
+    head:
+      tags: [pages]
+      summary: Dashboard HEAD 检查
+      responses:
+        '200':
+          description: 页面存在
+
+  /trace:
+    get:
+      tags: [pages]
+      summary: 流程追踪页面
+      description: 流程追踪与验收视图。
+      responses:
+        '200':
+          description: HTML 页面
+          content:
+            text/html:
+              schema:
+                type: string
+    head:
+      tags: [pages]
+      summary: Trace HEAD 检查
+      responses:
+        '200':
+          description: 页面存在
+
+  /playtest:
+    get:
+      tags: [pages]
+      summary: 游戏体验原型
+      description: AI 原生游戏玩法可玩原型。
+      responses:
+        '200':
+          description: HTML 页面
+          content:
+            text/html:
+              schema:
+                type: string

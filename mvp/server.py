@@ -170,6 +170,53 @@ def reset(goal: str):
         STATE["prototype"] = None
         STATE["twin"] = TWIN.snapshot(goal, team)
 
+def _assess_source_reliability(evidence: list) -> dict:
+    """对每条证据做结构性可靠性分级；只做结构检查，不证明任何事实为真。"""
+    reliable, questionable, unreliable = [], [], []
+    for item in evidence if isinstance(evidence, list) else []:
+        row = dict(item) if isinstance(item, dict) else dict(getattr(item, "__dict__", {}) or {})
+        source = row.get("source") if isinstance(row.get("source"), dict) else {}
+        url = str(source.get("url", "")).strip() if source else ""
+        finding = row.get("finding", "") if isinstance(row, dict) else ""
+        if not url:
+            unreliable.append({"finding": finding, "reason": "missing_or_invalid_source"})
+        elif row.get("simulated"):
+            unreliable.append({"finding": finding, "reason": "simulated_output"})
+        elif not url.startswith("https://"):
+            questionable.append({"finding": finding, "reason": "not_https"})
+        elif row.get("source_role") in ("primary", "secondary", "official"):
+            reliable.append({"finding": finding, "rating": "reliable"})
+        else:
+            questionable.append({"finding": finding, "reason": "source_role_unclassified"})
+    return {"reliable": reliable, "questionable": questionable, "unreliable": unreliable}
+
+
+def _check_evidence_traceability(output: str, evidence: list) -> dict:
+    """结构检查输出引用的 URL 是否出现在证据；不核对语义支持，不打开链接。"""
+    text = str(output or "")
+    cited = []
+    for token in text.replace("\n", " ").split(" "):
+        cleaned = token.strip().rstrip(".,;)]}\"'")
+        if cleaned.startswith(("http://", "https://")):
+            cited.append(cleaned)
+    evidence_urls = set()
+    for item in evidence if isinstance(evidence, list) else []:
+        row = dict(item) if isinstance(item, dict) else {}
+        source = row.get("source") if isinstance(row.get("source"), dict) else {}
+        url = str(source.get("url", "")).strip() if source else ""
+        if url:
+            evidence_urls.add(url)
+    matched = [url for url in cited if url in evidence_urls]
+    unmatched = [url for url in cited if url not in evidence_urls]
+    return {
+        "structural_traceability": bool(cited) and not unmatched,
+        "matched_urls": matched,
+        "unmatched_urls": unmatched,
+        "output_url_count": len(cited),
+        "evidence_url_count": len(evidence_urls),
+    }
+
+
 def _audit_worker_result(output: str, result_data: dict, evidence: list) -> dict:
     """Deterministic first-pass audit; explicitly does not claim semantic fact verification."""
     output_text = str(output or "").strip()
@@ -215,6 +262,8 @@ def _audit_worker_result(output: str, result_data: dict, evidence: list) -> dict
             "来源链接、员工置信度和任务完成状态均不能单独证明事实正确。",
         ],
         "adoption": "不得直接作为已核实事实采纳" if verdict != "TRACEABLE_BUT_UNVERIFIED" else "仅可作为待核验分析线索",
+        "source_reliability": _assess_source_reliability(evidence),
+        "traceability": _check_evidence_traceability(output, evidence),
     }
 
 
@@ -957,6 +1006,10 @@ def authenticate_workforce(headers, required_role: str) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     def _json(self, payload, code=200):
+        # 幂键：首次执行缓存结果，重放返回缓存。
+        key = getattr(self, "_idem_key", None)
+        if key:
+            WORKFORCE.store_idempotency(key, {"body": payload, "status": code})
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1168,6 +1221,13 @@ class Handler(BaseHTTPRequestHandler):
         global RUN_THREAD
         # Query parameters must not prevent API route matching.
         self.path = urlsplit(self.path).path
+        # 幂键：重复请求返回缓存结果，不重新执行。
+        self._idem_key = (self.headers.get("Idempotency-Key") or "").strip()
+        if self._idem_key:
+            cached = WORKFORCE.check_idempotency(self._idem_key)
+            if cached is not None:
+                self._json(cached["body"], cached["status"])
+                return
         if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:

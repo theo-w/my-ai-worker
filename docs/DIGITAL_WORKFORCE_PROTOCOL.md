@@ -10,6 +10,29 @@ Turn JARVIS from a single-task demo into a digital-twin orchestrator that can as
 - **Digital Employee (worker):** accepts an assigned task, acknowledges it, reports progress, returns a structured result with evidence and limitations, and raises a blocker instead of silently failing.
 - **Human operator:** sets goals and constraints, approves gated actions, and can pause, cancel, or reassign work.
 
+## 2.5 证据链原则（强制约束）
+
+分身与员工交互的所有结果必须满足以下证据链要求：
+
+1. **可追溯性（Traceability）：** 每个员工提交的结论必须附带来源 URL、来源标题、原始摘录（excerpt）。没有来源的结论标记为 `untraceable`，不得作为决策依据。
+
+2. **原始数据客观性（Objectivity）：** 员工不得用自己的语言转述替代原始数据。所有引用必须保留原始摘录，并标注来源类型（一手数据/二手分析/媒体报道/用户评论）。转述仅可作为辅助说明，不能替代原文。
+
+3. **来源可靠性论证（Source Reliability）：** 分身收到员工结果后，必须检查：
+   - 来源 URL 是否可访问（HTTPS）
+   - 来源类型是否支持该结论（如：媒体报道 ≠ 一手用户数据）
+   - 来源发布时间是否在合理范围内
+   - 是否存在对立来源（counter-source）
+
+4. **依据可溯源（Evidence Traceability）：** 分身的每个决策必须记录：
+   - 决策依据的证据 ID 列表
+   - 被忽略的证据及其原因
+   - 不确定性声明（哪些结论缺乏足够证据）
+
+5. **不可伪造性（Non-repudiation）：** 员工提交的结果一旦进入 `awaiting_validation` 状态，不得被员工自行修改。只有管理员或分身策略可以触发修订。
+
+6. **模拟与真实的明确标注：** 所有输出必须标注 `simulated: true/false`。模拟输出不得进入证据链，不得作为任何决策的依据。
+
 ## Task lifecycle
 
 `queued -> assigned -> accepted -> running -> succeeded | blocked | failed | cancelled`

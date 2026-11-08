@@ -373,11 +373,13 @@
 
  <!-- Workflow timeline -->
  <section id="workflowTimeline" class="panel" style="margin-top:12px;padding:12px;background:rgba(8,15,27,.72);display:none">
-  <div class="section-title"><span>分身 ↔ 员工 · 工作流时间线</span><span id="timelineCount" class="status">0 条事件</span></div>
-  <div class="sub" style="margin:-4px 0 8px">按时间顺序展示数字分身的调度决策和员工的执行反馈。点击事件可展开查看详情。</div>
-  <div id="timelineList" class="workflow-timeline">
-   <div class="sub">启动任务后，这里会显示真实的工作流事件。</div>
-  </div>
+  <details>
+   <summary class="section-title" style="cursor:pointer"><span>分身 ↔ 员工 · 工作流时间线</span><span id="timelineCount" class="status">0 条事件</span></summary>
+   <div class="sub" style="margin:-4px 0 8px">按时间顺序展示数字分身的调度决策和员工的执行反馈。点击事件可展开查看详情。</div>
+   <div id="timelineList" class="workflow-timeline">
+    <div class="sub">启动任务后，这里会显示真实的工作流事件。</div>
+   </div>
+  </details>
  </section>
 
  <!-- Simplified signal bar -->
@@ -608,14 +610,11 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
    var short=body.length>200?body.slice(0,200)+"…":body;
    var id="tw-"+i;
    var expandBtn=body.length>200?'<button class="workflow-expand" onclick="var b=this;var bd=document.getElementById(\''+id+'\');if(bd.classList.contains(\'clamped\')){bd.classList.remove(\'clamped\');b.textContent=\'收起内容\';}else{bd.classList.add(\'clamped\');b.textContent=\'展开全文\';}">展开全文</button>':'';
-   // 信任徽章：根据事件文本推断来源真实性
-   var badgeClass="no-source",badgeText="⚫ 无来源";
+   // 信任徽章：只用结构化 simulated 字段与 URL，避免"模拟"等关键词误判（如"模拟经营类游戏"）
+   var badgeClass="no-source",badgeText="⚫ 无链接";
    var hasUrl=body.indexOf("http")>=0;
-   var isSimulated=body.indexOf("SIMULATION")>=0||body.indexOf("模拟")>=0;
-   var hasEvidence=body.indexOf("证据")>=0||body.indexOf("evidence")>=0||body.indexOf("来源")>=0;
-   if(isSimulated){badgeClass="simulated";badgeText="🔴 模拟";}
-   else if(hasUrl&&hasEvidence){badgeClass="real";badgeText="🟢 有来源";}
-   else if(hasUrl){badgeClass="pending";badgeText="🟡 仅链接";}
+   if(e.simulated===true){badgeClass="simulated";badgeText="🔴 模拟";}
+   else if(hasUrl){badgeClass="pending";badgeText="🟡 含链接";}
    return '<div class="workflow-event '+cls+'"><div class="workflow-time">'+time+'</div><div class="workflow-from">'+esc(who)+' → '+esc(to)+' <span class="trust-badge '+badgeClass+'">'+badgeText+'</span></div><div id="'+id+'" class="workflow-body clamped">'+esc(short)+'</div>'+expandBtn+'</div>';
   }).join("");
   // Show stage summary
@@ -639,7 +638,7 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
     const who=String(e.from||"")+String(e.worker||"");
     return who.indexOf("Worker")===0||agentNames.some(n=>n&&who.indexOf(n)>=0);
    });
-   const simulated=stageWorkers.filter(e=>/SIMULATION|模拟/.test(String(e.text||"")));
+   const simulated=stageWorkers.filter(e=>e.simulated===true);
    const simAgents=agents.filter(a=>{const ex=a.execution||{};return ex.simulated===true||ex.mode==="simulation";});
    const realAgents=agents.filter(a=>{const ex=a.execution||{};return Boolean(ex.mode)&&ex.mode!=="simulation"&&ex.simulated!==true;});
    html+='<div class="stage-summary-row"><span>员工执行</span><span>真实执行 '+realAgents.length+' 名 · 模拟 '+simAgents.length+' 名</span></div>';
@@ -723,9 +722,8 @@ function render(){
   const blockers=decisionPD.blockers||[];
   const blockerHtml=blockers.length?'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">卡点：'+blockers.map(b=>"• "+b).join("<br>")+'</div>':'';
   holdActions.innerHTML=blockerHtml+
-   '<button class="hold-btn" onclick="event.stopPropagation();continueResearch()"><span class="icon">🔄</span><div><span>继续调研</span><span class="hold-btn-desc">补充缺口证据</span></div></button>'+
-   '<button class="hold-btn" onclick="event.stopPropagation();manualReview()"><span class="icon">✋</span><div><span>手动验收</span><span class="hold-btn-desc">用户自行判断</span></div></button>'+
-   '<button class="hold-btn" onclick="event.stopPropagation();skipStep()"><span class="icon">⏭️</span><div><span>跳过此步</span><span class="hold-btn-desc">推进到下一步</span></div></button>';
+   '<button class="hold-btn" onclick="event.stopPropagation();continueResearch()"><span class="icon">🔄</span><div><span>补充调研缺口</span><span class="hold-btn-desc">用卡点生成查询词，触发一次真实搜索</span></div></button>'+
+   '<span class="hold-btn-desc" style="align-self:center;max-width:260px">是否采纳、是否推进由你决定；系统不会代为标记"手动验收"或"跳过"。</span>';
   holdActions.style.display="flex";
  }
 
@@ -796,20 +794,20 @@ function render(){
  document.getElementById("evSourceCount").textContent=sources.length;
  document.getElementById("evAcceptedCount").textContent=accepted;
  document.getElementById("evUserCount").textContent=rawUser;
- document.getElementById("evIndependentCount").textContent=indepCount||sources.length;
+ document.getElementById("evIndependentCount").textContent=(indepCount>0?indepCount+"（已核实的独立来源）":"未核实");
 
- // Evidence stamp row — visual trust signal
+ // Evidence stamp row — 只展示后端真实字段，不用减法推测可靠性分类
  const stampRow=document.getElementById("evStampRow");
  if(sources.length){
-  const reliableCount=quality.accepted||0;
-  const questionableCount=Math.max(0,sources.length-reliableCount-(rawUser>0?1:0));
-  const unreliableCount=Math.max(0,sources.length-reliableCount-questionableCount-(rawUser>0?1:0));
+  const qualityItems=Array.isArray(quality.items)?quality.items:[];
+  const rejectedCount=qualityItems.filter(i=>i.quality_accepted!==true).length;
+  const simulatedCount=sources.filter(s=>s.simulated===true).length;
   const stamps=[];
-  if(reliableCount>0)stamps.push('<span class="evidence-stamp reliable"><span class="stamp-icon">✅</span> '+reliableCount+' 可靠</span>');
+  if(accepted>0)stamps.push('<span class="evidence-stamp reliable"><span class="stamp-icon">✅</span> '+accepted+' 门禁通过</span>');
   if(rawUser>0)stamps.push('<span class="evidence-stamp reliable"><span class="stamp-icon">👤</span> '+rawUser+' 原始评价</span>');
-  if(questionableCount>0)stamps.push('<span class="evidence-stamp questionable"><span class="stamp-icon">⚠️</span> '+questionableCount+' 待验证</span>');
-  if(unreliableCount>0)stamps.push('<span class="evidence-stamp unreliable"><span class="stamp-icon">❌</span> '+unreliableCount+' 不可靠</span>');
-  stampRow.innerHTML=stamps.join('');
+  if(simulatedCount>0)stamps.push('<span class="evidence-stamp questionable"><span class="stamp-icon">⚠️</span> '+simulatedCount+' 模拟</span>');
+  if(rejectedCount>0)stamps.push('<span class="evidence-stamp questionable"><span class="stamp-icon">△</span> '+rejectedCount+' 未通过门禁</span>');
+  stampRow.innerHTML=stamps.join('')||'<span class="signal-muted">来源 '+sources.length+' 条 · 门禁记录未返回</span>';
  }else{
   stampRow.innerHTML='<span class="signal-muted">启动任务后显示证据印章</span>';
  }
@@ -952,10 +950,21 @@ function render(){
  if(activeStageFilter){try{filterTimelineByStage(activeStageFilter);}catch(_){}}
 }
 
-// HOLD action handlers
-function continueResearch(){alert("继续调研：将缺口证据需求发送给数字分身，补充独立来源。")}
-function manualReview(){alert("手动验收：用户自行判断当前证据是否充分。")}
-function skipStep(){alert("跳过此步：推进到下一阶段，但决策标记为跳过。")}
+// HOLD action: 用卡点（或目标）生成查询词，展开补充工具并触发一次真实补充调研
+function continueResearch(){
+ const decision=(state&&state.decision)||{};
+ const blockers=Array.isArray(decision.blockers)?decision.blockers:[];
+ const goal=(state&&state.goal||"").trim();
+ const query=blockers.length?blockers.join("；").slice(0,200):(goal||"补充调研");
+ const input=document.getElementById("researchQuery");
+ if(input)input.value=query;
+ const tools=document.getElementById("supportingTools");
+ if(tools)tools.open=true;
+ const panel=document.getElementById("researchPanel");
+ if(panel&&panel.scrollIntoView)panel.scrollIntoView({behavior:"smooth",block:"start"});
+ const runBtn=document.getElementById("researchRun");
+ if(runBtn)runBtn.click();
+}
 
 function renderExplainableReport(data){
  const put=(id,value)=>{const el=document.getElementById(id);if(el)el.innerHTML=value;};
@@ -1072,14 +1081,11 @@ function renderWorkflowTimeline(data){
   var short=body.length>200?body.slice(0,200)+"…":body;
   var id="tw-"+i;
   var expandBtn=body.length>200?'<button class="workflow-expand" onclick="var b=this;var bd=document.getElementById(\''+id+'\');if(bd.classList.contains(\'clamped\')){bd.classList.remove(\'clamped\');b.textContent=\'收起内容\';}else{bd.classList.add(\'clamped\');b.textContent=\'展开全文\';}">展开全文</button>':'';
-  // 信任徽章：根据事件文本推断来源真实性
-  var badgeClass="no-source",badgeText="⚫ 无来源";
+  // 信任徽章：只用结构化 simulated 字段与 URL，避免"模拟"等关键词误判（如"模拟经营类游戏"）
+  var badgeClass="no-source",badgeText="⚫ 无链接";
   var hasUrl=body.indexOf("http")>=0;
-  var isSimulated=body.indexOf("SIMULATION")>=0||body.indexOf("模拟")>=0;
-  var hasEvidence=body.indexOf("证据")>=0||body.indexOf("evidence")>=0||body.indexOf("来源")>=0;
-  if(isSimulated){badgeClass="simulated";badgeText="🔴 模拟";}
-  else if(hasUrl&&hasEvidence){badgeClass="real";badgeText="🟢 有来源";}
-  else if(hasUrl){badgeClass="pending";badgeText="🟡 仅链接";}
+  if(e.simulated===true){badgeClass="simulated";badgeText="🔴 模拟";}
+  else if(hasUrl){badgeClass="pending";badgeText="🟡 含链接";}
   return '<div class="workflow-event '+cls+'"><div class="workflow-time">'+time+'</div><div class="workflow-from">'+esc(who)+' → '+esc(to)+' <span class="trust-badge '+badgeClass+'">'+badgeText+'</span></div><div id="'+id+'" class="workflow-body clamped">'+esc(short)+'</div>'+expandBtn+'</div>';
  }).join("");
 }
