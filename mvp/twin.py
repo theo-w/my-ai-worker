@@ -29,7 +29,7 @@ class TwinPolicy:
 
 @dataclass
 class DigitalTwin:
-    name: str = "AI CEO / Digital Twin"
+    name: str = "AI CEO / 数字分身"
     role: str = "Intent, priorities and final decision layer"
     objective: str = "Turn a business goal into an executable AI workforce"
     policy: TwinPolicy | None = None

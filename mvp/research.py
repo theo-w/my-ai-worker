@@ -230,7 +230,7 @@ def research_environment_status() -> dict:
         "configured": configured,
         "provider": provider,
         "message": "Search provider configured." if configured
-                   else "No live search provider configured; real research is unavailable.",
+                   else "未配置真实搜索服务,无法进行真实调研。",
     }
 
 
@@ -430,7 +430,7 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
         return {
             "ok": False, "status": "provider_unconfigured", "query": joined_query,
             "queries": normalized, "query_errors": [],
-            "message": "No live search provider configured; no real research was performed.",
+            "message": "未配置真实搜索服务,未执行真实调研。",
             "sources": [], "evidence": [], "quality": evaluate_evidence([]),
             "synthesis": synthesize(joined_query, []).to_dict(),
             "llm_synthesis": _synthesize_with_llm(joined_query, []),
@@ -588,7 +588,7 @@ def run_live_research(query: str, limit: int = 5) -> dict:
     if not endpoint:
         return {
             "ok": False, "status": "provider_unconfigured",
-            "message": "No live search provider configured; no real research was performed.",
+            "message": "未配置真实搜索服务,未执行真实调研。",
             "sources": [], "evidence": [], "quality": evaluate_evidence([]),
             "synthesis": synthesize(query, []).to_dict(),
             "llm_synthesis": _synthesize_with_llm(query, []),

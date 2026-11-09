@@ -502,16 +502,16 @@
 
  <div class="panel wide">
   <div class="section-title"><span>业务执行 / 原型</span><span class="sub">决策之后</span></div>
-  <div id="prototype" class="outcome">决策后，Digital Twin 可以把结果交给下一阶段的执行团队。</div>
+  <div id="prototype" class="outcome">决策后,数字分身可以把结果交给下一阶段的执行团队。</div>
  </div>
 </div></details>
 
 <details class="panel wide" id="supportingTools"><summary style="cursor:pointer;font-weight:800">补充工具：调研、知识库与方案创意</summary><div class="sub" style="margin:6px 0 12px">日常启动会按主流程执行；只有需要补充检索、查历史资料或单独生成方案假设时，才展开这些工具。</div>
 <div class="panel wide workflow-panel" id="researchPanel" style="margin-top:14px">
- <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
+ <div class="section-title"><span>本轮执行 · 研究与证据</span><span id="researchMode" class="status">正在检查数据源…</span></div>
  <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
  <div class="input"><button id="llmSmokeTest" class="btn" type="button">验证模型连接（最多 64 tokens）</button><span id="llmSmokeResult" class="sub">需要管理员认证；测试只发出一条短请求，不展示或记录密钥。</span></div>
- <div class="input"><input id="researchQuery" value="market opportunities and user demand evidence" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
+ <div class="input"><input id="researchQuery" value="产品机会与用户需求证据" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
  <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
 </div>
 
@@ -523,7 +523,7 @@
 </div>
 
 <div class="panel wide workflow-panel" id="gameLabPanel" style="margin-top:14px">
- <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
+ <div class="section-title"><span>本轮产出 · 产品体验实验室</span><span class="sub">方案假设 · 非真实测试数据</span></div>
  <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
  <div class="input">
   <input id="sourceGame" value="" placeholder="参考产品(选填,勿当作已调研竞品)" aria-label="Reference game">
@@ -603,7 +603,7 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
   // Render filtered events
   el.innerHTML=filtered.map(function(e,i){
    var who=e.from||"系统";var to=e.to||"系统";
-   var cls=who==="Digital Twin"||who==="AI CEO"?"twin":who.indexOf("Worker")===0?"worker":"system";
+   var cls=who==="数字分身"||who==="AI CEO"?"twin":who.indexOf("Worker")===0?"worker":"system";
    var time=e.at?new Date(Number(e.at)*1000).toLocaleString("zh-CN",{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):"未知时间";
    var body=String(e.text||"").replace(/\s+/g," ").trim();
    var short=body.length>200?body.slice(0,200)+"…":body;
@@ -851,7 +851,7 @@ function render(){
  const hasRun=Boolean(state.goal||workers.length||state.phase&&state.phase!=="idle");
  const decision=state.decision;
  const evidence=state.evidence||[];
- const ss2=document.getElementById("signalSummary");if(ss2)ss2.textContent=!hasRun?"WAITING FOR RUN":live?"WORKERS ACTIVE":decision?"DECISION READY":evidence.length?"EVIDENCE RETURNED":"FLOW IN PROGRESS";
+ const ss2=document.getElementById("signalSummary");if(ss2)ss2.textContent=!hasRun?"等待启动":live?"员工工作中":decision?"决策就绪":evidence.length?"证据已返回":"流程进行中";
  const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};const sc=document.getElementById("signalCaption");if(sc)sc.textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、方案假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/方案/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续方案与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在方案假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
  const node=(title,detail,cls="")=>'<div class="signal-node '+cls+'"><strong>'+esc(title)+'</strong><small>'+esc(detail)+'</small></div>';
  const workerNodes=workers.length?workers.map(w=>{const s=String(w.status||"").toLowerCase();const cls=["running","in_progress","working"].includes(s)?"is-running":s==="completed"?"is-active":["blocked","failed","error"].includes(s)?"is-blocked":["queued","ready","pending"].includes(s)?"is-queued":"";return node(w.worker,w.status+" · "+(w.progress||0)+"%",cls)}).join(""):node("等待员工组建","启动后按目标动态分工");
@@ -918,7 +918,7 @@ function render(){
  document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>意图</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
  document.getElementById("intent").textContent=state.goal||"等待目标...";
  document.getElementById("teamSummary").textContent=(t?t.team_size:0)+" Digital Workers";
- document.getElementById("teamWhy").innerHTML=t?'<b>Why these workers?</b><br>根据当前 Business Goal，Digital Twin 选择最相关的能力组合，并受 max parallel = '+t.policy.max_parallel_workers+' 约束。':'Digital Twin 会根据业务目标决定团队。';
+ document.getElementById("teamWhy").innerHTML=t?'<b>为什么这些员工？</b><br>根据当前业务目标，数字分身选择最相关的能力组合,并受最大并行 = '+t.policy.max_parallel_workers+' 约束。':'数字分身会根据业务目标决定团队。';
  document.getElementById("agentCount").textContent=(state.agents||[]).filter(a=>a.status==="completed").length+"/"+(state.agents||[]).length+" completed";
  document.getElementById("agents").innerHTML=(state.agents||[]).map((a,i)=>'<div class="agent '+(i===selected?'selected':'')+'" onclick="selected='+i+';render()"><div class="agent-head"><span>'+esc(a.worker)+'</span><span class="pill '+a.status+'">'+esc(a.status)+'</span></div><div class="sub">'+esc(a.task)+'</div><div class="bar"><i style="width:'+a.progress+'%"></i></div></div>').join("");
  const a=(state.agents||[])[selected];
@@ -1074,7 +1074,7 @@ function renderWorkflowTimeline(data){
  countEl.textContent=events.length+" 条事件";
  el.innerHTML=events.map(function(e,i){
   var who=e.from||"系统";var to=e.to||"系统";
-  var cls=who==="Digital Twin"||who==="AI CEO"?"twin":who.indexOf("Worker")===0?"worker":"system";
+  var cls=who==="数字分身"||who==="AI CEO"?"twin":who.indexOf("Worker")===0?"worker":"system";
   var time=e.at?new Date(Number(e.at)*1000).toLocaleString("zh-CN",{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):"未知时间";
   var body=String(e.text||"").replace(/\s+/g," ").trim();
   var short=body.length>200?body.slice(0,200)+"…":body;
@@ -1093,7 +1093,7 @@ function renderTwinChat(data){
  const log=document.getElementById("twinChatLog");const rows=(data.chat_messages||[]);
  if(!rows.length)return;
  const nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<60;
- log.innerHTML=rows.map(m=>'<div class="twin-bubble '+(m.role==="user"?"user":"assistant")+'"><div class="bubble-meta">'+(m.role==="user"?"你":"Digital Twin")+'</div>'+esc(m.text)+'</div>').join("");
+ log.innerHTML=rows.map(m=>'<div class="twin-bubble '+(m.role==="user"?"user":"assistant")+'"><div class="bubble-meta">'+(m.role==="user"?"你":"数字分身")+'</div>'+esc(m.text)+'</div>').join("");
  if(nearBottom)log.scrollTop=log.scrollHeight;
 }
 async function sendTwinMessage(){
@@ -1413,7 +1413,7 @@ function renderRunOutputs(data){
  const knowledgeSummary=document.getElementById("knowledgeSummary");
  const knowledgeResult=document.getElementById("knowledgeResult");
  const records=knowledge.retrieved||[];
- knowledgeSummary.textContent=(knowledge.total_records||0)+" RECORDS · "+(knowledge.status||"idle").toUpperCase();
+ knowledgeSummary.textContent=(knowledge.total_records||0)+" 记录 · "+(knowledge.status||"idle");
  const cards=records.map(row=>{const url=row.url||"";const snippet=row.snippet||"";const shortSnippet=snippet.length>120?snippet.slice(0,120)+"…":snippet;return '<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b>'+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'')+(shortSnippet?'<details class="evidence-detail"><summary>查看摘要</summary><pre>'+esc(shortSnippet)+'</pre></details>':'')+'<div class="evidence-meta">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>';}).join("");
  const ingest=knowledge.ingest?("本轮收录：新增 "+String(knowledge.ingest.inserted||0)+" 条，更新 "+String(knowledge.ingest.updated||0)+" 条。"):"本轮调研后会自动去重收录来源。";
  knowledgeResult.innerHTML='<div class="kv"><b>复用旧知识</b><div>'+records.length+' 条匹配记录</div><b>本轮收录</b><div>'+esc(ingest)+'</div></div>'+(cards||'<div class="sub">目前没有匹配的旧知识；首次分析会在获得真实来源后建立知识记录。</div>');
@@ -1532,7 +1532,7 @@ async function refreshProviderStatus(){
      :"LLM: NOT CONFIGURED";
   const modelWarning=llm.model_warning?" · WARNING: "+llm.model_warning:"";
   document.getElementById("researchMode").textContent=
-   llmLabel+modelWarning+" · "+(search.configured?"SEARCH: CONFIGURED":"SEARCH: NOT CONFIGURED");
+   llmLabel+modelWarning+" · "+(search.configured?"已配置搜索":"未配置搜索");
  }catch(e){document.getElementById("researchMode").textContent="PROVIDER STATUS UNAVAILABLE";}
 }
 async function refreshKnowledgeStatus(){
@@ -1542,7 +1542,7 @@ async function refreshKnowledgeStatus(){
   if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
   const k=data.knowledge||{},backend=k.storage_backend||"json";
   document.getElementById("knowledgeSummary").textContent=
-   (backend==="supabase"?"SUPABASE":"JSON FALLBACK") + " · " + (k.record_count||0) + " RECORDS" +
+   (backend==="supabase"?"SUPABASE":"JSON FALLBACK") + " · " + (k.record_count||0) + " 记录" +
    (k.storage_error?" · SYNC ERROR":"");
   if(k.storage_error)document.getElementById("knowledgeResult").textContent=
    "云端持久化未确认："+k.storage_error+"。当前使用本地缓存；请检查 Supabase 表结构和 Render 环境变量。";
@@ -1564,7 +1564,7 @@ document.getElementById("knowledgeSearch").onclick=async function(){
   const response=await apiFetch("/api/knowledge/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query,limit:8})});
   const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||("HTTP "+response.status));
   const result=data.knowledge||{},matches=result.matches||[];
-  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" RECORDS · "+(document.getElementById("knowledgeSummary").textContent.split(" · ").slice(0,1)[0]||"KNOWLEDGE")+" · SEARCHED";
+  document.getElementById("knowledgeSummary").textContent=(result.total_records||0)+" 记录 · "+(document.getElementById("knowledgeSummary").textContent.split(" · ").slice(0,1)[0]||"知识库")+" · 已检索";
   out.innerHTML='<div class="sub">找到 '+matches.length+' 条相关记录。搜索匹配分仅用于排序，不代表真实性或可信度。</div>'+(matches.map(row=>{const url=row.url||"";const snippet=row.snippet||"";const shortSnippet=snippet.length>120?snippet.slice(0,120)+"…":snippet;return '<div class="ev"><b>'+esc(row.title||"未命名来源")+'</b>'+(url?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(url)+'</a>':'')+(shortSnippet?'<details class="evidence-detail"><summary>查看摘要</summary><pre>'+esc(shortSnippet)+'</pre></details>':'')+'<div class="evidence-meta">状态：来源摘要未独立核验 · 匹配分 '+esc(String(row.retrieval_score||0))+'</div></div>';}).join("")||'<div class="sub">没有找到匹配记录。</div>');
  }catch(e){out.textContent="知识库检索失败："+e.message;}
  finally{button.disabled=false;}

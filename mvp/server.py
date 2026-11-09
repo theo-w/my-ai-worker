@@ -124,7 +124,7 @@ def _record_twin_push(stage: str, decision: str, action: str, outcome: str = "",
         supervision["blocker"] = str(blocker)
         STATE.setdefault("conversation", []).append({
             "id": str(int(event["at"] * 1000)) + "-twin-push",
-            "at": event["at"], "kind": "supervision", "from": "Digital Twin",
+            "at": event["at"], "kind": "supervision", "from": "数字分身",
             "to": "JARVIS Run", "worker": "",
             "text": f"监督判断：{decision}；采取动作：{action}"
                   + (f"；结果：{outcome}" if outcome else "")
@@ -156,7 +156,7 @@ def reset(goal: str):
         STATE["last_progress_at"] = STATE["started_at"]
         STATE.pop("history_error", None)
         STATE.pop("run_error", None)
-        STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
+        STATE["conversation"] = [{"id": str(int(time.time() * 1000)) + "-start", "at": time.time(), "kind": "system", "from": "数字分身", "to": "Workforce", "worker": "", "text": "已接收目标，开始规划任务与组建员工团队。"}]
         STATE["agents"] = [
             {"id": i, "worker": w, "capability": cap, "status": "queued",
              "progress": 0, "task": cap, "input": goal, "output": "", "evidence": []}
@@ -393,7 +393,7 @@ def _execute_run(goal: str):
     time.sleep(.1)
     with LOCK:
         STATE["phase"] = "team"
-        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-team", "at": time.time(), "kind": "system", "from": "Digital Twin", "to": "Workforce", "worker": "", "text": "团队已组建，开始逐个执行分配任务。"})
+        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-team", "at": time.time(), "kind": "system", "from": "数字分身", "to": "Workforce", "worker": "", "text": "团队已组建，开始逐个执行分配任务。"})
         for agent in STATE["agents"]:
             agent["status"] = "ready"
         planned = [(a["worker"], a["capability"]) for a in STATE["agents"]]
@@ -404,7 +404,7 @@ def _execute_run(goal: str):
         with LOCK:
             STATE["agents"][idx]["status"] = "running"
             STATE["agents"][idx]["progress"] = 20
-            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-dispatch-" + str(idx), "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": worker, "worker": worker, "text": "任务派发：" + capability + "。目标：" + goal})
+            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-dispatch-" + str(idx), "at": time.time(), "kind": "dispatch", "from": "数字分身", "to": worker, "worker": worker, "text": "任务派发：" + capability + "。目标：" + goal})
         try:
             if isinstance(WORKER_EXECUTOR, SimulatedWorkerExecutor):
                 items = run_worker(worker, capability, goal)
@@ -426,7 +426,7 @@ def _execute_run(goal: str):
                 agent.update({"progress": 100, "output": output, "execution": result_data,
                               "evidence": worker_evidence, "twin_review": twin_review, "status": "completed"})
                 STATE["evidence"].extend(item.__dict__ for item in items)
-                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-reply-" + str(idx), "at": time.time(), "kind": "reply", "from": worker, "to": "Digital Twin", "worker": worker, "text": output, "simulated": bool(result_data.get("simulated", False))})
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-reply-" + str(idx), "at": time.time(), "kind": "reply", "from": worker, "to": "数字分身", "worker": worker, "text": output, "simulated": bool(result_data.get("simulated", False))})
                 execution_meta = result_data.get("metadata", {}) if isinstance(result_data, dict) else {}
                 execution_mode = execution_meta.get("mode") or result_data.get("mode", "未记录")
                 external_tools = execution_meta.get("external_tools_used", False if result_data.get("simulated") else "未记录")
@@ -438,13 +438,13 @@ def _execute_run(goal: str):
                     + "；语义支持核验=未完成。"
                     + " 该审核是确定性初筛，不代表已经验证员工结论。"
                 )
-                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-twin-review-" + str(idx), "at": time.time(), "kind": "review", "from": "Digital Twin", "to": worker, "worker": worker, "text": review_text, "simulated": bool(result_data.get("simulated", False))})
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-twin-review-" + str(idx), "at": time.time(), "kind": "review", "from": "数字分身", "to": worker, "worker": worker, "text": review_text, "simulated": bool(result_data.get("simulated", False))})
         except Exception as exc:
             with LOCK:
                 agent = STATE["agents"][idx]
                 agent.update({"status": "blocked", "progress": 100, "output": "执行失败：" + type(exc).__name__,
                               "execution": {"status": "failed", "error_type": type(exc).__name__}})
-                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-error-" + str(idx), "at": time.time(), "kind": "system", "from": worker, "to": "Digital Twin", "worker": worker, "text": "员工执行受阻：" + type(exc).__name__})
+                STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-error-" + str(idx), "at": time.time(), "kind": "system", "from": worker, "to": "数字分身", "worker": worker, "text": "员工执行受阻：" + type(exc).__name__})
 
     _persist_run_history()
 
@@ -453,7 +453,7 @@ def _execute_run(goal: str):
     with LOCK:
         STATE["phase"] = "research"
         STATE["research"] = {"status": "running", "query": goal, "sources": [], "quality": None, "error": None}
-        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "Digital Twin", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
+        STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research", "at": time.time(), "kind": "dispatch", "from": "数字分身", "to": "Live Research Adapter", "worker": "Live Research Adapter", "text": "启动本轮真实调研：" + goal})
     _persist_run_history()
     try:
         is_game_feasibility = any(token in goal.casefold() for token in (
@@ -493,7 +493,7 @@ def _execute_run(goal: str):
                     STATE.setdefault("conversation", []).append({
                         "id": str(int(time.time() * 1000)) + "-research-progress",
                         "at": time.time(), "kind": "progress",
-                        "from": "Live Research Adapter", "to": "Digital Twin",
+                        "from": "Live Research Adapter", "to": "数字分身",
                         "worker": "Live Research Adapter",
                         "text": "调研进度：" + str(progress.get("queries_completed", 0)) + "/"
                             + str(progress.get("queries_total", len(research_queries)))
@@ -520,7 +520,7 @@ def _execute_run(goal: str):
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
             }
-            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research-result", "at": time.time(), "kind": "reply" if result.get("ok") else "system", "from": "Live Research Adapter", "to": "Digital Twin", "worker": "Live Research Adapter", "text": "调研返回 " + str(len(result.get("sources", []))) + " 个来源，" + str(accepted) + " 条证据通过门禁。" if result.get("ok") else "调研未成功：" + str(result.get("error") or result.get("message") or result.get("status")), "simulated": False})
+            STATE["conversation"].append({"id": str(int(time.time() * 1000)) + "-research-result", "at": time.time(), "kind": "reply" if result.get("ok") else "system", "from": "Live Research Adapter", "to": "数字分身", "worker": "Live Research Adapter", "text": "调研返回 " + str(len(result.get("sources", []))) + " 个来源，" + str(accepted) + " 条证据通过门禁。" if result.get("ok") else "调研未成功：" + str(result.get("error") or result.get("message") or result.get("status")), "simulated": False})
             if result.get("ok") and accepted:
                 for item in result.get("evidence", []):
                     source = item.get("source")
@@ -617,7 +617,7 @@ def _execute_run(goal: str):
                         current_research["follow_up_batches"] = current_research["follow_up_batches"][-4:]
                         STATE["conversation"].append({
                             "id": str(int(time.time() * 1000)) + "-followup-research-" + str(idx) + "-" + str(revision_round),
-                            "at": time.time(), "kind": "research", "from": "Digital Twin",
+                            "at": time.time(), "kind": "research", "from": "数字分身",
                             "to": review_agent.get("worker", "数字员工"), "worker": review_agent.get("worker", ""),
                             "text": "根据分身指出的证据缺口追加调研；查询=" + "；".join(follow_up_queries)
                                 + "；新增来源=" + str(len(new_sources)) + "；新增证据记录=" + str(len(added_evidence))
@@ -633,7 +633,7 @@ def _execute_run(goal: str):
                 STATE["conversation"].append({
                     "id": str(int(time.time() * 1000)) + "-revision-" + str(idx) + "-" + str(revision_round),
                     "at": time.time(), "kind": "revision", "from": review_agent.get("worker", "数字员工"),
-                    "to": "Digital Twin", "worker": review_agent.get("worker", ""),
+                    "to": "数字分身", "worker": review_agent.get("worker", ""),
                     "text": "员工按分身意见完成第 " + str(revision_round) + " 轮修订；变更摘要="
                         + str(revision.get("changes_made", [])) + "；未解决缺口="
                         + str(revision.get("unresolved_gaps", [])) + "；修订后审查="
@@ -654,7 +654,7 @@ def _execute_run(goal: str):
                 twin_review["revision_history"] = revision_history
                 STATE["conversation"].append({
                     "id": str(int(time.time() * 1000)) + "-semantic-review-" + str(idx),
-                    "at": time.time(), "kind": "review", "from": "Digital Twin",
+                    "at": time.time(), "kind": "review", "from": "数字分身",
                     "to": current.get("worker", "数字员工"), "worker": current.get("worker", ""),
                     "text": "员工结果语义审查：" + str(semantic_review.get("status", "unknown")) + "；"
                         + str(semantic_review.get("summary") or semantic_review.get("message") or "未提供审查摘要")
@@ -846,7 +846,7 @@ def execute(goal: str):
             STATE.setdefault("conversation", []).append({
                 "id": str(int(time.time() * 1000)) + "-fatal",
                 "at": time.time(), "kind": "system", "from": "JARVIS Runtime",
-                "to": "Digital Twin", "worker": "", "text": "本轮执行异常终止：" + type(exc).__name__,
+                "to": "数字分身", "worker": "", "text": "本轮执行异常终止：" + type(exc).__name__,
             })
     finally:
         _persist_run_history()

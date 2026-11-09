@@ -16,7 +16,7 @@ def test_digital_twin_forms_task_specific_team():
 def test_digital_twin_snapshot_contains_policy_and_intent():
     twin = DigitalTwin()
     snapshot = twin.snapshot("AI RPG", WORKERS)
-    assert snapshot["name"] == "AI CEO / Digital Twin"
+    assert snapshot["name"] == "AI CEO / 数字分身"
     assert snapshot["intent"] == "AI RPG"
     assert snapshot["policy"]["decision_style"] == "evidence_first"
 

@@ -79,7 +79,7 @@ def evaluate(goal: str, evidence: list[Evidence], demo_mode: bool = False) -> De
             "NPC memory and behavior can drift",
             "Inference cost and latency may limit production economics",
         ],
-        next_step=("AI Game Prototype Sprint (demo only)" if recommendation == "DEMO_GO_TO_PROTOTYPE" else ("AI Game Prototype Sprint" if recommendation == "GO_TO_PROTOTYPE" else "Evidence Collection Sprint")),
+        next_step=("产品原型冲刺(仅演示)" if recommendation == "DEMO_GO_TO_PROTOTYPE" else ("产品原型冲刺" if recommendation == "GO_TO_PROTOTYPE" else "证据收集冲刺")),
     )
 
 
