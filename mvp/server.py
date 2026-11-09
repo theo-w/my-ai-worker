@@ -91,7 +91,7 @@ def _build_worker_executor():
 WORKER_EXECUTOR = _build_worker_executor()
 RUN_THREAD = None  # Track the in-process JARVIS run so stale phases can be recovered safely.
 STATE = {
-    "goal": "评估一个 AI 原生游戏机会",
+    "goal": "评估某个业务机会是否值得投入",
     "chat_messages": [],
     "pending_direction": None,
     "business_context": "用最小成本验证一个业务机会，只有值得做才进入 Prototype。",
@@ -99,7 +99,7 @@ STATE = {
     "agents": [],
     "evidence": [],
     "decision": None,
-    "twin": TWIN.snapshot("评估一个 AI 原生游戏机会", WORKERS),
+    "twin": TWIN.snapshot("评估某个业务机会是否值得投入", WORKERS),
     "prototype": None,
     "feasibility": {"status": "not_started", "contract": None, "report": None, "evaluation": None},
     "knowledge": {"status": "not_started", "retrieved": [], "ingest": None},
@@ -468,7 +468,7 @@ def _execute_run(goal: str):
                 goal + " criticism failures negative reviews counter evidence risks",
                 "site:store.steampowered.com/app/ " + goal + " reviews",
                 "site:steamcommunity.com/app/ " + goal + " player feedback discussions",
-                goal + " 玩家需求 竞品 负面反馈 推理成本 延迟 风险",
+                goal + " 用户需求 竞品 负面反馈 推理成本 延迟 风险",
             ]
             def report_research_progress(progress):
                 with LOCK:
@@ -688,8 +688,8 @@ def _execute_run(goal: str):
                     for row in prior_rows
                 )
                 context = ("Prior knowledge for comparison only; verify freshness and claims.\\n" + prior_context + "\\nCurrent research:\\n" + current_context)[:7000]
-                source_game = (goal[:160] or "AI 原生游戏机会")
-                brief = create_design_brief(source_game, "本轮原创游戏概念", llm_client, research_context=context)
+                source_game = (goal[:160] or "业务机会")
+                brief = create_design_brief(source_game, "本轮原创产品方案", llm_client, research_context=context)
                 with LOCK:
                     STATE["design"] = {"status": "completed",
                         "reason": "基于本轮真实调研来源生成；仍是设计假设，不代表市场验证。",
@@ -698,7 +698,7 @@ def _execute_run(goal: str):
             with LOCK:
                 STATE["design"] = {"status": "failed", "reason": "创意生成失败：" + type(exc).__name__, "brief": None}
 
-    _record_twin_push("独立验收", "检查玩法输出与验收条件", "计算可行性门禁并列出缺失证据；未满足标准不判定完成")
+    _record_twin_push("独立验收", "检查方案输出与验收条件", "计算可行性门禁并列出缺失证据；未满足标准不判定完成")
     with LOCK:
         STATE["phase"] = "evaluation"
     _persist_run_history()
@@ -1446,11 +1446,11 @@ class Handler(BaseHTTPRequestHandler):
                     game_feasibility = template == "ai_game_feasibility"
                     if game_feasibility:
                         assessment_context = (
-                            "AI 原生游戏可行性评估验收清单：\n"
+                            "产品可行性评估验收清单：\n"
                             "1. 中英文来源分别检索并记录可追溯 URL、日期、原始摘录/数据与来源类型；\n"
-                            "2. 区分真实玩家需求信号、普通抱怨、重复内容、疑似营销/水军及无法核实的说法，不把噪声当需求；\n"
-                            "3. 提出可证伪的核心玩法/市场假设，说明支持证据、反证和不确定性；\n"
-                            "4. 设计成本最低的可玩原型或玩家实验，写明样本/方法与观察指标；\n"
+                            "2. 区分真实用户需求信号、普通抱怨、重复内容、疑似营销/水军及无法核实的说法，不把噪声当需求；\n"
+                            "3. 提出可证伪的核心方案/市场假设，说明支持证据、反证和不确定性；\n"
+                            "4. 设计成本最低的可验证原型或用户实验，写明样本/方法与观察指标；\n"
                             "5. 在执行前定义成功阈值、失败阈值及停止条件；\n"
                             "6. 给出 GO / ITERATE / NO-GO 建议并逐条映射到证据；独立验收前不得声称结论已证实。"
                         )
@@ -1923,8 +1923,8 @@ class Handler(BaseHTTPRequestHandler):
                 for row in rows
             )[:5000]
             # Empty form fields mean derive from this run's accepted research; no canned demo defaults.
-            source_game = source_game.strip() or "从本轮调研证据中提取最相关的参考游戏"
-            concept_name = concept_name.strip() or "请基于本轮证据生成原创玩法名称"
+            source_game = source_game.strip() or "从本轮调研证据中提取最相关的参考产品"
+            concept_name = concept_name.strip() or "请基于本轮证据生成原创方案名称"
             try:
                 brief = create_design_brief(source_game, concept_name, llm_client, research_context=research_context)
             except (ValueError, RuntimeError) as exc:
@@ -2040,7 +2040,7 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "planned",
                     "mode": "demo" if demo_mode else "evidence-backed",
                     "notice": "Demo handoff only; simulated evidence is not a business approval." if demo_mode else "Evidence-backed prototype handoff.",
-                    "name": "AI Game Prototype Sprint",
+                    "name": "产品原型冲刺",
                     "steps": [
                         "Define business success criteria",
                         "Design the smallest playable AI-native loop",
@@ -2055,7 +2055,7 @@ class Handler(BaseHTTPRequestHandler):
         body = self._read_json()
         if body is None:
             return
-        goal = str(body.get("goal", "")).strip() or "评估一个 AI 原生游戏机会"
+        goal = str(body.get("goal", "")).strip() or "评估某个业务机会是否值得投入"
         with LOCK:
             busy_phases = {"planning", "team", "research", "design", "evaluation"}
             if STATE["phase"] in busy_phases:

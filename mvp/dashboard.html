@@ -243,8 +243,8 @@
 </details>
 
 <div class="panel wide" id="goalPanel" style="margin-top:14px">
- <div class="section-title"><span>Business Goal · 让数字分身替我完成什么业务</span><span class="sub">Natural Language</span></div>
- <div class="input"><input id="goal" value="评估一款玩家可以与长期记忆 NPC 建立关系的 AI 原生 RPG 是否值得进入 Prototype"><button id="run" class="btn" type="button" aria-live="polite" onclick="document.getElementById('runInlineStatus').textContent='已触发点击，正在连接执行接口…'">启动 JARVIS</button><span id="runInlineStatus" class="run-inline-status" role="status" aria-live="polite">准备就绪</span></div>
+ <div class="section-title"><span>业务目标 · 希望数字员工替你完成什么工作</span><span class="sub">自然语言</span></div>
+ <div class="input"><input id="goal" value="评估某个功能或产品机会是否值得投入,例如「客服自动工单」能否替代人工初筛"><button id="run" class="btn" type="button" aria-live="polite" onclick="document.getElementById('runInlineStatus').textContent='已触发点击，正在连接执行接口…'">启动 JARVIS</button><span id="runInlineStatus" class="run-inline-status" role="status" aria-live="polite">准备就绪</span></div>
 </div>
 <script>
 // Early launch guard: provide visible feedback and a direct API fallback if another script error prevents the main handler from binding.
@@ -283,7 +283,7 @@
      "阶段："+String(state.phase||"unknown"),
      "运行 ID："+String(state.run_id||"未生成"),
      "员工 "+agents.filter(a=>a.status==="completed").length+"/"+agents.length+" 完成",
-     "调研："+String((state.research||{}).status||"待开始")+"；玩法："+String((state.design||{}).status||"待开始")+"；验收："+String((state.feasibility||{}).status||"待开始")
+     "调研："+String((state.research||{}).status||"待开始")+"；方案:"+String((state.design||{}).status||"待开始")+"；验收："+String((state.feasibility||{}).status||"待开始")
     ];
     if((state.supervision||{}).message)lines.push("监督："+state.supervision.message);
     if((state.research||{}).error)lines.push("当前阻塞："+state.research.error);
@@ -307,7 +307,7 @@
 
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>首页 · 本轮任务执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div>
- <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、玩法方案、阻塞原因和验收结论。</div>
+ <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、方案假设、阻塞原因和验收结论。</div>
  <div id="flow" class="flow"></div>
 
  <!-- Primary decision card — the single most important element -->
@@ -419,7 +419,7 @@
 </div>
 
 <div class="panel wide" style="margin-top:14px" id="feasibilityPanel">
- <div class="section-title"><span>商业可行性闸门 · Grill-Me</span><span id="feasibilityStatus" class="status">NOT STARTED</span></div>
+ <div class="section-title"><span>商业可行性闸门 · Grill-Me</span><span id="feasibilityStatus" class="status">未开始</span></div>
  <div class="sub" style="margin-bottom:10px">先明确评估范围与完成标准；评估结果需要证据、反证、原型实验和成本情景。建立契约不代表市场已验证。</div>
  <div class="input" style="flex-wrap:wrap"><input id="feasibilityBudget" type="number" min="0" step="100" placeholder="预算上限（可选）" aria-label="预算上限" style="max-width:220px"><input id="feasibilityDays" type="number" min="1" max="365" step="1" placeholder="时间盒天数（可选）" aria-label="时间盒天数" style="max-width:220px"><button id="feasibilityCreate" class="btn" type="button">建立评估契约</button></div>
  <div id="feasibilityResult" class="sub" style="margin-top:10px;white-space:pre-wrap">尚未建立商业可行性评估契约。</div>
@@ -475,7 +475,7 @@
  </div>
  <div class="panel">
   <div class="section-title"><span>Business Context</span><span class="sub">WHY</span></div>
-  <div class="kv"><b>Objective</b><div id="businessContext">用最小成本验证业务机会，只有值得做才进入 Prototype。</div><b>Intent</b><div id="intent">等待目标...</div><b>Outcome</b><div>Business Decision → Execution → Feedback</div></div>
+  <div class="kv"><b>目标</b><div id="businessContext">用最小成本验证业务机会，只有值得做才进入 Prototype。</div><b>意图</b><div id="intent">等待目标...</div><b>Outcome</b><div>业务决策 → 执行 → 反馈</div></div>
  </div>
  <div class="panel">
   <div class="section-title"><span>Workforce Formation</span><span class="sub" id="teamSummary">0 workers</span></div>
@@ -501,24 +501,24 @@
  </div>
 
  <div class="panel wide">
-  <div class="section-title"><span>Business Execution / Prototype</span><span class="sub">AFTER DECISION</span></div>
+  <div class="section-title"><span>业务执行 / 原型</span><span class="sub">决策之后</span></div>
   <div id="prototype" class="outcome">决策后，Digital Twin 可以把结果交给下一阶段的执行团队。</div>
  </div>
 </div></details>
 
-<details class="panel wide" id="supportingTools"><summary style="cursor:pointer;font-weight:800">补充工具：调研、知识库与玩法创意</summary><div class="sub" style="margin:6px 0 12px">日常启动会按主流程执行；只有需要补充检索、查历史资料或单独生成玩法假设时，才展开这些工具。</div>
+<details class="panel wide" id="supportingTools"><summary style="cursor:pointer;font-weight:800">补充工具：调研、知识库与方案创意</summary><div class="sub" style="margin:6px 0 12px">日常启动会按主流程执行；只有需要补充检索、查历史资料或单独生成方案假设时，才展开这些工具。</div>
 <div class="panel wide workflow-panel" id="researchPanel" style="margin-top:14px">
  <div class="section-title"><span>本轮执行 · Research & Evidence</span><span id="researchMode" class="status">CHECKING PROVIDERS…</span></div>
  <div class="workflow-hint">数字员工完成分工后，在这里集中查看真实调研、来源证据和综合结论。也可手动补充一次独立调研。</div>
  <div class="input"><button id="llmSmokeTest" class="btn" type="button">验证模型连接（最多 64 tokens）</button><span id="llmSmokeResult" class="sub">需要管理员认证；测试只发出一条短请求，不展示或记录密钥。</span></div>
- <div class="input"><input id="researchQuery" value="AI-native game market opportunities and persistent NPC memory" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
+ <div class="input"><input id="researchQuery" value="market opportunities and user demand evidence" aria-label="Research query"><button id="researchRun" class="btn">补充调研</button></div>
  <div id="researchResult" class="sub" style="margin-top:12px">等待本轮调研启动。真实搜索需要配置有效的搜索服务。</div>
 </div>
 
 <div class="panel wide workflow-panel" id="knowledgePanel" style="margin-top:14px">
- <div class="section-title"><span>游戏玩法知识库 · Prior Research Memory</span><span id="knowledgeSummary" class="status">LOADING KNOWLEDGE…</span></div>
+ <div class="section-title"><span>调研知识库</span><span id="knowledgeSummary" class="status">知识库加载中…</span></div>
  <div class="workflow-hint">每轮启动先检索过往来源，再执行本轮新搜索；本轮新来源会去重后收录。知识库中的搜索摘要默认标记为"来源可追溯、内容未独立核验"，过期或矛盾信息不会自动当成事实。</div>
- <div class="input"><input id="knowledgeQuery" value="AI 原生游戏 NPC 记忆 留存 成本" aria-label="知识库搜索"><button id="knowledgeSearch" class="btn">检索知识库</button></div>
+ <div class="input"><input id="knowledgeQuery" value="产品机会 用户需求 留存 成本" aria-label="知识库搜索"><button id="knowledgeSearch" class="btn">检索知识库</button></div>
  <div id="knowledgeResult" class="sub" style="margin-top:12px">启动研究后，这里会显示本轮复用的旧知识与收录情况。</div>
 </div>
 
@@ -526,12 +526,12 @@
  <div class="section-title"><span>本轮产出 · Game Experience Lab</span><span class="sub">DESIGN HYPOTHESES · NOT PLAYTEST DATA</span></div>
  <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
  <div class="input">
-  <input id="sourceGame" value="" placeholder="参考游戏（选填，勿当作已调研竞品）" aria-label="Reference game">
-  <input id="conceptName" value="" placeholder="新玩法名称（生成前为空）" aria-label="New game concept name">
+  <input id="sourceGame" value="" placeholder="参考产品(选填,勿当作已调研竞品)" aria-label="Reference game">
+  <input id="conceptName" value="" placeholder="新产品方案(生成前为空)" aria-label="New game concept name">
   <button id="designRun" class="btn" disabled>等待调研完成</button>
  </div>
  <div id="designResult" class="sub" style="margin-top:12px">当前轮次尚无已验收的调研证据。完成真实搜索并获得可接受来源后，才开放创意生成。</div>
- <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开可玩原型 ↗</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
+ <div style="margin-top:12px"><a href="/playtest" class="btn" style="display:inline-flex;align-items:center;text-decoration:none;min-height:38px" target="_blank" rel="noopener">打开演示原型</a><span class="sub" style="margin-left:10px">仅为独立原型，不代表本轮自动生成结果</span></div>
 </div>
 
 </details>
@@ -558,7 +558,7 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
   "分身规划":["team","planning","assign","dispatch","规划","组建","派发","拆分","团队"],
   "员工执行":["worker","agent","employee","execut","员工","执行","任务"],
   "真实调研":["research","search","source","evidence","query","调研","搜索","来源","证据","抓取"],
-  "玩法假设":["design","concept","gameplay","creative","mechanic","玩法","创意","概念","假设"],
+  "方案假设":["design","concept","gameplay","creative","mechanic","玩法","创意","概念","假设"],
   "可行性验收":["feasibility","evaluation","assess","gate","accept","验收","评估","可行性"],
   "决策 / 原型":["decision","prototype","recommendation","verdict","决策","建议","原型","结论","hold","go"]
  };
@@ -822,7 +822,7 @@ function render(){
  document.getElementById("signalFeasStatus").textContent=evalDecision||feasibility.status==="not_started"?"等待启动":feasibility.status==="evaluated"?"已出结论 · "+evalDecision:"执行中";
 
  const runProgressText=document.getElementById("runProgressText");
- if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const agents=Array.isArray(state.agents)?state.agents:[];const sup=state.supervision||{};const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"运行 ID："+(state.run_id||"尚未创建"),"员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）","调研："+(rs.status||"待开始"),"玩法假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(sup.message)parts.push("分身监督："+sup.message);if(sup.status==="attention_required")parts.push("监督建议："+(sup.recommended_action||"检查阻塞原因"));if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("玩法阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);const messages=Array.isArray(state.conversation)?state.conversation.slice(-4):[];const activity=messages.map(m=>{const who=m.from||m.worker||"系统";const msg=String(m.text||"").replace(/\s+/g," ").trim();return who+"："+msg;}).filter(Boolean);const outputs=agents.filter(a=>a.output&&String(a.output).trim()).slice(-3).map(a=>(a.worker||"员工")+" 输出："+String(a.output).slice(0,240));runProgressText.textContent=parts.join(" · ")+(activity.length?"\n\n最新执行记录：\n"+activity.join("\n"):"")+(outputs.length?"\n\n员工输出：\n"+outputs.join("\n"):"");}
+ if(runProgressText){const rs=state.research||{},ds=state.design||{},fs=state.feasibility||{},decision=state.decision||{};const agents=Array.isArray(state.agents)?state.agents:[];const sup=state.supervision||{};const parts=["阶段："+(labels[state.phase]||state.phase||"尚未启动"),"运行 ID："+(state.run_id||"尚未创建"),"员工："+agents.length+" 名（"+agents.filter(a=>a.status==="completed").length+" 完成 / "+agents.filter(a=>a.status==="running").length+" 执行中 / "+agents.filter(a=>a.status==="blocked").length+" 受阻）","调研："+(rs.status||"待开始"),"方案假设："+(ds.status||"待开始"),"可行性验收："+(fs.status||"待开始")];if(sup.message)parts.push("分身监督："+sup.message);if(sup.status==="attention_required")parts.push("监督建议："+(sup.recommended_action||"检查阻塞原因"));if(rs.error)parts.push("调研阻塞："+rs.error);if(ds.reason&&["blocked","failed"].includes(ds.status))parts.push("方案阻塞："+ds.reason);if(decision.recommendation)parts.push("当前判断："+decision.recommendation);const messages=Array.isArray(state.conversation)?state.conversation.slice(-4):[];const activity=messages.map(m=>{const who=m.from||m.worker||"系统";const msg=String(m.text||"").replace(/\s+/g," ").trim();return who+"："+msg;}).filter(Boolean);const outputs=agents.filter(a=>a.output&&String(a.output).trim()).slice(-3).map(a=>(a.worker||"员工")+" 输出："+String(a.output).slice(0,240));runProgressText.textContent=parts.join(" · ")+(activity.length?"\n\n最新执行记录：\n"+activity.join("\n"):"")+(outputs.length?"\n\n员工输出：\n"+outputs.join("\n"):"");}
  const researchState=state.research||{};
  const designState=state.design||{};
  const feasibilityState=state.feasibility||{};
@@ -833,7 +833,7 @@ function render(){
   {name:"分身规划",index:1,done:currentIndex>1,status:"auto"},
   {name:"员工执行",index:2,done:workers.length>0&&workers.every(w=>String(w.status||"").toLowerCase()==="completed"),blocked:workers.some(w=>["blocked","failed","error"].includes(String(w.status||"").toLowerCase())),status:"auto"},
   {name:"真实调研",index:3,done:researchState.status==="completed"&&Number((researchState.quality||{}).accepted||0)>0,blocked:["failed","provider_error","provider_unconfigured"].includes(researchState.status)||Boolean(researchState.error)&&Number((researchState.quality||{}).accepted||0)===0||(researchState.status==="completed"&&Number((researchState.quality||{}).accepted||0)===0),status:"auto"},
-  {name:"玩法假设",index:4,done:designState.status==="completed",blocked:currentIndex>=4&&["blocked","failed"].includes(designState.status),status:"auto"},
+  {name:"方案假设",index:4,done:designState.status==="completed",blocked:currentIndex>=4&&["blocked","failed"].includes(designState.status),status:"auto"},
   {name:"可行性验收",index:5,done:feasibilityState.status==="evaluated"&&feasibilityState.evaluation&&feasibilityState.evaluation.decision==="GO_TO_PROTOTYPE",blocked:feasibilityState.status==="incomplete",status:"auto"},
   {name:"决策 / 原型",index:6,done:Boolean(state.prototype),blocked:Boolean(decisionState&&decisionState.recommendation==="HOLD_FOR_EVIDENCE"),status:"auto"}
  ];
@@ -852,7 +852,7 @@ function render(){
  const decision=state.decision;
  const evidence=state.evidence||[];
  const ss2=document.getElementById("signalSummary");if(ss2)ss2.textContent=!hasRun?"WAITING FOR RUN":live?"WORKERS ACTIVE":decision?"DECISION READY":evidence.length?"EVIDENCE RETURNED":"FLOW IN PROGRESS";
- const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};const sc=document.getElementById("signalCaption");if(sc)sc.textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、玩法假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/玩法/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续玩法与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在玩法假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
+ const researchNow=state.research||{},designNow=state.design||{},feasibilityNow=state.feasibility||{};const sc=document.getElementById("signalCaption");if(sc)sc.textContent=!hasRun?"启动 JARVIS 后，这里会显示真实派发、员工反馈、调研、方案假设与验收状态。":live?"数字员工正在执行或等待任务；下方会同时显示调研/方案/验收各阶段状态。":researchNow.error?"流程停在调研阶段："+researchNow.error+"。后续方案与验收未输出是因为上游调研失败或证据不足。":designNow.status==="blocked"?"流程停在方案假设阶段："+(designNow.reason||"缺少生成条件")+"。":feasibilityNow.status==="incomplete"?"可行性验收未通过完整性门禁；请查看评估报告中缺失的证据项。":decision&&decision.recommendation==="HOLD_FOR_EVIDENCE"?"分身已收到阶段性反馈，但证据不足，当前暂停决策推进。":decision?"已收到阶段性决策；最终业务完成仍以独立验收和执行状态为准。":evidence.length?"员工产出已回传证据区，正在等待后续判断。":"本轮已启动；当前尚无足够状态表明执行已完成。";
  const node=(title,detail,cls="")=>'<div class="signal-node '+cls+'"><strong>'+esc(title)+'</strong><small>'+esc(detail)+'</small></div>';
  const workerNodes=workers.length?workers.map(w=>{const s=String(w.status||"").toLowerCase();const cls=["running","in_progress","working"].includes(s)?"is-running":s==="completed"?"is-active":["blocked","failed","error"].includes(s)?"is-blocked":["queued","ready","pending"].includes(s)?"is-queued":"";return node(w.worker,w.status+" · "+(w.progress||0)+"%",cls)}).join(""):node("等待员工组建","启动后按目标动态分工");
  const signalMarkup=
@@ -861,7 +861,7 @@ function render(){
  node("目标与策略",state.goal||"等待输入",hasRun?"is-active":"")+'</div>'+
  '<div class="signal-lane">'+node("协作中枢",live?"任务执行与状态同步":evidence.length?"证据已回传":decision?"阶段性判断已返回":"任务编排与反馈",hasRun?"signal-core is-active":"signal-core")+
  node("真实调研",((state.research||{}).status||"待开始")+" · "+(((state.research||{}).sources||[]).length)+" 个来源"+((state.research||{}).error?" · "+String(state.research.error).slice(0,90):""),((state.research||{}).status==="completed"?"is-active":["failed","blocked","provider_error","provider_unconfigured"].includes((state.research||{}).status)?"is-blocked":""))+
- node("玩法假设",((state.design||{}).status||"待开始")+((state.design||{}).reason?" · "+String(state.design.reason).slice(0,110):""),((state.design||{}).status==="completed"?"is-active":["failed","blocked"].includes((state.design||{}).status)?"is-blocked":""))+
+ node("方案假设",((state.design||{}).status||"待开始")+((state.design||{}).reason?" · "+String(state.design.reason).slice(0,110):""),((state.design||{}).status==="completed"?"is-active":["failed","blocked"].includes((state.design||{}).status)?"is-blocked":""))+
  node("可行性验收",((state.feasibility||{}).status||"待开始")+((state.feasibility||{}).evaluation&&((state.feasibility||{}).evaluation.decision)?" · "+(state.feasibility||{}).evaluation.decision:""),((state.feasibility||{}).status==="evaluated"?"is-active":(state.feasibility||{}).status==="incomplete"?"is-blocked":""))+
  node("Evidence Gate",evidence.length?evidence.length+" 条证据已记录":"等待可核验来源",evidence.length?"is-active":"")+'</div>'+
  '<div class="signal-lane">'+workerNodes+node("Business Decision",decision?decision.recommendation:"等待判断",decision?"is-active":"")+'</div>';
@@ -887,12 +887,12 @@ function render(){
  const designTitle=originalConcept.title||designBrief.title||designDetail.title||designDetail.concept;
  const designLoop=originalConcept.core_loop||originalConcept.gameplay_loop||originalConcept.description||designBrief.core_loop;
  const designSummary=designDetail.error||designDetail.reason
-  ? "未形成玩法假设："+String(designDetail.error||designDetail.reason)
+  ? "未形成方案假设："+String(designDetail.error||designDetail.reason)
   : designTitle||designLoop
-   ? "玩法假设："+String(designTitle||"已生成概念")+(designLoop?"；核心玩法："+String(designLoop):"")+(designBrief.generation&&designBrief.generation.mode==="template_fallback"?"（模板结果，非本轮 LLM 原创输出）":"")
+   ? "方案假设："+String(designTitle||"已生成概念")+(designLoop?"；核心方案:"+String(designLoop):"")+(designBrief.generation&&designBrief.generation.mode==="template_fallback"?"（模板结果，非本轮 LLM 原创输出）":"")
    : designDetail.status==="blocked"
-    ? "玩法阶段被阻断；原因未返回，需检查执行器与上游证据。"
-    : "暂无玩法假设输出。若本轮仅返回等待决策，说明下游阶段尚未产出，不能视为完成。";
+    ? "方案阶段被阻断；原因未返回，需检查执行器与上游证据。"
+    : "暂无方案假设输出。若本轮仅返回等待决策，说明下游阶段尚未产出，不能视为完成。";
  const completionBlockers=feasibilityDetail.completion&&Array.isArray(feasibilityDetail.completion.blockers)?feasibilityDetail.completion.blockers:[];
  const feasibilitySummary=feasibilityDetail.evaluation&&feasibilityDetail.evaluation.decision
   ? "验收结论："+String(feasibilityDetail.evaluation.decision)+(completionBlockers.length?"；缺口："+completionBlockers.slice(0,3).join("、"):"")
@@ -909,13 +909,13 @@ function render(){
  const stageDetails='<div class="signal-lane stage-detail-lane">'+
   node("分身推进与监督",twinSummary+(twinSupervision.blocker?"；当前阻塞："+twinSupervision.blocker:""),twinSupervision.status==="blocked"?"is-blocked":twinEvents.length?"is-active":"is-queued")+
   node("真实调研 · 阶段输出",researchSummary,researchDetail.error?"is-blocked":researchSources.length?"is-active":researchDetail.status==="running"?"is-running":"is-queued")+
-  node("玩法假设 · 阶段输出",designSummary,designDetail.status==="blocked"||designDetail.error?"is-blocked":designDetail.title||designDetail.concept?"is-active":"is-queued")+
+  node("方案假设 · 阶段输出",designSummary,designDetail.status==="blocked"||designDetail.error?"is-blocked":designDetail.title||designDetail.concept?"is-active":"is-queued")+
   node("可行性验收 · 阶段输出",feasibilitySummary,feasibilityDetail.status==="incomplete"?"is-blocked":feasibilityDetail.status==="evaluated"?"is-active":"is-queued")+
   '</div><div class="twin-push-history">'+twinEventMarkup+'</div>';
  const signalOffice=document.getElementById("signalOffice");
  const expandedSignalMarkup=signalMarkup+stageDetails+timelineMarkup+(visibleWorkerOutput?'<div class="signal-lane">'+visibleWorkerOutput+'</div>':"");
  // Single rendering authority: renderCriticalFlow(data), called after render() in poll().
- document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>Intent</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
+ document.getElementById("twin").innerHTML=t?'<div class="kv"><b>Name</b><div><strong>'+esc(t.name)+'</strong></div><b>Role</b><div>'+esc(t.role)+'</div><b>意图</b><div>'+esc(t.intent)+'</div><b>Autonomy</b><div>'+esc(t.policy.autonomy_level)+'</div><b>Decision</b><div>'+esc(t.decision_style)+'</div><b>Approval</b><div>'+esc((t.policy.approval_required_for||[]).join(", "))+'</div></div>':'等待业务目标...';
  document.getElementById("intent").textContent=state.goal||"等待目标...";
  document.getElementById("teamSummary").textContent=(t?t.team_size:0)+" Digital Workers";
  document.getElementById("teamWhy").innerHTML=t?'<b>Why these workers?</b><br>根据当前 Business Goal，Digital Twin 选择最相关的能力组合，并受 max parallel = '+t.policy.max_parallel_workers+' 约束。':'Digital Twin 会根据业务目标决定团队。';
@@ -972,7 +972,7 @@ function renderExplainableReport(data){
  const goal=text(data.goal,"本轮目标未记录"),phase=text(data.phase,"unknown");
  const research=data.research||{},quality=research.quality||{},decision=data.decision||{},feas=data.feasibility||{},report=feas.report||{},evaluation=feas.evaluation||{};
  const agents=Array.isArray(data.agents)?data.agents:[],sources=Array.isArray(research.sources)?research.sources:[],evidence=Array.isArray(data.evidence)?data.evidence:[];
- const dims=report.dimensions||{},dimNames={player_value:"玩家价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与重复游玩",risk_and_compliance:"风险与合规"};
+ const dims=report.dimensions||{},dimNames={player_value:"用户价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与复用",risk_and_compliance:"风险与合规"};
  const scored=Object.entries(dimNames).filter(([k])=>{const d=dims[k]||{};return Number.isFinite(Number(d.score))&&Number(d.score)>=1&&Number(d.score)<=5&&Array.isArray(d.evidence_refs)&&d.evidence_refs.length>0&&String(d.rationale||"").trim();});
  const checks=Array.isArray(evaluation.checks)?evaluation.checks:[];
  const failedChecks=checks.filter(c=>c.passed===false);
@@ -1001,7 +1001,7 @@ function renderExplainableReport(data){
  put("reportAdoption",esc(adoption+" · "+adoptionLabel));
  put("reportConclusion",'<b>'+esc(decisionLabel)+'</b><div style="margin-top:6px">任务：'+esc(goal)+'</div><div>阶段：'+esc(phase)+' · 运行 ID：'+esc(text(data.run_id))+'</div><div>员工：'+agents.length+' 名；研究来源：'+sources.length+' 个；门禁接受证据：'+esc(text(quality.accepted,"0"))+' 条</div><div style="margin-top:6px">'+esc(text(decision.next_step,"后端尚未提供下一步建议。"))+'</div>'+(decision.risks&&decision.risks.length?list(decision.risks,"未记录风险"):""));
  const semanticReviews=agents.map(a=>(a.twin_review||{}).semantic_review||{}); const semanticDone=semanticReviews.filter(r=>r.status==="completed_review_required").length;
- const steps=["目标："+goal,"员工执行："+agents.filter(a=>a.status==="completed").length+"/"+agents.length+" 完成；"+agents.filter(a=>["blocked","failed"].includes(String(a.status||""))).length+" 受阻","员工结论审查："+semanticDone+"/"+agents.length+" 员工完成结构化语义审查；语义审查不等于事实核验","调研："+text(research.status)+"；"+sources.length+" 个来源，"+text(quality.accepted,0)+" 条通过机械门禁；原始用户评价 "+text(quality.raw_user_content_records,0)+" 条","玩法生成："+text((data.design||{}).status)+"；"+text((data.design||{}).reason,"未提供生成说明"),"评估："+text(feas.status)+"；八维度中"+scored.length+"项同时具备有效评分、理由和证据引用"];
+ const steps=["目标："+goal,"员工执行："+agents.filter(a=>a.status==="completed").length+"/"+agents.length+" 完成；"+agents.filter(a=>["blocked","failed"].includes(String(a.status||""))).length+" 受阻","员工结论审查："+semanticDone+"/"+agents.length+" 员工完成结构化语义审查；语义审查不等于事实核验","调研："+text(research.status)+"；"+sources.length+" 个来源，"+text(quality.accepted,0)+" 条通过机械门禁；原始用户评价 "+text(quality.raw_user_content_records,0)+" 条","方案生成："+text((data.design||{}).status)+"；"+text((data.design||{}).reason,"未提供生成说明"),"评估："+text(feas.status)+"；八维度中"+scored.length+"项同时具备有效评分、理由和证据引用"];
  const dimensionReasons=Object.entries(dimNames).map(([key,label])=>{const d=dims[key]||{};return label+"："+(d.score==null?"未评分":d.score+"/5")+"；"+text(d.rationale,"无评分理由")+"；证据引用："+(Array.isArray(d.evidence_refs)&&d.evidence_refs.length?d.evidence_refs.join("、"):"无");});
  const checkReasons=checks.map(c=>text(c.name,"检查项")+"："+(c.passed===true?"通过":c.passed===false?"未通过":"未判定")+"；"+text(c.reason,"后端未提供原因"));
  put("reportDerivation",list(steps)+(scored.length?'<details class="content-fold"><summary>八维评分推导与引用</summary>'+list(dimensionReasons)+'</details>':"")+(checkReasons.length?'<details class="content-fold"><summary>验收检查的通过/失败原因</summary>'+list(checkReasons)+'</details>':"")+(Array.isArray(data.conversation)&&data.conversation.length?'<details class="content-fold"><summary>查看最近执行记录</summary>'+list(data.conversation.slice(-5).map(m=>text(m.from,"系统")+"："+text(m.text,"无正文")))+"</details>":""));
@@ -1033,7 +1033,7 @@ function renderExplainableReport(data){
  })();
  const counterCandidates=Array.isArray(report.candidate_counter_evidence_refs)?report.candidate_counter_evidence_refs:[];
  const errors=Array.isArray(research.query_errors)?research.query_errors:[];
- const gaps=[!realResearch?"未确认本轮真实调研完整成功":"",!Number(quality.raw_user_content_records||0)?"没有采集到带原文、ID、时间和采集方式的原始用户评价":"",!Number(quality.accepted_user_demand_records||0)?"当前没有可用于直接需求判断的合格原始用户评价记录":"",!sourceCountKnown?"独立来源数量未核实":"",sourceCountKnown&&sourceCount<3?"独立来源数量低于 3":"",!hasPrototype?"缺少真实原型/玩家实验引用":"",!costComplete?"保守/基准/乐观成本情景不完整":"",!counterRefs.length?"未提交已审查的反证引用":"",truthVerified?"":"没有独立事实核验记录",...errors.map(e=>"查询失败："+text(e.query,"未知查询")+"（"+text(e.error,"错误未记录")+"）")].filter(Boolean);
+ const gaps=[!realResearch?"未确认本轮真实调研完整成功":"",!Number(quality.raw_user_content_records||0)?"没有采集到带原文、ID、时间和采集方式的原始用户评价":"",!Number(quality.accepted_user_demand_records||0)?"当前没有可用于直接需求判断的合格原始用户评价记录":"",!sourceCountKnown?"独立来源数量未核实":"",sourceCountKnown&&sourceCount<3?"独立来源数量低于 3":"",!hasPrototype?"缺少真实原型/用户实验引用":"",!costComplete?"保守/基准/乐观成本情景不完整":"",!counterRefs.length?"未提交已审查的反证引用":"",truthVerified?"":"没有独立事实核验记录",...errors.map(e=>"查询失败："+text(e.query,"未知查询")+"（"+text(e.error,"错误未记录")+"）")].filter(Boolean);
  const workerReviewNotes=agents.map(a=>{const review=((a.twin_review||{}).semantic_review)||{};const unsupported=Array.isArray(review.unsupported_claims)?review.unsupported_claims:[];return (a.worker||"数字员工")+"：语义审查="+text(review.status,"未记录")+"；"+text(review.summary||review.message,"没有审查摘要")+"；缺乏支持的主张="+unsupported.length;});
  put("reportObjectivity",'<div><b>反证已审查：</b>'+counterRefs.length+' 条；<b>反证候选：</b>'+counterCandidates.length+' 条</div><div><b>员工结果审查摘要</b>'+list(workerReviewNotes,"本轮没有员工审查记录")+'</div><div><b>当前决策风险：</b>'+list(Array.isArray(decision.risks)?decision.risks:[],"后端未记录显式风险")+'</div><div><b>独立真实性核验：</b>'+(truthVerified?"后端标记已核验，请查看核验记录":"未记录；URL、搜索摘要和模型置信度都不等于事实核验")+'</div><div style="margin-top:6px"><b>未解决缺口</b>'+list(gaps,"当前门禁字段未发现缺口，但仍需人工/独立核验确认")+'</div><div class="fv-note">来源角色若由域名推断，只是启发式分类；不代表内容真实、用户有代表性或不同来源彼此独立。</div>');
  const advice=[];
@@ -1052,11 +1052,11 @@ function renderExplainableReport(data){
   ["原型证据",hasPrototype?"已提供引用；内容真实性仍待核验":"未提供"],
   ["成本情景",costComplete?"三种情景字段完整":"三种情景字段不完整"],
   ["员工语义审查",semanticReviewClear?"结构化审查已完成且未列出未支持主张":"审查未完成或仍有未支持主张"],
-  ["原始用户评价",esc(text(quality.accepted_user_demand_records,0))+" 条（游戏任务要求至少 3 条；仍需代表性审查）"],
+  ["原始用户评价",esc(text(quality.accepted_user_demand_records,0))+" 条（任务要求至少 3 条；仍需代表性审查）"],
   ["事实核验",truthVerified?"后端有核验标记":"未记录核验程序/结果"]
  ];
  const acceptancePassed=isGame?gameAccepted:genericAccepted;
- put("reportAcceptance",'<div><b>总状态：</b><span class="report-chip">'+(acceptancePassed?"通过当前验收门禁":"未通过 / 未完成验收")+'</span></div>'+list(acceptanceItems.map(x=>x[0]+"： "+x[1]))+'<div class="fv-blockers"><b>验收规则：</b>游戏可行性只有在八维度均有有效评分/理由/证据引用、至少 3 个独立来源、至少 3 条合格原始用户评价、反证引用、原型证据、完整三情景成本、员工语义审查通过且后端决策为 GO 时才通过。通用任务须完成员工执行、真实研究、证据门禁和结构化语义审查；存在未支持/无法测试的关键主张或模拟执行时不能判为通过。模型审查不等于独立事实核验。此界面不会将阶段结束等同于验收通过。</div>');
+ put("reportAcceptance",'<div><b>总状态：</b><span class="report-chip">'+(acceptancePassed?"通过当前验收门禁":"未通过 / 未完成验收")+'</span></div>'+list(acceptanceItems.map(x=>x[0]+"： "+x[1]))+'<div class="fv-blockers"><b>验收规则：</b>产品可行性只有在八维度均有有效评分/理由/证据引用、至少 3 个独立来源、至少 3 条合格原始用户评价、反证引用、原型证据、完整三情景成本、员工语义审查通过且后端决策为 GO 时才通过。通用任务须完成员工执行、真实研究、证据门禁和结构化语义审查；存在未支持/无法测试的关键主张或模拟执行时不能判为通过。模型审查不等于独立事实核验。此界面不会将阶段结束等同于验收通过。</div>');
 }
 
 function renderWorkflowTimeline(data){
@@ -1281,10 +1281,10 @@ function renderCriticalFlow(data){
  const summary=document.getElementById("signalSummary");
  const caption=document.getElementById("signalCaption");
  if(summary)summary.textContent=!data.goal&&(!data.phase||data.phase==="idle")?"等待启动":["planning","team","research","design","evaluation"].includes(data.phase)?"执行中 · "+String(data.phase).toUpperCase():["failed","blocked","error"].includes(data.phase)?"执行受阻 · "+String(data.phase).toUpperCase():"状态 · "+String(data.phase||"unknown").toUpperCase();
- if(caption)caption.textContent=data.run_error?"本轮执行异常："+String(data.run_error)+"。请查看分身推进记录与阶段输出。":research.error?"调研受阻："+String(research.error)+"；下游阶段不会被伪装成完成。":design.status==="blocked"?"玩法阶段受阻："+String(design.reason||"未返回原因"):"首页内容来自本轮后端状态；空数据会明确标记，不以旧结果填充。";
+ if(caption)caption.textContent=data.run_error?"本轮执行异常："+String(data.run_error)+"。请查看分身推进记录与阶段输出。":research.error?"调研受阻："+String(research.error)+"；下游阶段不会被伪装成完成。":design.status==="blocked"?"方案阶段受阻："+String(design.reason||"未返回原因"):"首页内容来自本轮后端状态；空数据会明确标记，不以旧结果填充。";
  const brief=design.brief&&typeof design.brief==="object"?design.brief:{};
  const concept=brief.original_concept&&typeof brief.original_concept==="object"?brief.original_concept:{};
- const designOutput=design.error||design.reason||concept.title||brief.title||design.title||design.concept||concept.core_loop||concept.gameplay_loop||"本轮尚未生成玩法假设";
+ const designOutput=design.error||design.reason||concept.title||brief.title||design.title||design.concept||concept.core_loop||concept.gameplay_loop||"本轮尚未生成方案假设";
  const sources=Array.isArray(research.sources)?research.sources:[];
  const blockers=feasibility.completion&&Array.isArray(feasibility.completion.blockers)?feasibility.completion.blockers:[];
  const decision=feasibility.evaluation&&feasibility.evaluation.decision||data.decision&&data.decision.recommendation||"尚无最终结论";
@@ -1299,7 +1299,7 @@ function renderCriticalFlow(data){
  const twinBody='<div class="signal-facts"><div><small>当前阶段</small><b>'+esc(data.phase||"idle")+'</b></div><div><small>监督状态</small><b>'+esc(twin.status||"等待本轮运行")+'</b></div><div><small>分身判断</small><p>'+esc(twin.last_decision||"等待分身判断")+'</p></div><div><small>下一步</small><p>'+esc(twin.next_action||"等待启动")+'</p></div></div>';
  const sourceRows=sources.slice(0,20).map((s,i)=>{const url=String(s.url||"");const title=String(s.title||s.domain||("来源 "+(i+1)));const channel=String(s.channel||s.provider||s.source||s.domain||"未标注渠道");const role=String(s.source_role||s.role||"").toLowerCase();const raw=s.raw_review_text||s.review_text||s.review||"";const isRaw=Boolean(raw&&String(raw).trim())&&Boolean(s.review_id)&&Boolean(s.review_created_at||s.published_at)&&Boolean(s.collection_method);let host="";try{host=new URL(url).hostname.toLowerCase().replace(/^www\./,"")}catch(e){}const mediaHosts=["medium.com","substack.com","gamasutra.com","gamedeveloper.com","ign.com","gamespot.com","pcgamer.com","polygon.com","rockpapershotgun.com","eurogamer.net","youtube.com","youtu.be","kotaku.com","venturebeat.com","techcrunch.com","theverge.com","forbes.com","gamesindustry.biz"];const isMedia=mediaHosts.some(h=>host===h||host.endsWith("."+h))||/secondary_analysis|media|article|editorial/.test(role);const isOfficial=/official_or_industry_data|official|industry/.test(role)||/(^|\.)(gov|edu)$/.test(host.split(".").slice(-1)[0]||"");const sourceType=isRaw?"原始用户评价记录（仍需真实性核验）":isMedia?"二手文章/媒体分析":isOfficial?"官方/行业资料（需核对口径）":/primary_user_signal/.test(role)?"用户平台线索（原始性未确认）":"来源性质未确认";const useLabel=isRaw?"直接用户信号候选：仅支持有限的体验/需求主张":isMedia?"辅助材料：用于背景、假设和寻找原始出处，不可单独证明用户需求":isOfficial?"条件性直接证据：仅支持与其数据口径匹配的事实":"线索级：不得直接支撑关键结论";const link=/^https?:\/\//i.test(url)?'<a class="evidence-url" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(title)+'</a>':esc(title);return '<li style="margin:3px 0">'+link+' <span class="evidence-meta">· '+esc(channel)+'</span><div class="evidence-meta">分类：'+esc(sourceType)+' · 用途：'+esc(useLabel)+'</div>'+(raw?'<details class="evidence-detail"><summary>查看原文片段</summary><pre>'+esc(shortText(raw,500))+'</pre></details>':'<div class="evidence-meta">无原始用户文本</div>')+'</li>'}).join("");
  const rawReviewCount=Number((research.review_collection||{}).collected||research.raw_user_review_records||0);const researchBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(research.status||"not_started")+'</b></div><div><small>抓取页面/来源</small><b>'+sources.length+'</b></div><div><small>原始评价采集器返回数</small><b>'+esc(rawReviewCount)+'</b></div><div><small>摘要 / 阻塞</small><p>'+esc(research.error||research.summary||"暂无调研摘要")+'</p></div><div><small>来源性质与链接（最多显示 12 条）</small>'+(sourceRows?'<ul>'+sourceRows+'</ul>':'<p>本轮尚无可追溯来源</p>')+'</div><div><small>检索角度 / 失败数</small><p>'+esc((Array.isArray(research.queries)?research.queries.length:0)+' 个查询角度 · '+((research.query_errors||[]).length)+' 个查询错误')+'</p></div><div><small>判定口径</small><p>媒体文章、新闻报道和搜索摘要属于二手信息；只有可追溯的用户原文及 ID/时间/采集方式等字段，才可作为原始用户信号候选。字段齐全仍不等于真实性已核实。</p></div></div>';
- const designBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(design.status||"not_started")+'</b></div><div><small>玩法假设</small><p>'+esc(String(designOutput))+'</p></div></div>';
+ const designBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(design.status||"not_started")+'</b></div><div><small>方案假设</small><p>'+esc(String(designOutput))+'</p></div></div>';
  const feasibilityBody='<div class="signal-facts"><div><small>状态</small><b>'+esc(feasibility.status||"not_started")+'</b></div><div><small>结论</small><b>'+esc(decision)+'</b></div><div><small>待解决缺口</small><p>'+esc(blockers.length?blockers.join("、"):"暂无记录")+'</p></div></div>';
  const eventText=events.length?events.map(e=>String(e.stage||"阶段")+"："+String(e.decision||"")+"；下一步："+String(e.action||"")+(e.blocker?"；阻塞："+String(e.blocker):"")).join("\n"):"启动后显示分身的判断、动作和阻塞记录";
  office.innerHTML='<div class="signal-flow-map">'+
@@ -1311,7 +1311,7 @@ function renderCriticalFlow(data){
  '<div class="signal-flow-connector"><span>员工提交结论后，分身逐项质疑、核对证据与反证</span><i>↓</i></div>'+
  '<div class="signal-flow-row">'+card("04 · 分身审查员工结论（不自动采纳）",'<div class="signal-facts"><div><small>已完成审查</small><b>'+agents.filter(a=>((a.twin_review||{}).semantic_review||{}).status==="completed_review_required").length+' / '+agents.length+' 名员工</b></div><div><small>审查结果</small><p>'+esc(agents.map(a=>{const r=((a.twin_review||{}).semantic_review)||{};return (a.worker||"员工")+"："+String(r.adoption||r.status||"尚未审查")+"；"+String(r.summary||r.message||"暂无理由")}).join("\n")||"尚无员工结论可供分身审查")+'</p></div><div><small>审查规则</small><p>逐条检查主张、证据 ID、反方意见、未知项和下一步核验。审查未完成、无主张级证据或仍有未支持主张时，不视为通过。</p></div><div><small>事实核验边界</small><p>模型审查可以发现逻辑缺口，但不能单独证明来源真实；关键结论仍需独立验证。</p></div></div>',"twin-review-flow-card")+'</div>'+
  '<div class="signal-flow-connector"><span>只将经审查的假设送入下游；未通过则补证或退回</span><i>↓</i></div>'+
- '<div class="signal-flow-row signal-flow-parallel">'+card("05 · 玩法假设",designBody,"design-flow-card")+card("06 · 可行性验收",feasibilityBody,"acceptance-flow-card")+'</div>'+
+ '<div class="signal-flow-row signal-flow-parallel">'+card("05 · 方案假设",designBody,"design-flow-card")+card("06 · 可行性验收",feasibilityBody,"acceptance-flow-card")+'</div>'+
 
  '<details class="content-fold signal-event-fold"><summary>查看分身推进记录（'+events.length+' 条）</summary><pre>'+escText(eventText)+'</pre></details>'+
  '</div>';
@@ -1338,11 +1338,11 @@ function renderRunOutputs(data){
   const money=value=>value===null||value===undefined||value===""||!Number.isFinite(Number(value))?"未知":"$"+Number(value).toFixed(4);
   const costScenario=(label,scenario)=>'<div class="fv-card"><div class="fv-label">'+label+'情景 · AI 推理费（USD）</div><div class="fv-note">每次会话</div><div class="fv-value">'+money(scenario&&scenario.model_cost_per_session_usd)+'</div><div class="fv-note">每月 · 1000 名活跃用户</div><div class="fv-value">'+money(scenario&&scenario.monthly_ai_inference_cost_usd_at_1000_users)+'</div></div>';
   const costSummary=estimate&&estimate.status==="estimated"
-   ?'<div class="content-fold" style="margin-top:12px"><div class="section-title">AI 推理成本粗估 · 情景（美元）</div><div class="sub">保守 / 基准 / 乐观表示不同用量假设，不是开发预算，也不是总运营成本。model_warning 与价格依据会随本轮报告显示。</div><div class="feasibility-visual">'+costScenario("保守",estimate.scenarios&&estimate.scenarios.conservative)+costScenario("基准",estimate.scenarios&&estimate.scenarios.base)+costScenario("乐观",estimate.scenarios&&estimate.scenarios.optimistic)+'</div><div class="fv-note">仅估算模型推理费用；不含搜索 API、托管、开发人力、游戏内容制作、审核等费用。价格依据：'+esc(String(estimate.pricing_source||"未提供"))+'。数字依赖使用量假设，需用实际 token 用量与账单复核。</div></div>'
+   ?'<div class="content-fold" style="margin-top:12px"><div class="section-title">AI 推理成本粗估 · 情景（美元）</div><div class="sub">保守 / 基准 / 乐观表示不同用量假设，不是开发预算，也不是总运营成本。model_warning 与价格依据会随本轮报告显示。</div><div class="feasibility-visual">'+costScenario("保守",estimate.scenarios&&estimate.scenarios.conservative)+costScenario("基准",estimate.scenarios&&estimate.scenarios.base)+costScenario("乐观",estimate.scenarios&&estimate.scenarios.optimistic)+'</div><div class="fv-note">仅估算模型推理费用；不含搜索 API、托管、开发人力、内容制作、审核等费用。价格依据：'+esc(String(estimate.pricing_source||"未提供"))+'。数字依赖使用量假设，需用实际 token 用量与账单复核。</div></div>'
    :'<div class="fv-note" style="margin-top:12px">AI 推理成本暂不可估：'+esc(String(estimate&&estimate.message||"当前模型没有已知价格；可配置输入/输出每百万 token 价格。"))+'</div>';
   const blockers=(feasibility.completion.blockers||[]);
   const dims=(feasibility.report&&feasibility.report.dimensions)||{};
-  const dimensionLabels={player_value:"玩家价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与重复游玩",risk_and_compliance:"风险与合规"};
+  const dimensionLabels={player_value:"用户价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与复用",risk_and_compliance:"风险与合规"};
   const dimensionCards=Object.entries(dimensionLabels).map(([key,label])=>{const item=dims[key]||{};const valid=Number.isFinite(Number(item.score))&&Number(item.score)>=1&&Number(item.score)<=5&&Array.isArray(item.evidence_refs)&&item.evidence_refs.length>0&&String(item.rationale||"").trim();const score=valid?Number(item.score):null;const reason=item.rationale||item.reason||"系统尚未返回该维度的评分理由。";const refs=Array.isArray(item.evidence_refs)?item.evidence_refs:[];return '<div class="fv-dimension"><div class="fv-dimension-head"><span>'+label+'</span><b>'+(score===null?'暂无有效评分':score+'/5')+'</b></div><div class="fv-track"><i style="width:'+(score===null?0:score*20)+'%"></i></div><div class="fv-note">'+(valid?'已提供评分与证据引用，仍需独立核验':(!item.score?'缺少评分':'评分缺少理由或证据引用'))+'</div><details><summary>查看依据与缺口</summary><div class="fv-note">'+esc(reason)+'</div><div class="fv-note">证据引用：'+(refs.length?refs.map(x=>esc(typeof x==="string"?x:JSON.stringify(x))).join("；"):"暂无")+'</div></details></div>';}).join("");
   const visualEstimate=feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.pricing_estimate;
   feasibilityResultEl.innerHTML='<div class="outcome"><div class="kicker">本轮评估 · 尚未达标</div><div class="big">'+esc(verdict)+'</div><div class="sub">未满足完整验收条件；不得据此直接立项。</div></div><div class="feasibility-visual"><div class="fv-card"><div class="fv-label">维度覆盖</div><div class="fv-value">'+Object.keys(dims).filter(k=>dimensionLabels[k]&&dims[k]&&Number.isFinite(Number(dims[k].score))&&Array.isArray(dims[k].evidence_refs)&&dims[k].evidence_refs.length&&String(dims[k].rationale||"").trim()).length+'/8</div></div><div class="fv-card"><div class="fv-label">独立来源</div><div class="fv-value">'+esc(String((feasibility.report&&feasibility.report.independent_source_count)??'未知'))+'</div></div><div class="fv-card"><div class="fv-label">原型证据</div><div class="fv-value">'+((feasibility.report&&Array.isArray(feasibility.report.prototype_evidence_refs)&&feasibility.report.prototype_evidence_refs.length)?'已提供引用':'缺失')+'</div></div><div class="fv-card"><div class="fv-label">成本模型</div><div class="fv-value">'+((feasibility.report&&feasibility.report.cost_model&&feasibility.report.cost_model.scenarios)?'待核验':'缺失')+'</div></div></div><details class="content-fold" open><summary>八维度检查（逐项查看评分、依据与缺口）</summary><div class="fv-note">评分仅在有理由与证据引用时展示；引用本身不代表真实性已验证。缺少证据时会明确显示未评分。</div><div class="fv-dimensions">'+dimensionCards+'</div><div class="fv-note">完整报告仍可在下方高级 JSON 区域查看与编辑。</div></details>'+costSummary;
@@ -1357,7 +1357,7 @@ function renderRunOutputs(data){
   const decision=String(ev.decision||"UNKNOWN");
   const decisionLabel={GO_TO_PROTOTYPE:"建议进入有限原型验证",ITERATE:"建议调整后再验证",NO_GO:"当前不建议继续",INSUFFICIENT_EVIDENCE:"证据不足，暂不决策"}[decision]||decision;
   const checks=Array.isArray(ev.checks)?ev.checks:[];
-  const names={player_value:"玩家价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与重复游玩",risk_and_compliance:"风险与合规"};
+  const names={player_value:"用户价值",differentiation:"差异化",technical_feasibility:"技术可行性",market_evidence:"市场证据",unit_economics:"单位经济",production_cost:"开发成本",retention_and_replayability:"留存与复用",risk_and_compliance:"风险与合规"};
   const reportDims=(feasibility.report&&feasibility.report.dimensions)||{};
   const checkByName=Object.fromEntries(checks.map(c=>[c.name,c]));
   const dimHtml=Object.keys(names).map(key=>{const c=checkByName[key]||{};const d=reportDims[key]||{};const rawScore=c.score??d.score;const score=rawScore!==undefined&&rawScore!==null&&rawScore!==""&&Number.isFinite(Number(rawScore))?Number(rawScore):null;const refs=Array.isArray(c.evidence_refs)?c.evidence_refs:(Array.isArray(d.evidence_refs)?d.evidence_refs:[]);const rationale=c.reason||d.rationale||d.reason||"系统尚未返回评分理由。";return '<div class="fv-dimension"><div class="fv-dimension-head"><span>'+names[key]+'</span><b>'+(score===null?'暂无评分':score+'/5')+'</b></div><div class="fv-track"><i style="width:'+(score===null?0:Math.max(0,Math.min(100,score*20)))+'%"></i></div><div class="fv-note">'+(score===null?'评分数据未返回':(c.passed===true?'达到最低评分门槛':c.passed===false?'未达到最低评分门槛':'尚未判定是否通过'))+' · '+refs.length+' 条证据引用</div><details><summary>查看依据与缺口</summary><div class="fv-note">'+esc(rationale)+'</div><div class="fv-note">证据引用：'+(refs.length?refs.map(x=>esc(typeof x==="string"?x:JSON.stringify(x))).join("；"):"暂无") +'</div></details></div>';}).join("");
@@ -1367,8 +1367,8 @@ function renderRunOutputs(data){
   feasibilityStatusEl.textContent=feasibility.status==="researching"?"RESEARCHING · CONTRACT READY":"CONTRACT READY";
   feasibilityResultEl.textContent="评估范围已建立，正在等待本轮研究和证据。契约不是结论；最终评估还需要独立来源核验、反证、可运行原型证据与完整成本情景。";
  }else if(feasibility.status==="not_started"){
-  feasibilityStatusEl.textContent="NOT STARTED";
-  feasibilityResultEl.textContent="当前目标尚未进入游戏商业可行性评估。";
+  feasibilityStatusEl.textContent="未开始";
+  feasibilityResultEl.textContent="当前目标尚未进入产品商业可行性评估。";
   const currentRun=String(data.run_id||"");
   if(feasibilityReportEl&&feasibilityReportEl.dataset.runId!==currentRun){
    feasibilityReportEl.value="";
@@ -1609,7 +1609,7 @@ document.getElementById("designRun").onclick=async function(){
  if(!currentRunResearchReady){document.getElementById("designResult").textContent="尚未完成本轮调研，不能生成本轮创意。请先完成真实调研并确认来源证据。";return;}
  const button=document.getElementById("designRun");
  const out=document.getElementById("designResult");
- button.disabled=true;out.textContent="JARVIS 正在分析参考游戏并构建设计 brief…";
+ button.disabled=true;out.textContent="JARVIS 正在分析参考产品并构建设计 brief…";
  try{
   const response=await apiFetch("/api/experience-design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source_game:document.getElementById("sourceGame").value,concept_name:document.getElementById("conceptName").value})});
   const result=await response.json();
@@ -1620,7 +1620,7 @@ document.getElementById("designRun").onclick=async function(){
   if(sourceInput&&!sourceInput.value.trim())sourceInput.value=concept.reference_game||b.reference_game||b.source_game||"由本轮调研证据提取（详见机制分析）";
   if(conceptInput&&!conceptInput.value.trim())conceptInput.value=concept.title||"本轮原创概念";
   const list=(items,fn)=>'<ul>'+((items||[]).map(fn).join(""))+'</ul>';
-  const perspectives=list(b.player_perspectives,p=>'<li><b>'+esc(p.segment||"玩家视角")+'</b>：可能吸引 '+esc(p.likely_attraction||"未说明")+'；潜在排斥 '+esc(p.possible_rejection||"未说明")+'。<div class="sub">验证问题：'+esc(p.validation_question||"待定义")+'</div></li>');
+  const perspectives=list(b.player_perspectives,p=>'<li><b>'+esc(p.segment||"用户视角")+'</b>：可能吸引 '+esc(p.likely_attraction||"未说明")+'；潜在排斥 '+esc(p.possible_rejection||"未说明")+'。<div class="sub">验证问题：'+esc(p.validation_question||"待定义")+'</div></li>');
   const hypotheses=list(b.falsifiable_hypotheses,h=>'<li><b>'+esc(h.hypothesis||"假设")+'</b><div class="sub">失败信号：'+esc(h.failure_signal||"待定义")+'；指标：'+esc(h.metric||"待定义")+'</div></li>');
   const systems=list(concept.core_systems,s=>'<li>'+esc(s)+'</li>');
   const loop=list(concept.core_loop,s=>'<li>'+esc(s)+'</li>');
@@ -1628,7 +1628,7 @@ document.getElementById("designRun").onclick=async function(){
   const mechanisms=list(b.mechanism_analysis,m=>'<li><b>'+esc(m.feature||"机制")+'</b><div>'+esc(m.possible_experience||"")+'</div><div class="sub">因果机制：'+esc(m.causal_mechanism||"")+'<br>反例：'+esc(m.counter_hypothesis||"")+'</div></li>');
   const plan=concept.prototype_plan||b.prototype_plan||{};
   out.dataset.manualGenerated="true";out.dataset.generatedRunId=String((typeof state!=="undefined"&&state&&state.run_id)||"");
-  out.innerHTML='<div class="outcome"><div class="kicker">快速阅读 · 新游戏概念</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div class="summary-copy">'+esc(concept.one_line||"暂无一句话概述。")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"待补充")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"待补充")+'</div><b>验证状态</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div><details class="content-fold"><summary>展开完整设计分析（机制、玩家假设、原型计划）</summary><h3>从参考游戏提炼的机制</h3>'+mechanisms+'<h3>可迁移原则</h3>'+principles+'<h3>新游戏核心系统</h3>'+systems+'<h3>核心循环</h3>'+loop+'<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+'<h3>可证伪假设</h3>'+hypotheses+'<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+'<div class="fv-note">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div></details>';
+  out.innerHTML='<div class="outcome"><div class="kicker">快速阅读 · 新产品方案</div><div class="big">'+esc(concept.title||"未命名概念")+'</div><div class="summary-copy">'+esc(concept.one_line||"暂无一句话概述。")+'</div><div class="kv"><b>差异化</b><div>'+esc(concept.differentiation||"待补充")+'</div><b>关键时刻</b><div>'+esc(concept.signature_moment||"待补充")+'</div><b>验证状态</b><div>'+esc(trust.generation_mode||"unknown")+' · 市场已验证：否 · 真实试玩：否</div></div></div><details class="content-fold"><summary>展开完整设计分析（机制、方案假设、原型计划）</summary><h3>从参考产品提炼的机制</h3>'+mechanisms+'<h3>可迁移原则</h3>'+principles+'<h3>新游戏核心系统</h3>'+systems+'<h3>核心循环</h3>'+loop+'<h3>不同玩家视角（假设，非真实访谈）</h3>'+perspectives+'<h3>可证伪假设</h3>'+hypotheses+'<h3>最小原型计划</h3><div>'+esc(plan.scope||"")+'</div>'+list(plan.steps,s=>'<li>'+esc(s)+'</li>')+'<div class="fv-note">证据纪律：AI 输出不是经过验证的玩家研究；市场可行性、概念原创性和真实玩家体验仍未验证。</div></details>';
  }catch(e){out.textContent="生成请求失败："+e.name;}
  finally{button.disabled=false;}
 };
@@ -1688,7 +1688,7 @@ refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();s
 </script>
 <script>
 // Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.
-(function(){const source=document.getElementById("decision"),target=document.getElementById("decisionSummaryText");if(!source||!target)return;const sync=()=>{const title=source.querySelector("h2"),text=(source.innerText||source.textContent||"").trim();if(!text||text==="等待数字分身完成判断…"){target.innerHTML='<div class="decision-summary-empty">尚无可用结论。先完成真实调研、玩法假设和证据验收；未验证前不显示为 GO。</div>';return;}const recommendation=(title?.textContent||"阶段性判断").trim().toUpperCase();const raw=text.replace(title?.textContent||"","").trim();const map=[[/GO_TO_PROTOTYPE/,"建议进入原型验证","good"],[/DEMO_GO_TO_PROTOTYPE/,"建议进入原型验证（演示级）","good"],[/HOLD_FOR_EVIDENCE|HOLD|EVIDENCE不足/,"暂缓：证据不足","warn"],[/NO[_ -]?GO|不建议继续投入/,"不建议继续投入","bad"]];const matched=map.find(([pattern])=>pattern.test(recommendation));const status=matched?[matched[1],matched[2]]:[recommendation==="阶段性判断"?"等待本轮决策":recommendation,"neutral"];target.innerHTML='<div class="decision-summary-card '+status[1]+'"><div class="decision-summary-label">本轮建议</div><div class="decision-summary-title">'+esc(status[0])+'</div><div class="decision-summary-detail">'+esc(raw||"尚无风险与下一步说明。")+'</div><div class="decision-summary-foot">注意：这是系统建议，不是已被市场验证的结论；需结合来源、反证、成本和原型测试结果判断。</div></div>';};sync();new MutationObserver(sync).observe(source,{subtree:true,childList:true,characterData:true,attributes:true});})();
+(function(){const source=document.getElementById("decision"),target=document.getElementById("decisionSummaryText");if(!source||!target)return;const sync=()=>{const title=source.querySelector("h2"),text=(source.innerText||source.textContent||"").trim();if(!text||text==="等待数字分身完成判断…"){target.innerHTML='<div class="decision-summary-empty">尚无可用结论。先完成真实调研、方案假设和证据验收；未验证前不显示为 GO。</div>';return;}const recommendation=(title?.textContent||"阶段性判断").trim().toUpperCase();const raw=text.replace(title?.textContent||"","").trim();const map=[[/GO_TO_PROTOTYPE/,"建议进入原型验证","good"],[/DEMO_GO_TO_PROTOTYPE/,"建议进入原型验证（演示级）","good"],[/HOLD_FOR_EVIDENCE|HOLD|EVIDENCE不足/,"暂缓：证据不足","warn"],[/NO[_ -]?GO|不建议继续投入/,"不建议继续投入","bad"]];const matched=map.find(([pattern])=>pattern.test(recommendation));const status=matched?[matched[1],matched[2]]:[recommendation==="阶段性判断"?"等待本轮决策":recommendation,"neutral"];target.innerHTML='<div class="decision-summary-card '+status[1]+'"><div class="decision-summary-label">本轮建议</div><div class="decision-summary-title">'+esc(status[0])+'</div><div class="decision-summary-detail">'+esc(raw||"尚无风险与下一步说明。")+'</div><div class="decision-summary-foot">注意：这是系统建议，不是已被市场验证的结论；需结合来源、反证、成本和原型测试结果判断。</div></div>';};sync();new MutationObserver(sync).observe(source,{subtree:true,childList:true,characterData:true,attributes:true});})();
 </script>
 
 <script>
