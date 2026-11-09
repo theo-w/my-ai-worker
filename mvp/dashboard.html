@@ -522,7 +522,7 @@
  <div id="knowledgeResult" class="sub" style="margin-top:12px">启动研究后，这里会显示本轮复用的旧知识与收录情况。</div>
 </div>
 
-<div class="panel wide workflow-panel" id="gameLabPanel" style="margin-top:14px">
+<div class="panel wide workflow-panel" id="gameLabPanel" style="margin-top:14px;display:none">
  <div class="section-title"><span>本轮产出 · 产品体验实验室</span><span class="sub">方案假设 · 非真实测试数据</span></div>
  <div class="workflow-hint">只展示与当前目标关联的创意。未完成调研时不应将预置模板误认为本轮结果。</div>
  <div class="input">
@@ -945,6 +945,8 @@ function render(){
  document.getElementById("prototype").innerHTML=p?'<b>'+esc(p.name)+'</b><div class="sub" style="margin:5px 0 9px">'+esc(p.notice||"Business decision 已转化为下一阶段工作。")+'</div>'+p.steps.map((s,i)=>'<div>'+(i+1)+'. '+esc(s)+'</div>').join(""):(d&&["GO_TO_PROTOTYPE","DEMO_GO_TO_PROTOTYPE"].includes(d.recommendation)?'<button class="btn" style="height:40px;padding:0 14px" onclick="startPrototype()">启动 Prototype Sprint →</button>':'等待 GO / NO-GO 决策。');
  renderExplainableReport(state);
  renderWorkflowTimeline(state);
+ // 产品体验实验室只在可行性任务时显示,用户研究任务不显示
+ {const labPanel=document.getElementById("gameLabPanel");if(labPanel){const g=(state.goal||"").toLowerCase();labPanel.style.display=/可行性|评估|分析|feasibility|assess|evaluate/.test(g)?"":"none";}}
  // 轮询重渲染后保持当前阶段筛选
  if(activeStageFilter){try{filterTimelineByStage(activeStageFilter);}catch(_){}}
 }
