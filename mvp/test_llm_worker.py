@@ -35,8 +35,14 @@ def test_llm_requires_explicit_environment_configuration():
 
 
 def test_llm_rejects_non_https_endpoint():
+    # 非回环主机走 http 必须被拒绝;回环(本机模型服务器)允许。
     with pytest.raises(ValueError, match="HTTPS"):
-        OpenAICompatibleLLM("http://localhost:8000/v1", "key", "model")
+        OpenAICompatibleLLM("http://model.example.com/v1", "key", "model")
+
+
+def test_llm_allows_loopback_http_endpoint():
+    client = OpenAICompatibleLLM("http://127.0.0.1:8000/v1", "key", "model")
+    assert client.base_url == "http://127.0.0.1:8000/v1"
 
 
 def test_llm_parses_chat_completion_response(monkeypatch):

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -37,8 +38,13 @@ class OpenAICompatibleLLM:
         self.model = model
         self.timeout = min(120.0, max(1.0, float(timeout)))
         self.max_tokens = min(4096, max(64, int(max_tokens)))
-        if not self.base_url.startswith("https://"):
-            raise ValueError("LLM base URL must use HTTPS.")
+        host = urlsplit(self.base_url).hostname or ""
+        if not (self.base_url.startswith("https://") or host in {"127.0.0.1", "localhost", "::1", "[::1]"}):
+            # 允许 http 只到回环地址(本机模型服务器,如 omlx);
+            # 其他主机必须用 https,防止凭证在明文传输。
+            raise ValueError(
+                "LLM base URL must use HTTPS (http is only allowed for localhost)."
+            )
 
     @classmethod
     def from_environment(cls):

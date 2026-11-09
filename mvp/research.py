@@ -153,6 +153,69 @@ class JsonHttpSearchProvider:
         return sources
 
 
+class AppStoreRssSearchProvider:
+    """Adapter for Apple customer-review RSS/JSON feeds (no API key needed).
+
+    Endpoint looks like https://itunes.apple.com/us/rss/customerreviews/id=<APPID>/sortby=mostrecent/json
+    Each entry is one real user review, so snippets are raw user content.
+    """
+
+    def __init__(self, endpoint: str, timeout: float = 15.0):
+        self.endpoint = endpoint.strip()
+        self.timeout = timeout
+
+    def search(self, query: str, limit: int = 5) -> list[ResearchSource]:
+        import json as _json
+
+        from urllib.request import Request, urlopen
+
+        request = Request(self.endpoint, headers={
+            "Accept": "application/json",
+            "User-Agent": "JARVIS-ResearchAdapter/1.0",
+        })
+        with urlopen(request, timeout=self.timeout) as response:
+            payload = _json.loads(response.read().decode("utf-8"))
+        feed = payload.get("feed") or {}
+        rows = feed.get("entry") or []
+        if isinstance(rows, dict):
+            rows = [rows]
+        sources = []
+        for row in rows[: max(1, min(int(limit), 25))]:
+            if not isinstance(row, dict):
+                continue
+
+            def label(key: str) -> str:
+                value = row.get(key) or {}
+                return str(value.get("label", "")).strip() if isinstance(value, dict) else ""
+
+            title = label("title")
+            body = label("content")
+            review_id = (row.get("id") or {}).get("label", "") if isinstance(row.get("id"), dict) else ""
+            rating = label("rating")
+            if not body or not review_id:
+                continue
+            sources.append(ResearchSource(
+                title=f"{title or 'App Store 评价'} · {rating}★",
+                url=str(review_id),
+                snippet=body[:1200],
+                provider="app_store_rss",
+            ))
+        return sources
+
+
+def build_search_provider(endpoint: str, api_key: str | None = None):
+    """按端点主机选择适配器;App Store RSS 无需密钥。"""
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(endpoint).hostname or "").lower()
+    if "itunes.apple.com" in host:
+        return AppStoreRssSearchProvider(endpoint)
+    if "reddit.com" in host or "steampowered.com" in host:
+        # 本网络无法访问 Reddit/Steam,直接拒绝而不是假成功。
+        raise ValueError(f"{host} 在本网络不可访问,未配置此源")
+    return JsonHttpSearchProvider(endpoint, api_key)
+
+
 def research_environment_status() -> dict:
     """Report provider configuration without exposing the API key."""
     import os
@@ -160,7 +223,9 @@ def research_environment_status() -> dict:
     configured = bool(endpoint)
     from urllib.parse import urlsplit
     host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
-    provider = "tavily" if host == "api.tavily.com" or host.endswith(".tavily.com") else ("json_http" if configured else None)
+    provider = ("app_store_rss" if "itunes.apple.com" in host
+                else "tavily" if host == "api.tavily.com" or host.endswith(".tavily.com")
+                else ("json_http" if configured else None))
     return {
         "configured": configured,
         "provider": provider,
@@ -372,9 +437,7 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
         }
 
     try:
-        provider = JsonHttpSearchProvider(
-            endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None
-        )
+        provider = build_search_provider(endpoint, os.getenv("JARVIS_SEARCH_API_KEY") or None)
     except Exception as exc:
         return {
             "ok": False, "status": "provider_error", "query": joined_query,
@@ -531,9 +594,7 @@ def run_live_research(query: str, limit: int = 5) -> dict:
             "llm_synthesis": _synthesize_with_llm(query, []),
         }
     try:
-        provider = JsonHttpSearchProvider(
-            endpoint=endpoint, api_key=os.getenv("JARVIS_SEARCH_API_KEY") or None
-        )
+        provider = build_search_provider(endpoint, os.getenv("JARVIS_SEARCH_API_KEY") or None)
         found = provider.search(query, limit)
         sources = []
         seen = set()
