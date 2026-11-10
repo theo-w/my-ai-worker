@@ -10,7 +10,7 @@ def test_live_research_without_provider_is_explicitly_unavailable():
     assert result["status"] == "provider_unconfigured"
     assert result["sources"] == []
     assert result["quality"]["accepted"] == 0
-    assert "no real research" in result["message"]
+    assert "未配置真实搜索服务" in result["message"]
 
 
 def test_live_research_runs_quality_and_synthesis_pipeline():

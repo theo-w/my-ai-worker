@@ -86,7 +86,7 @@ def test_demo_mode_allows_labeled_handoff_without_real_evidence():
         evidence.extend(run_worker(worker, capability, "AI RPG"))
     decision = evaluate("AI RPG", evidence, demo_mode=True)
     assert decision.recommendation == "DEMO_GO_TO_PROTOTYPE"
-    assert "demo only" in decision.next_step.lower()
+    assert "仅演示" in decision.next_step
 
 
 def test_dashboard_executor_does_not_turn_llm_output_into_evidence():

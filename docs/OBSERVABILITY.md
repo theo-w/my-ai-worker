@@ -4,6 +4,9 @@ The read-only monitor reports the live workforce queue and event history through
 the authenticated administrator endpoint. It does not mutate tasks and never
 prints bearer tokens.
 
+> 注意:结构化检查通过、员工自报完成或模拟输出,都不证明事实正确。
+> 关键结论仍需来源、验证记录与可追溯历史;未配置搜索源会直接拒绝,不会假成功。
+
 ## Run one snapshot
 
 Set these environment variables in the same shell as the monitor process:
