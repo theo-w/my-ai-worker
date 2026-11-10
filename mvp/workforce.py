@@ -32,6 +32,8 @@ class WorkforceRegistry:
         self.workers: dict[str, dict] = {}
         # 幂键缓存：Idempotency-Key → {body, status}，用于重放返回缓存结果。
         self.idempotency: dict[str, dict] = {}
+        # 项目记录：project_id -> {id,name,kind,status,...}；kind 是数据,不分支。
+        self.projects: dict[str, dict] = {}
         self.load()
 
     def _event(self, event_type: str, **details):
@@ -80,12 +82,49 @@ class WorkforceRegistry:
                 self.events = data.get("events", [])
                 self.workers = data.get("workers", {})
                 self.idempotency = data.get("idempotency", {})
+                self.projects = data.get("projects", {})
             except FileNotFoundError:
                 return
             except (OSError, ValueError, TypeError):
                 self.tasks, self.events, self.workers = {}, [], {}
                 self.idempotency = {}
+                self.projects = {}
                 self._event("state_recovered", reason="invalid_or_unreadable_store")
+
+    def create_project(self, project_id: str, name: str, kind: str = "general",
+                     status: str = "active") -> dict:
+        """Create or replace a project record; kind stays data, never a code branch."""
+        if not isinstance(project_id, str) or not project_id.strip() or len(project_id) > 80:
+            raise ValueError("project_id must be a non-empty string up to 80 characters")
+        if not isinstance(name, str) or not name.strip() or len(name) > 200:
+            raise ValueError("name must be a non-empty string up to 200 characters")
+        if not isinstance(kind, str) or not kind.strip() or len(kind) > 40:
+            raise ValueError("kind must be a non-empty string up to 40 characters")
+        with self.lock:
+            record = {"id": project_id.strip(), "name": name.strip(),
+                      "kind": kind.strip(), "status": status, "created_at": _stamp()}
+            self.projects[record["id"]] = record
+            self._event("project_created", project_id=record["id"], kind=kind.strip())
+            self.save()
+            return dict(record)
+
+    def list_projects(self) -> list[dict]:
+        """List projects with per-project task counts from the task mailbox."""
+        with self.lock:
+            result = []
+            for record in self.projects.values():
+                count = sum(1 for task in self.tasks.values()
+                            if isinstance(task.get("success_criteria"), dict)
+                            and task["success_criteria"].get("project_id") == record["id"])
+                result.append({**record, "task_count": count})
+            return sorted(result, key=lambda item: item["id"])
+
+    def project_tasks(self, project_id: str) -> list[dict]:
+        """Tasks whose success criteria tag this project."""
+        with self.lock:
+            return [dict(task) for task in self.tasks.values()
+                    if isinstance(task.get("success_criteria"), dict)
+                    and task["success_criteria"].get("project_id") == project_id]
 
     def check_idempotency(self, key: str) -> dict | None:
         """按幂键返回缓存响应；未见过该键时返回 None。"""
@@ -108,7 +147,7 @@ class WorkforceRegistry:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         tmp.write_text(json.dumps({"tasks": self.tasks, "events": self.events, "workers": self.workers,
-                                   "idempotency": self.idempotency},
+                                   "idempotency": self.idempotency, "projects": self.projects},
                                   ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(self.path)
 

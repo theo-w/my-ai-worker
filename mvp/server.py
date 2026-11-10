@@ -1060,6 +1060,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         # BaseHTTPRequestHandler includes the query string in self.path; route on pathname only.
         self.path = urlsplit(self.path).path
+        if self.path == "/api/projects":
+            try:
+                authenticate_workforce(self.headers, "admin")
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            self._json({"ok": True, "projects": WORKFORCE.list_projects()})
+            return
         if self.path == "/api/improvement/report":
             try:
                 authenticate_workforce(self.headers, "admin")
@@ -1228,7 +1236,7 @@ class Handler(BaseHTTPRequestHandler):
             if cached is not None:
                 self._json(cached["body"], cached["status"])
                 return
-        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/projects", "/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -1239,7 +1247,18 @@ class Handler(BaseHTTPRequestHandler):
             if body is None:
                 return
             try:
-                if self.path == "/api/workforce/maintain":
+                if self.path == "/api/projects":
+                    try:
+                        project = WORKFORCE.create_project(
+                            str(body.get("id", "")),
+                            str(body.get("name", "")),
+                            str(body.get("kind", "general")),
+                        )
+                    except ValueError as exc:
+                        self._json({"ok": False, "error": str(exc)}, 400)
+                        return
+                    self._json({"ok": True, "project": project}, 201)
+                elif self.path == "/api/workforce/maintain":
                     self._json({"ok": True, "maintenance": WORKFORCE.maintain()})
                 elif self.path == "/api/workers/heartbeat":
                     worker_id = actor["worker_id"]
@@ -1443,6 +1462,9 @@ class Handler(BaseHTTPRequestHandler):
                     if template not in ("general", "ai_game_feasibility"):
                         raise ValueError("template must be general or ai_game_feasibility")
                     project_id = __import__("uuid").uuid4().hex[:12]
+                    WORKFORCE.create_project(
+                        project_id, goal[:200], "game-feasibility" if template == "ai_game_feasibility" else "general",
+                    )
                     game_feasibility = template == "ai_game_feasibility"
                     if game_feasibility:
                         assessment_context = (
@@ -1549,7 +1571,8 @@ class Handler(BaseHTTPRequestHandler):
                         priority=body.get("priority", 3),
                         assigned_to=body.get("assigned_to"),
                         approval_required=bool(body.get("approval_required", False)),
-                        success_criteria=body.get("success_criteria", {}),
+                        success_criteria={**body.get("success_criteria", {}),
+                                          **({"project_id": body["project_id"]} if isinstance(body.get("project_id"), str) else {})},
                         evidence_required=bool(body.get("evidence_required", False)),
                     )
                     self._json({"ok": True, "task": task}, 201)

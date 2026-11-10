@@ -305,6 +305,20 @@
 })();
 </script>
 
+<div class="panel wide" id="projectPanel">
+  <div class="section-title"><span>项目</span><select id="projectPicker" style="margin-left:auto"></select></div>
+  <div class="sub">任务按项目分组。新建项目只登记记录,不自动创建任务。</div>
+  <div id="projectList" class="sub">加载项目…</div>
+  <details style="margin-top:8px"><summary>新建项目</summary>
+    <div class="kv">
+      <b>ID</b><input id="projectId" placeholder="如 user-research">
+      <b>名称</b><input id="projectName" placeholder="如 用户研究">
+      <b>类型</b><input id="projectKind" value="general">
+    </div>
+    <button onclick="createProject()">创建</button>
+  </details>
+</div>
+
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>首页 · 本轮任务执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div>
  <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、方案假设、阻塞原因和验收结论。</div>
@@ -668,6 +682,24 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
   panel.style.display="";
  }
 
+async function loadProjects(){
+ const list=document.getElementById("projectList");const picker=document.getElementById("projectPicker");
+ try{
+  const r=await apiFetch("/api/projects");const data=await r.json();
+  if(!data.ok)throw new Error(data.error||"HTTP "+r.status);
+  const projects=data.projects||[];
+  if(picker)picker.innerHTML=projects.length?projects.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):'<option>无项目</option>';
+  if(list)list.innerHTML=projects.length?projects.map(x=>'<div class="kv"><b>'+esc(x.name)+'</b><div>'+esc(x.kind)+' · '+x.task_count+' 任务</div></div>').join(""):'<div class="sub">还没有项目。用"新建项目"登记一个。</div>';
+ }catch(e){if(list)list.textContent="无法读取项目:"+(e&&e.message?e.message:String(e));}
+}
+async function createProject(){
+ try{
+  const body={id:document.getElementById("projectId").value.trim(),name:document.getElementById("projectName").value.trim(),kind:document.getElementById("projectKind").value.trim()||"general"};
+  const r=await apiFetch("/api/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await r.json();if(!data.ok)throw new Error(data.error||"HTTP "+r.status);
+  await loadProjects();
+ }catch(e){alert("创建失败:"+(e&&e.message?e.message:String(e)));}
+}
 function render(){
  if(!state)return;
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
@@ -1686,7 +1718,7 @@ rememberToken.addEventListener("change",()=>{try{if(rememberToken.checked&&token
 tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}poll();refreshKnowledgeStatus()});
 tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
 tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
-refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();loadProjects();setInterval(refreshProviderStatus,10000);
 </script>
 <script>
 // Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.
