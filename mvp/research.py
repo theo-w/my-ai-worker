@@ -17,6 +17,10 @@ class ResearchSource:
     snippet: str
     provider: str = "unknown"
     published_at: str | None = None
+    # 原始用户评价记录字段(仅真实采集时填充);质量门据此判定"直接用户需求信号"。
+    raw_review_text: str | None = None
+    review_id: str | None = None
+    collection_method: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -118,6 +122,14 @@ class JsonHttpSearchProvider:
             }).encode("utf-8")
             headers["Content-Type"] = "application/json"
             request = Request(self.endpoint, data=body, headers=headers, method="POST")
+        elif host == "api.github.com":
+            # GitHub 搜索 API:分页参数是 per_page(不是 limit),响应体为 {"items": [...]}。
+            url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
+                "q": query, "per_page": limit
+            })
+            if self.api_key:
+                headers["Authorization"] = "Bearer " + self.api_key
+            request = Request(url, headers=headers, method="GET")
         else:
             url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
                 "q": query, "limit": limit
@@ -131,13 +143,25 @@ class JsonHttpSearchProvider:
                 raise RuntimeError("Search provider returned HTTP " + str(response.status))
             payload = json.loads(response.read().decode("utf-8"))
 
-        rows = payload.get("results", []) if isinstance(payload, dict) else payload
+        if host == "api.github.com":
+            rows = payload.get("items", []) if isinstance(payload, dict) else []
+        else:
+            rows = payload.get("results", []) if isinstance(payload, dict) else payload
         if not isinstance(rows, list):
             raise ValueError("Search provider response must be a list or contain a results list.")
         sources = []
         for row in rows[:limit]:
             if not isinstance(row, dict):
                 continue
+            if host == "api.github.com":
+                # GitHub item 没有 title/url/snippet:仓库名作标题,html_url 作链接;
+                # description 可能为 null(用仓库名兜底),pushed_at 作更新时间。
+                full_name = str(row.get("full_name") or row.get("name") or "").strip()
+                description = str(row.get("description") or "").strip()
+                row = {**row, "title": full_name,
+                       "url": str(row.get("html_url") or ""),
+                       "snippet": description or f"GitHub 仓库:{full_name}(无描述)",
+                       "published_at": row.get("pushed_at"), "provider": "github"}
             title = str(row.get("title", "")).strip()
             source_url = str(row.get("url", "")).strip()
             # Tavily calls the excerpt field "content"; generic providers often use snippet/description.
@@ -161,8 +185,16 @@ class AppStoreRssSearchProvider:
     """
 
     def __init__(self, endpoint: str, timeout: float = 15.0):
+        import re
+
         self.endpoint = endpoint.strip()
         self.timeout = timeout
+        # 每条评价没有独立公开 URL;用应用页 https 链接作可追溯来源,
+        # 否则质量门(validate_source_record)会因非 https URL 拒绝全部评价。
+        app_id = (re.search(r"id=(\d+)", self.endpoint) or [None, ""])[1]
+        storefront = (re.search(r"apple\.com/([a-z]{2})/", self.endpoint) or [None, "us"])[1]
+        self.app_page_url = (f"https://apps.apple.com/{storefront}/app/id{app_id}"
+                             if app_id else "https://www.apple.com/app-store/")
 
     def search(self, query: str, limit: int = 5) -> list[ResearchSource]:
         import json as _json
@@ -177,6 +209,10 @@ class AppStoreRssSearchProvider:
             payload = _json.loads(response.read().decode("utf-8"))
         feed = payload.get("feed") or {}
         rows = feed.get("entry") or []
+        # 评价条目本身不带时间;用 feed 级 updated(最近刷新)作近似 published_at,
+        # 并在 collection_method 中如实标注,避免把近似时间当成精确发布时间。
+        updated = feed.get("updated") or {}
+        feed_updated = str(updated.get("label", "")).strip() if isinstance(updated, dict) else ""
         if isinstance(rows, dict):
             rows = [rows]
         sources = []
@@ -196,9 +232,13 @@ class AppStoreRssSearchProvider:
                 continue
             sources.append(ResearchSource(
                 title=f"{title or 'App Store 评价'} · {rating}★",
-                url=str(review_id),
+                url=self.app_page_url,
                 snippet=body[:1200],
                 provider="app_store_rss",
+                published_at=feed_updated or None,
+                raw_review_text=body,
+                review_id=str(review_id),
+                collection_method="App Store Customer Reviews RSS(feed 级时间戳,近似)",
             ))
         return sources
 
@@ -225,7 +265,8 @@ def research_environment_status() -> dict:
     host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
     provider = ("app_store_rss" if "itunes.apple.com" in host
                 else "tavily" if host == "api.tavily.com" or host.endswith(".tavily.com")
-                else ("json_http" if configured else None))
+                else ("github" if host == "api.github.com"
+                      else ("json_http" if configured else None)))
     return {
         "configured": configured,
         "provider": provider,

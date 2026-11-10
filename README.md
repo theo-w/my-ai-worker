@@ -19,8 +19,12 @@ JARVIS 数字分身与数字员工通用执行底座：以目标为中心动态�
 git clone https://github.com/theo-w/my-ai-worker.git
 cd my-ai-worker
 
-# 仅用于本机模拟工作台；不要配置真实模型/搜索凭证
+# 仅用于本机模拟工作台；JARVIS_NO_DOTENV=1 跳过 .env，避免与真实凭证冲突
 export JARVIS_PUBLIC_DEMO=true
+export JARVIS_NO_DOTENV=1
+python -m mvp.server
+
+# 真实模式：自动加载 .env（本地模型 + GitHub 调研源），需管理员 Token
 python -m mvp.server
 ```
 
@@ -46,13 +50,15 @@ python -m mvp.demo_workflow
 
 请在启动前配置管理员和员工凭证。示例变量名称及完整配置方式见 [安全与认证说明](docs/SECURITY_AND_AUTH.md)。监督器会回收过期租约；对明确阻塞的任务，系统默认要求分身显式决定是否重试。
 
+服务启动时会自动加载仓库根目录的 `.env`（已存在的真实环境变量优先，如 Render 平台注入；设 `JARVIS_NO_DOTENV=1` 可完全跳过）。
+
 ## 当前能力与边界
 
 - 数字分身可创建、检查和管理任务，员工通过任务邮箱与能力路由领取任务、发送心跳、提交反馈和结果；没有 agent-to-agent 消息传递，员工是无状态轮者。结果提交后进入验证阶段，验证记录通过后才会标记为完成。
 - 每次领取有独立租约令牌，防止过期执行的迟到结果覆盖新一轮状态。
 - 监控页展示运行时已记录的状态和事件；它不会凭空证明模型输出真实，也不会将 `completed` 自动等同于事实正确。
 - 当前部分故障处理仍基于规则启发式，不是通用语义规划器；高影响操作仍需明确授权。
-- 调研源:App Store RSS(无需密钥,已验证可用)与 GitHub API 可达;Reddit、Steam 评价端点在本网络不可访问,`build_search_provider` 直接拒绝而非假成功。
+- 调研源:GitHub 仓库搜索 API(无需密钥,已验证可达并返回结果)为默认;App Store RSS 端点当前可达但 feed 为空(0 entries),适配器已按真实评价结构修复,恢复后即可用;Reddit、Steam 在本网络不可访问,`build_search_provider` 直接拒绝而非假成功。
 - 自动化测试通过不代表已部署、真实模型已接通或真实市场研究已完成。部署配置和服务边界仍需按 [Issue #8](https://github.com/theo-w/my-ai-worker/issues/8) 核对后验收。
 
 ## 文档

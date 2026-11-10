@@ -136,6 +136,12 @@ def assess_user_demand_source(source: dict | None) -> dict:
         )
     elif host == "steamcommunity.com":
         known_user_content = "/app/" in path and ("/discussions/" in path or "/comment/" in path)
+    elif host == "apps.apple.com" or (host.endswith(".apple.com") and "/app/id" in path):
+        # App Store 评价 RSS:条目带原始正文、review_id 与采集方式;
+        # url 指向应用页(单条评价无独立公开链接)。
+        known_user_content = source.get("provider") == "app_store_rss" and bool(
+            str(source.get("raw_review_text", "")).strip() and source.get("review_id")
+        )
 
     eligible = bool(role["source_role"] == "primary_user_signal" and known_user_content and explicit_raw_record)
     if role["source_role"] == "secondary_analysis":

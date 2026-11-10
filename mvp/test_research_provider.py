@@ -47,3 +47,32 @@ def test_environment_status_does_not_expose_api_key():
         status = research_environment_status()
     assert status["configured"] is True
     assert "do-not-print" not in str(status)
+
+
+def test_json_http_provider_parses_github_items():
+    """GitHub 搜索 API:items/full_name/html_url/description(可为 null)应被正确归一化。"""
+    provider = JsonHttpSearchProvider("https://api.github.com/search/repositories")
+    payload = {"total_count": 2, "items": [
+        {"full_name": "org/repo", "name": "repo",
+         "html_url": "https://github.com/org/repo",
+         "description": "AI game tooling",
+         "pushed_at": "2026-10-01T00:00:00Z"},
+        {"full_name": "org/nodesc", "name": "nodesc",
+         "html_url": "https://github.com/org/nodesc",
+         "description": None, "pushed_at": None},
+    ]}
+
+    class FakeResponse:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self): return json.dumps(payload).encode()
+
+    with patch("urllib.request.urlopen", return_value=FakeResponse()) as urlopen:
+        results = provider.search("ai game", 5)
+    assert [r.title for r in results] == ["org/repo", "org/nodesc"]
+    assert [r.url for r in results] == ["https://github.com/org/repo", "https://github.com/org/nodesc"]
+    assert all(r.provider == "github" for r in results)
+    assert "(无描述)" in results[1].snippet
+    request = urlopen.call_args.args[0]
+    assert "per_page=5" in request.full_url and "q=" in request.full_url

@@ -47,6 +47,36 @@ except ImportError:  # Direct script execution from mvp/
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
 ROOT = Path(__file__).parent
+
+
+def _load_dotenv() -> None:
+    """加载仓库根目录 .env(KEY=VALUE)到进程环境。
+
+    已存在的环境变量优先(部署平台注入的值不被本地文件覆盖);
+    JARVIS_NO_DOTENV=1 可完全跳过(纯模拟演示用)。测试导入本模块时不执行。
+    """
+    if os.getenv("JARVIS_NO_DOTENV", "").strip().lower() in {"1", "true"}:
+        return
+    env_path = ROOT.parent / ".env"
+    if not env_path.is_file():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue  # 真实环境变量优先(如 Render 平台注入)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]  # 去掉成对引号
+        os.environ[key] = value
+
+
+if __name__ == "__main__":
+    _load_dotenv()  # python -m mvp.server / render.yaml startCommand
+
 logging.basicConfig(level=os.getenv("JARVIS_LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 LOGGER = logging.getLogger("jarvis.server")
 LOCK = threading.Lock()
@@ -1662,10 +1692,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             started = time.monotonic()
             try:
+                # 不传 max_tokens,用配置的 JARVIS_LLM_MAX_TOKENS(默认 768):
+                # 思考型模型先消耗 reasoning tokens,固定 64 永远产不出正文。
                 reply = client.complete(
                     "You are running a connectivity check. Follow the user's instruction exactly.",
                     "Reply with exactly this marker and no other text: JARVIS_LLM_OK",
-                    max_tokens=64,
                 )
             except Exception as exc:
                 self._json({
@@ -1673,7 +1704,7 @@ class Handler(BaseHTTPRequestHandler):
                     "error_type": type(exc).__name__,
                     "model": getattr(client, "model", "configured"),
                     "elapsed_ms": round((time.monotonic() - started) * 1000),
-                    "max_tokens": 64,
+                    "max_tokens": getattr(client, "max_tokens", None),
                 }, 502)
                 return
             matched = isinstance(reply, str) and "JARVIS_LLM_OK" in reply
@@ -1682,7 +1713,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "connected" if matched else "unexpected_response",
                 "model": getattr(client, "model", "configured"),
                 "elapsed_ms": round((time.monotonic() - started) * 1000),
-                "max_tokens": 64,
+                "max_tokens": getattr(client, "max_tokens", None),
                 "marker_matched": matched,
                 "message": "LLM request succeeded." if matched else "The provider responded, but the smoke-test marker did not match.",
             }, 200 if matched else 502)
