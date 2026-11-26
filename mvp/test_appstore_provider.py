@@ -40,13 +40,14 @@ def test_appstore_parses_real_reviews():
     assert found[0].collection_method.startswith("App Store Customer Reviews RSS")
 
 
-def test_unreachable_sources_rejected():
+def test_sources_without_search_adapter_rejected():
+    """主机可达不等于能当搜索源:Reddit 与 Steam 没有搜索适配器,应明确拒绝。"""
     for url in ("https://www.reddit.com/r/x/top.json",
                 "https://store.steampowered.com/appreviews/1?json=1"):
         try:
             build_search_provider(url)
         except ValueError as exc:
-            assert "不可访问" in str(exc)
+            assert "没有可用的搜索适配器" in str(exc)
         else:
             raise AssertionError("应拒绝: " + url)
 

@@ -58,7 +58,7 @@ python -m mvp.demo_workflow
 - 每次领取有独立租约令牌，防止过期执行的迟到结果覆盖新一轮状态。
 - 监控页展示运行时已记录的状态和事件；它不会凭空证明模型输出真实，也不会将 `completed` 自动等同于事实正确。
 - 当前部分故障处理仍基于规则启发式，不是通用语义规划器；高影响操作仍需明确授权。
-- 调研源:GitHub 仓库搜索 API(无需密钥,已验证可达并返回结果)为默认;App Store RSS 端点当前可达但 feed 为空(0 entries),适配器已按真实评价结构修复,恢复后即可用;Reddit、Steam 在本网络不可访问,`build_search_provider` 直接拒绝而非假成功。
+- 调研源:GitHub 仓库搜索 API(无需密钥)为默认调研端点,查询会被截断到接口可接受的长度。玩家原始评价走 App Store 评价 RSS 与 iTunes 商店读数接口,由 `JARVIS_APP_STORE_APP_IDS`(逗号分隔的应用 ID)指定对照产品,已验证返回真实评价原文与商店读数。Steam 主机可达,但本网络下其评价接口返回网页而非 JSON,适配器如实记错而不是假成功;Reddit 没有搜索适配器。
 - 自动化测试通过不代表已部署、真实模型已接通或真实市场研究已完成。部署配置和服务边界仍需按 [Issue #8](https://github.com/theo-w/my-ai-worker/issues/8) 核对后验收。
 
 ## 文档

@@ -415,6 +415,27 @@ def _revise_worker_result(goal: str, output: str, review: dict, evidence: list, 
     except Exception as exc:
         return {"ok": False, "status": "failed", "message": "员工自动修订失败：" + type(exc).__name__}
 
+
+_GOAL_KEYWORD_MAP = (
+    ("大逃杀", "battle royale"), ("吃鸡", "battle royale"), ("生存", "survival"),
+    ("余料", "weapon crafting"), ("王国之泪", "crafting mechanics"), ("武器", "weapon"),
+    ("合成", "crafting"), ("建造", "building"), ("多人", "multiplayer"),
+    ("竞技", "competitive"), ("游戏", "game"), ("玩法", "gameplay"),
+)
+
+
+def _goal_keywords(goal: str) -> str:
+    """把中文目标压成简短英文关键词:调研接口会拒绝过长的拼接查询。"""
+    text = str(goal).casefold()
+    picked: list[str] = []
+    for token, english in _GOAL_KEYWORD_MAP:
+        if token in text and english not in picked:
+            picked.append(english)
+    latin = [w for w in text.split() if w.isascii() and len(w) > 2][:4]
+    joined = " ".join(latin + picked[:6])
+    return joined[:60] or "game concept"
+
+
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
@@ -491,14 +512,13 @@ def _execute_run(goal: str):
             "ai native game", "game feasibility", "游戏可行性"
         ))
         if is_game_feasibility:
+            keywords = _goal_keywords(goal)
             research_queries = [
-                goal + " competitors existing games market alternatives",
-                goal + " target players needs user feedback reviews",
-                goal + " AI inference costs latency production feasibility",
-                goal + " criticism failures negative reviews counter evidence risks",
-                "site:store.steampowered.com/app/ " + goal + " reviews",
-                "site:steamcommunity.com/app/ " + goal + " player feedback discussions",
-                goal + " 用户需求 竞品 负面反馈 推理成本 延迟 风险",
+                keywords + " open source implementation",
+                keywords + " prototype gameplay demo",
+                "battle royale crafting survival game",
+                "weapon crafting fusion game mechanics",
+                "crafting build competitive multiplayer",
             ]
             def report_research_progress(progress):
                 with LOCK:
@@ -546,6 +566,7 @@ def _execute_run(goal: str):
                 "queries": result.get("queries", research_queries),
                 "coverage": result.get("coverage"),
                 "query_errors": result.get("query_errors", []),
+                "review_collection": result.get("review_collection", {}),
                 "sources": result.get("sources", []), "quality": quality,
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
