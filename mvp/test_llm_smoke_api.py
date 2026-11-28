@@ -12,6 +12,7 @@ ADMIN = "admin-secret-for-llm-smoke-tests-0001"
 
 class FakeLLMClient:
     model = "test-model"
+    max_tokens = 768
 
     def __init__(self, reply="JARVIS_LLM_OK", error=None):
         self.reply = reply
@@ -74,7 +75,7 @@ def test_llm_smoke_test_requires_admin_authentication(monkeypatch):
         close(httpd, thread)
 
 
-def test_llm_smoke_test_uses_small_token_budget_and_returns_safe_status(monkeypatch):
+def test_llm_smoke_test_uses_configured_token_budget_and_returns_safe_status(monkeypatch):
     client = FakeLLMClient()
     httpd, thread, base = serve(monkeypatch, client)
     try:
@@ -83,8 +84,9 @@ def test_llm_smoke_test_uses_small_token_budget_and_returns_safe_status(monkeypa
         assert result["ok"] is True
         assert result["status"] == "connected"
         assert result["model"] == "test-model"
-        assert result["max_tokens"] == 64
-        assert client.max_tokens_seen == 64
+        # 不再固定 64:思考型模型先消耗 reasoning tokens,需用客户端配置的完整预算
+        assert result["max_tokens"] == 768
+        assert client.max_tokens_seen is None
         assert "JARVIS_LLM_OK" not in json.dumps(result)
     finally:
         close(httpd, thread)

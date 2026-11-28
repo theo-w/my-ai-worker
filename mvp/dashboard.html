@@ -305,6 +305,22 @@
 })();
 </script>
 
+<div class="panel wide" id="projectPanel">
+ <div class="section-title"><span>项目</span><select id="projectPicker" style="background:#0a1221;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:8px 10px"><option value="">正在加载…</option></select></div>
+ <div class="sub" style="margin:-4px 0 10px">按项目查看任务分组。新建项目只登记记录,不会自动创建任务。</div>
+ <div id="projectList" class="sub">正在加载项目…</div>
+ <details class="content-fold" style="margin-top:10px">
+  <summary>新建项目</summary>
+  <div class="input" style="margin-top:8px;flex-wrap:wrap">
+   <input id="projectId" placeholder="项目 ID(如 user-research)" style="max-width:220px">
+   <input id="projectName" placeholder="项目名称(如 用户研究)" style="max-width:220px">
+   <input id="projectKind" value="general" style="max-width:140px">
+   <button class="btn" type="button" onclick="createProject()">创建</button>
+  </div>
+  <span id="projectStatus" class="sub"></span>
+ </details>
+</div>
+
 <div class="panel wide" id="journeyPanel" style="margin-top:14px">
  <div class="section-title"><span>首页 · 本轮任务执行与验收</span><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span id="phase" class="status">IDLE</span></div></div>
  <div class="sub" style="margin:-4px 0 10px">唯一执行主界面：启动后在这里持续查看分身决策、员工实际输出、调研证据、方案假设、阻塞原因和验收结论。</div>
@@ -668,6 +684,28 @@ function toggleMessage(i){const el=document.getElementById("chatbody-"+i);if(!el
   panel.style.display="";
  }
 
+async function loadProjects(){
+ const list=document.getElementById("projectList");const picker=document.getElementById("projectPicker");
+ try{
+  const r=await apiFetch("/api/projects");const data=await r.json();
+  if(!data.ok)throw new Error(data.error||"HTTP "+r.status);
+  const projects=data.projects||[];
+  if(picker)picker.innerHTML=projects.length?projects.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join(""):'<option>无项目</option>';
+  if(list)list.innerHTML=projects.length?'<div class="kv">'+projects.map(x=>'<b>'+esc(x.name)+'</b><div>'+esc(x.kind)+' · '+x.task_count+' 任务</div>').join("")+'</div>':'<div class="sub">还没有项目。用「新建项目」登记一个。</div>';
+ }catch(e){if(list)list.textContent="无法读取项目:"+(e&&e.message?e.message:String(e));}
+}
+async function createProject(){
+ const status=document.getElementById("projectStatus");
+ try{
+  const body={id:document.getElementById("projectId").value.trim(),name:document.getElementById("projectName").value.trim(),kind:document.getElementById("projectKind").value.trim()||"general"};
+  if(!body.id||!body.name){if(status)status.textContent="请填写项目 ID 和名称。";return;}
+  if(status)status.textContent="正在创建…";
+  const r=await apiFetch("/api/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await r.json();if(!data.ok)throw new Error(data.error||"HTTP "+r.status);
+  if(status)status.textContent="已创建「"+body.name+"」";
+  await loadProjects();
+ }catch(e){if(status)status.textContent="创建失败:"+(e&&e.message?e.message:String(e));}
+}
 function render(){
  if(!state)return;
  document.getElementById("status").textContent=(state.phase||"idle").toUpperCase();
@@ -1686,7 +1724,7 @@ rememberToken.addEventListener("change",()=>{try{if(rememberToken.checked&&token
 tokenInput.addEventListener("change",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());else if(rememberToken.checked)localStorage.removeItem("jarvis_admin_token");}catch(_){}poll();refreshKnowledgeStatus()});
 tokenInput.addEventListener("input",()=>{try{if(rememberToken.checked&&tokenInput.value.trim())localStorage.setItem("jarvis_admin_token",tokenInput.value.trim());}catch(_){}});
 tokenInput.addEventListener("keydown",e=>{if(e.key==="Enter")poll()});
-refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();setInterval(refreshProviderStatus,10000);
+refreshKnowledgeStatus();setInterval(poll,1500);poll();refreshProviderStatus();loadProjects();setInterval(refreshProviderStatus,10000);
 </script>
 <script>
 // Mirror the live decision into the primary run summary; the diagnostic node remains the single data source.

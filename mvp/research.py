@@ -17,6 +17,10 @@ class ResearchSource:
     snippet: str
     provider: str = "unknown"
     published_at: str | None = None
+    # 原始用户评价记录字段(仅真实采集时填充);质量门据此判定"直接用户需求信号"。
+    raw_review_text: str | None = None
+    review_id: str | None = None
+    collection_method: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -105,6 +109,9 @@ class JsonHttpSearchProvider:
             "User-Agent": "JARVIS-ResearchAdapter/1.0",
         }
         host = (urlsplit(self.endpoint).hostname or "").lower()
+        if host == "api.github.com":
+            # GitHub 搜索接口会拒绝过长的拼接查询,这里截断到接口可接受的长度。
+            query = str(query).strip()[:120]
         if host == "api.tavily.com" or host.endswith(".tavily.com"):
             # Tavily's native API uses POST JSON, not the generic GET contract.
             if not self.api_key:
@@ -118,6 +125,14 @@ class JsonHttpSearchProvider:
             }).encode("utf-8")
             headers["Content-Type"] = "application/json"
             request = Request(self.endpoint, data=body, headers=headers, method="POST")
+        elif host == "api.github.com":
+            # GitHub 搜索 API:分页参数是 per_page(不是 limit),响应体为 {"items": [...]}。
+            url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
+                "q": query, "per_page": limit
+            })
+            if self.api_key:
+                headers["Authorization"] = "Bearer " + self.api_key
+            request = Request(url, headers=headers, method="GET")
         else:
             url = self.endpoint + ("&" if "?" in self.endpoint else "?") + urlencode({
                 "q": query, "limit": limit
@@ -131,13 +146,25 @@ class JsonHttpSearchProvider:
                 raise RuntimeError("Search provider returned HTTP " + str(response.status))
             payload = json.loads(response.read().decode("utf-8"))
 
-        rows = payload.get("results", []) if isinstance(payload, dict) else payload
+        if host == "api.github.com":
+            rows = payload.get("items", []) if isinstance(payload, dict) else []
+        else:
+            rows = payload.get("results", []) if isinstance(payload, dict) else payload
         if not isinstance(rows, list):
             raise ValueError("Search provider response must be a list or contain a results list.")
         sources = []
         for row in rows[:limit]:
             if not isinstance(row, dict):
                 continue
+            if host == "api.github.com":
+                # GitHub item 没有 title/url/snippet:仓库名作标题,html_url 作链接;
+                # description 可能为 null(用仓库名兜底),pushed_at 作更新时间。
+                full_name = str(row.get("full_name") or row.get("name") or "").strip()
+                description = str(row.get("description") or "").strip()
+                row = {**row, "title": full_name,
+                       "url": str(row.get("html_url") or ""),
+                       "snippet": description or f"GitHub 仓库:{full_name}(无描述)",
+                       "published_at": row.get("pushed_at"), "provider": "github"}
             title = str(row.get("title", "")).strip()
             source_url = str(row.get("url", "")).strip()
             # Tavily calls the excerpt field "content"; generic providers often use snippet/description.
@@ -161,8 +188,16 @@ class AppStoreRssSearchProvider:
     """
 
     def __init__(self, endpoint: str, timeout: float = 15.0):
+        import re
+
         self.endpoint = endpoint.strip()
         self.timeout = timeout
+        # 每条评价没有独立公开 URL;用应用页 https 链接作可追溯来源,
+        # 否则质量门(validate_source_record)会因非 https URL 拒绝全部评价。
+        app_id = (re.search(r"id=(\d+)", self.endpoint) or [None, ""])[1]
+        storefront = (re.search(r"apple\.com/([a-z]{2})/", self.endpoint) or [None, "us"])[1]
+        self.app_page_url = (f"https://apps.apple.com/{storefront}/app/id{app_id}"
+                             if app_id else "https://www.apple.com/app-store/")
 
     def search(self, query: str, limit: int = 5) -> list[ResearchSource]:
         import json as _json
@@ -177,6 +212,10 @@ class AppStoreRssSearchProvider:
             payload = _json.loads(response.read().decode("utf-8"))
         feed = payload.get("feed") or {}
         rows = feed.get("entry") or []
+        # 评价条目本身不带时间;用 feed 级 updated(最近刷新)作近似 published_at,
+        # 并在 collection_method 中如实标注,避免把近似时间当成精确发布时间。
+        updated = feed.get("updated") or {}
+        feed_updated = str(updated.get("label", "")).strip() if isinstance(updated, dict) else ""
         if isinstance(rows, dict):
             rows = [rows]
         sources = []
@@ -196,9 +235,13 @@ class AppStoreRssSearchProvider:
                 continue
             sources.append(ResearchSource(
                 title=f"{title or 'App Store 评价'} · {rating}★",
-                url=str(review_id),
+                url=self.app_page_url,
                 snippet=body[:1200],
                 provider="app_store_rss",
+                published_at=feed_updated or None,
+                raw_review_text=body,
+                review_id=str(review_id),
+                collection_method="App Store Customer Reviews RSS(feed 级时间戳,近似)",
             ))
         return sources
 
@@ -211,8 +254,9 @@ def build_search_provider(endpoint: str, api_key: str | None = None):
     if "itunes.apple.com" in host:
         return AppStoreRssSearchProvider(endpoint)
     if "reddit.com" in host or "steampowered.com" in host:
-        # 本网络无法访问 Reddit/Steam,直接拒绝而不是假成功。
-        raise ValueError(f"{host} 在本网络不可访问,未配置此源")
+        # 主机可达但没有搜索适配器:本网络下 Steam 评价接口返回网页而不是 JSON,
+        # 不能当搜索源。玩家原始评价请走 App Store 源(JARVIS_APP_STORE_APP_IDS)。
+        raise ValueError(f"{host} 没有可用的搜索适配器;玩家评价请配置 JARVIS_APP_STORE_APP_IDS")
     return JsonHttpSearchProvider(endpoint, api_key)
 
 
@@ -225,7 +269,8 @@ def research_environment_status() -> dict:
     host = (urlsplit(endpoint).hostname or "").lower() if endpoint else ""
     provider = ("app_store_rss" if "itunes.apple.com" in host
                 else "tavily" if host == "api.tavily.com" or host.endswith(".tavily.com")
-                else ("json_http" if configured else None))
+                else ("github" if host == "api.github.com"
+                      else ("json_http" if configured else None)))
     return {
         "configured": configured,
         "provider": provider,
@@ -327,6 +372,136 @@ def _synthesize_with_llm(query: str, accepted_items: list[dict]) -> dict:
 
 
 
+def _review_timeout() -> float:
+    """评价接口不可达时要快速失败,而不是拖住整轮调研。"""
+    import os
+    try:
+        return max(1.0, min(float(os.getenv("JARVIS_REVIEW_TIMEOUT_SECONDS", "6")), 15.0))
+    except ValueError:
+        return 6.0
+
+
+def _http_get(url: str, timeout: float, headers: dict | None = None) -> bytes:
+    """GET 并解 gzip。Steam 与 iTunes 都返回 gzip,不解压会把正文当成非法 JSON。"""
+    import gzip
+    from urllib.request import Request, urlopen
+    request = Request(url, headers=headers or {
+        "Accept": "application/json",
+        "User-Agent": "JARVIS-ResearchAdapter/1.0",
+        "Accept-Encoding": "gzip",
+    })
+    with urlopen(request, timeout=timeout) as response:
+        body = response.read()
+        if str(response.headers.get("Content-Encoding", "")).lower() == "gzip":
+            body = gzip.decompress(body)
+        return body
+
+
+def _curated_review_app_ids() -> dict:
+    """对照产品 ID 改由环境变量提供,不再写死在游戏代码里。"""
+    import os
+
+    def parse(name: str) -> list[str]:
+        raw = os.getenv(name, "").replace(";", ",")
+        return [x.strip() for x in raw.split(",") if x.strip().isdigit()]
+    return {"app_store": parse("JARVIS_APP_STORE_APP_IDS"), "steam": parse("JARVIS_STEAM_APP_IDS")}
+
+
+def collect_app_store_raw_reviews(app_id: str, max_reviews_per_app: int = 8) -> tuple[list[dict], list[dict]]:
+    """抓 App Store 公开评价原文:带正文、评价 ID 与评分,可作为玩家原始信号。"""
+    import json
+    import re
+    app_id = str(app_id).strip()
+    if not app_id.isdigit():
+        return [], [{"app_id": app_id, "provider": "app_store_rss", "error": "invalid_app_id"}]
+    endpoint = f"https://itunes.apple.com/us/rss/customerreviews/page=1/id={app_id}/sortby=mostrecent/json"
+    app_page = f"https://apps.apple.com/us/app/id{app_id}"
+    try:
+        payload = json.loads(_http_get(endpoint, timeout=_review_timeout()).decode("utf-8", "ignore").lstrip())
+    except Exception as exc:
+        return [], [{"app_id": app_id, "provider": "app_store_rss", "error": type(exc).__name__}]
+    feed = payload.get("feed") or {}
+    rows = feed.get("entry") or []
+    if isinstance(rows, dict):
+        rows = [rows]
+    updated = feed.get("updated") or {}
+    feed_updated = str(updated.get("label", "")).strip() if isinstance(updated, dict) else ""
+    stamp = re.search(r"\d{4}-\d{2}-\d{2}T[\d:.\-]+", feed_updated)
+    created_iso = stamp.group(0) if stamp else None
+    reviews: list[dict] = []
+    for row in rows[: max(1, min(int(max_reviews_per_app), 25))]:
+        if not isinstance(row, dict):
+            continue
+
+        def label(key: str) -> str:
+            value = row.get(key) or {}
+            return str(value.get("label", "")).strip() if isinstance(value, dict) else ""
+
+        body = label("content")
+        review_id = str((row.get("id") or {}).get("label", "")).strip() if isinstance(row.get("id"), dict) else ""
+        if not body or not review_id:
+            continue
+        reviews.append({
+            "title": f"App Store 原始玩家评价 · {label('title') or app_id}",
+            "url": app_page,
+            "snippet": body[:1200],
+            "raw_review_text": body,
+            "review_id": review_id,
+            "review_created_at": created_iso,
+            "published_at": created_iso,
+            "collection_method": "App Store Customer Reviews RSS(feed 级时间戳,近似)",
+            "source_role": "primary_user_signal",
+            "provider": "app_store_rss",
+            "app_id": app_id,
+            "rating": label("rating"),
+            "simulated": False,
+        })
+    return reviews, []
+
+
+def collect_app_store_market_snapshot(app_ids: list[str]) -> tuple[list[dict], list[dict]]:
+    """iTunes 查询接口给出商店读数(评分、评分人数、价格、品类),作为行业数据线索。"""
+    import json
+    ids = [str(x).strip() for x in app_ids if str(x).strip().isdigit()][:5]
+    if not ids:
+        return [], []
+    try:
+        payload = json.loads(_http_get(
+            "https://itunes.apple.com/lookup?id=" + ",".join(ids) + "&country=us",
+            timeout=_review_timeout(),
+        ).decode("utf-8", "ignore").lstrip())
+    except Exception as exc:
+        return [], [{"provider": "itunes_lookup", "error": type(exc).__name__}]
+    rows: list[dict] = []
+    for item in payload.get("results", [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        track_id = str(item.get("trackId", "")).strip()
+        name = str(item.get("trackName", "")).strip()
+        rating = item.get("averageGameRating", item.get("averageUserRating"))
+        count = item.get("userRatingCount", item.get("ratingCount"))
+        bits = [
+            f"商店评分 {rating}" if rating is not None else "",
+            f"评分人数 {count}" if count is not None else "",
+            f"价格 {item.get('formattedPrice')}" if item.get("formattedPrice") else "",
+            f"品类 {item.get('primaryGenreName')}" if item.get("primaryGenreName") else "",
+            f"上架 {str(item.get('releaseDate', ''))[:10]}" if item.get("releaseDate") else "",
+        ]
+        snippet = " · ".join([b for b in bits if b])
+        if not name or not snippet:
+            continue
+        rows.append({
+            "title": f"App Store 商店读数 · {name}",
+            "url": f"https://apps.apple.com/us/app/id{track_id}" if track_id else "https://apps.apple.com/us",
+            "snippet": snippet[:1200],
+            "provider": "itunes_lookup",
+            "source_role": "industry_data",
+            "published_at": str(item.get("releaseDate", ""))[:10] or None,
+            "simulated": False,
+        })
+    return rows, []
+
+
 def collect_steam_raw_reviews(sources: list[dict], max_reviews_per_app: int = 30) -> tuple[list[dict], list[dict]]:
     """Collect public raw Steam review records for app IDs found in research URLs.
 
@@ -357,12 +532,10 @@ def collect_steam_raw_reviews(sources: list[dict], max_reviews_per_app: int = 30
             "filter": "recent",
         })
         try:
-            request = Request(endpoint, headers={
+            payload = json.loads(_http_get(endpoint, timeout=_review_timeout(), headers={
                 "Accept": "application/json",
                 "User-Agent": "JARVIS-ResearchAdapter/1.0",
-            })
-            with urlopen(request, timeout=12) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            }).decode("utf-8", "ignore").lstrip())
             for row in payload.get("reviews", [])[:max_reviews_per_app]:
                 if not isinstance(row, dict):
                     continue
@@ -391,7 +564,9 @@ def collect_steam_raw_reviews(sources: list[dict], max_reviews_per_app: int = 30
                     "simulated": False,
                 })
         except Exception as exc:
-            errors.append({"app_id": app_id, "provider": "steam_store_reviews_api", "error": type(exc).__name__})
+            hint = "接口返回网页而非 JSON" if isinstance(exc, json.JSONDecodeError) else ""
+            errors.append({"app_id": app_id, "provider": "steam_store_reviews_api",
+                           "error": type(exc).__name__, "hint": hint})
     return reviews, errors
 
 
@@ -498,31 +673,26 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
     # Collect Steam raw reviews from search results.
     raw_user_reviews, review_collection_errors = collect_steam_raw_reviews(sources)
 
-    # Also collect from a curated list of known AI-native / AI-adjacent games
-    # on Steam. This ensures we get primary user signals even when search
-    # results are dominated by media articles.
-    _ai_game_app_ids = [
-        "2056290",  # Neural Space - AI space exploration
-        "2363330",  # Artificial Adventure - AI-generated adventure game
-        "1817110",  # Marks and Miles - AI NPC behavior
-        "2138720",  # Starfield (AI NPCs mod community)
-        "1282100",  # Sunless Skies (AI narrative)
-        "1091150",  # Cyberpunk 2077 (AI NPCs in 2.0)
-        "1172620",  # Planet Zoo (AI animal behavior)
-        "814380",   # Sekiro (AI enemy behavior reference)
-        "1245630",  # ELDEN RING (AI enemy design reference)
-        "1966720",  # Helldivers 2 (AI swarm behavior)
-    ]
-    for app_id in _ai_game_app_ids:
-        try:
-            _reviews, _errors = collect_steam_raw_reviews([{
-                "url": "https://store.steampowered.com/app/" + app_id + "/",
-                "title": "Steam App " + app_id,
-            }])
-            raw_user_reviews.extend(_reviews)
-            review_collection_errors.extend(_errors)
-        except Exception:
-            pass  # Non-fatal; continue with other app IDs
+    # 额外采集人工指定的对照产品:App Store 评价原文与商店读数。
+    # 默认不抓(环境变量为空),避免在本网络不可达的源上无意义等待。
+    curated = _curated_review_app_ids()
+    for app_id in curated.get("app_store", [])[:5]:
+        _reviews, _errors = collect_app_store_raw_reviews(app_id, max_reviews_per_app=8)
+        raw_user_reviews.extend(_reviews)
+        review_collection_errors.extend(_errors)
+    for app_id in curated.get("steam", [])[:5]:
+        _reviews, _errors = collect_steam_raw_reviews([{
+            "url": "https://store.steampowered.com/app/" + app_id + "/",
+            "title": "Steam App " + app_id,
+        }])
+        raw_user_reviews.extend(_reviews)
+        review_collection_errors.extend(_errors)
+    market_rows, market_errors = collect_app_store_market_snapshot(curated.get("app_store", [])[:5])
+    for row in market_rows:
+        row_url = row["url"].split("#", 1)[0].rstrip("/")
+        if row_url and all(str(s.get("url", "")).split("#", 1)[0].rstrip("/") != row_url for s in sources):
+            sources.append(row)
+    review_collection_errors.extend(market_errors)
     # Keep article/search-result sources and individual original reviews separate.
     sources.extend(raw_user_reviews)
     evidence = [{
@@ -550,10 +720,11 @@ def run_live_research_batch(queries: list[str], limit_per_query: int = 3, progre
         "ok": ok, "status": status, "query": joined_query, "queries": normalized,
         "query_errors": query_errors, "sources": sources, "evidence": quality["items"],
         "review_collection": {
-            "provider": "steam_store_reviews_api",
+            "providers": sorted({str(s.get("provider", "")) for s in raw_user_reviews if isinstance(s, dict)}),
             "raw_review_records": len(raw_user_reviews),
+            "store_snapshot_records": len(market_rows),
             "errors": review_collection_errors,
-            "note": "Raw Steam review collection only runs when a Steam app ID is found in search results; no records means no original reviews were collected from this adapter.",
+            "note": "玩家评价原文来自 App Store 评价 RSS 与 Steam 评价接口;商店读数来自 iTunes 查询接口。两者都带可追溯来源。",
         },
         "quality": quality, "synthesis": deterministic.to_dict(),
         "llm_synthesis": llm_synthesis,

@@ -5,14 +5,14 @@
 
 ## 结论
 
-这是一个**自己用、demo 级**的执行底座。它没"接真模型/真调研",也不打算把——`build_search_provider` 对不可访问源直接拒绝,比假成功好。
+这是一个**自己用、demo 级**的执行底座。2026-11-10 起已接真实模型(本地 oMLX)与 GitHub 调研源(.env 自动加载);`build_search_provider` 对不可访问源仍直接拒绝,比假成功好。
 所以两周目标不是"补功能",而是**让文档/测试跟现实**,再决定"每周不到两次跑它"算不算砍。
 
 ## 先修(P0,约 1.5h)
 
 ### P0-1 三个失败测试:文案改成通用中文,断还英文
 
-`python3 -m pytest mvp -q` → **3 failed, 291 passed**。
+`python3 -m pytest mvp tests -q` → **307 passed**(2026-11-10 复跑,全绿;三个失败测试已修复)。
 
 | 测试 | 问题 |
 | --- | --- |
@@ -26,7 +26,7 @@
 
 | 文件 | 说 | 实际 |
 | --- | --- | --- |
-| `docs/COMPARISON_MATURE_PROJECTS.md` | 291 全绿;55/55 ✅ | 3 失败;`docs/GLOSSARY.md` 仍列待实现 |
+| `docs/COMPARISON_MATURE_PROJECTS.md` | 291 全绿;55/55 ✅ | 307 全绿(数字待刷新);`docs/GLOSSARY.md` 仍列待实现 |
 | `docs/SPEC_TRACEABILITY.md` | 幂键/证据链 ✅ | 部分条目 🔲,与"已补"矛盾 |
 
 **修**:重生成矩阵后 P0-1 绿;`GLOSSARY.md` 待实现项保留,别删。

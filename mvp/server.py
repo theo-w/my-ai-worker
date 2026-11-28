@@ -47,6 +47,36 @@ except ImportError:  # Direct script execution from mvp/
     from supabase_game_knowledge import SupabaseGameKnowledgeBase
 
 ROOT = Path(__file__).parent
+
+
+def _load_dotenv() -> None:
+    """加载仓库根目录 .env(KEY=VALUE)到进程环境。
+
+    已存在的环境变量优先(部署平台注入的值不被本地文件覆盖);
+    JARVIS_NO_DOTENV=1 可完全跳过(纯模拟演示用)。测试导入本模块时不执行。
+    """
+    if os.getenv("JARVIS_NO_DOTENV", "").strip().lower() in {"1", "true"}:
+        return
+    env_path = ROOT.parent / ".env"
+    if not env_path.is_file():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue  # 真实环境变量优先(如 Render 平台注入)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]  # 去掉成对引号
+        os.environ[key] = value
+
+
+if __name__ == "__main__":
+    _load_dotenv()  # python -m mvp.server / render.yaml startCommand
+
 logging.basicConfig(level=os.getenv("JARVIS_LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 LOGGER = logging.getLogger("jarvis.server")
 LOCK = threading.Lock()
@@ -385,6 +415,27 @@ def _revise_worker_result(goal: str, output: str, review: dict, evidence: list, 
     except Exception as exc:
         return {"ok": False, "status": "failed", "message": "员工自动修订失败：" + type(exc).__name__}
 
+
+_GOAL_KEYWORD_MAP = (
+    ("大逃杀", "battle royale"), ("吃鸡", "battle royale"), ("生存", "survival"),
+    ("余料", "weapon crafting"), ("王国之泪", "crafting mechanics"), ("武器", "weapon"),
+    ("合成", "crafting"), ("建造", "building"), ("多人", "multiplayer"),
+    ("竞技", "competitive"), ("游戏", "game"), ("玩法", "gameplay"),
+)
+
+
+def _goal_keywords(goal: str) -> str:
+    """把中文目标压成简短英文关键词:调研接口会拒绝过长的拼接查询。"""
+    text = str(goal).casefold()
+    picked: list[str] = []
+    for token, english in _GOAL_KEYWORD_MAP:
+        if token in text and english not in picked:
+            picked.append(english)
+    latin = [w for w in text.split() if w.isascii() and len(w) > 2][:4]
+    joined = " ".join(latin + picked[:6])
+    return joined[:60] or "game concept"
+
+
 def _execute_run(goal: str):
     """Run workforce -> live research -> evidence-gated concept -> decision."""
     reset(goal)
@@ -461,14 +512,13 @@ def _execute_run(goal: str):
             "ai native game", "game feasibility", "游戏可行性"
         ))
         if is_game_feasibility:
+            keywords = _goal_keywords(goal)
             research_queries = [
-                goal + " competitors existing games market alternatives",
-                goal + " target players needs user feedback reviews",
-                goal + " AI inference costs latency production feasibility",
-                goal + " criticism failures negative reviews counter evidence risks",
-                "site:store.steampowered.com/app/ " + goal + " reviews",
-                "site:steamcommunity.com/app/ " + goal + " player feedback discussions",
-                goal + " 用户需求 竞品 负面反馈 推理成本 延迟 风险",
+                keywords + " open source implementation",
+                keywords + " prototype gameplay demo",
+                "battle royale crafting survival game",
+                "weapon crafting fusion game mechanics",
+                "crafting build competitive multiplayer",
             ]
             def report_research_progress(progress):
                 with LOCK:
@@ -516,6 +566,7 @@ def _execute_run(goal: str):
                 "queries": result.get("queries", research_queries),
                 "coverage": result.get("coverage"),
                 "query_errors": result.get("query_errors", []),
+                "review_collection": result.get("review_collection", {}),
                 "sources": result.get("sources", []), "quality": quality,
                 "synthesis": result.get("synthesis"), "llm_synthesis": result.get("llm_synthesis"),
                 "error": result.get("error") or result.get("message"),
@@ -1060,6 +1111,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         # BaseHTTPRequestHandler includes the query string in self.path; route on pathname only.
         self.path = urlsplit(self.path).path
+        if self.path == "/api/projects":
+            try:
+                authenticate_workforce(self.headers, "admin")
+            except WorkforceAuthError as exc:
+                self._json({"ok": False, "error": str(exc)}, exc.status)
+                return
+            self._json({"ok": True, "projects": WORKFORCE.list_projects()})
+            return
         if self.path == "/api/improvement/report":
             try:
                 authenticate_workforce(self.headers, "admin")
@@ -1228,7 +1287,7 @@ class Handler(BaseHTTPRequestHandler):
             if cached is not None:
                 self._json(cached["body"], cached["status"])
                 return
-        if self.path in ("/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
+        if self.path in ("/api/projects", "/api/twin/goal", "/api/twin/review", "/api/twin/advance", "/api/workforce/tasks", "/api/workforce/claim", "/api/workforce/report", "/api/workforce/feedback", "/api/workforce/approve", "/api/workforce/cancel", "/api/workforce/merge", "/api/workforce/retry", "/api/workforce/verify", "/api/workforce/maintain", "/api/workers/heartbeat"):
             role = "worker" if self.path in ("/api/workforce/claim", "/api/workforce/report", "/api/workers/heartbeat") else "admin"
             try:
                 actor = authenticate_workforce(self.headers, role)
@@ -1239,7 +1298,18 @@ class Handler(BaseHTTPRequestHandler):
             if body is None:
                 return
             try:
-                if self.path == "/api/workforce/maintain":
+                if self.path == "/api/projects":
+                    try:
+                        project = WORKFORCE.create_project(
+                            str(body.get("id", "")),
+                            str(body.get("name", "")),
+                            str(body.get("kind", "general")),
+                        )
+                    except ValueError as exc:
+                        self._json({"ok": False, "error": str(exc)}, 400)
+                        return
+                    self._json({"ok": True, "project": project}, 201)
+                elif self.path == "/api/workforce/maintain":
                     self._json({"ok": True, "maintenance": WORKFORCE.maintain()})
                 elif self.path == "/api/workers/heartbeat":
                     worker_id = actor["worker_id"]
@@ -1443,6 +1513,9 @@ class Handler(BaseHTTPRequestHandler):
                     if template not in ("general", "ai_game_feasibility"):
                         raise ValueError("template must be general or ai_game_feasibility")
                     project_id = __import__("uuid").uuid4().hex[:12]
+                    WORKFORCE.create_project(
+                        project_id, goal[:200], "game-feasibility" if template == "ai_game_feasibility" else "general",
+                    )
                     game_feasibility = template == "ai_game_feasibility"
                     if game_feasibility:
                         assessment_context = (
@@ -1549,7 +1622,8 @@ class Handler(BaseHTTPRequestHandler):
                         priority=body.get("priority", 3),
                         assigned_to=body.get("assigned_to"),
                         approval_required=bool(body.get("approval_required", False)),
-                        success_criteria=body.get("success_criteria", {}),
+                        success_criteria={**body.get("success_criteria", {}),
+                                          **({"project_id": body["project_id"]} if isinstance(body.get("project_id"), str) else {})},
                         evidence_required=bool(body.get("evidence_required", False)),
                     )
                     self._json({"ok": True, "task": task}, 201)
@@ -1639,10 +1713,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             started = time.monotonic()
             try:
+                # 不传 max_tokens,用配置的 JARVIS_LLM_MAX_TOKENS(默认 768):
+                # 思考型模型先消耗 reasoning tokens,固定 64 永远产不出正文。
                 reply = client.complete(
                     "You are running a connectivity check. Follow the user's instruction exactly.",
                     "Reply with exactly this marker and no other text: JARVIS_LLM_OK",
-                    max_tokens=64,
                 )
             except Exception as exc:
                 self._json({
@@ -1650,7 +1725,7 @@ class Handler(BaseHTTPRequestHandler):
                     "error_type": type(exc).__name__,
                     "model": getattr(client, "model", "configured"),
                     "elapsed_ms": round((time.monotonic() - started) * 1000),
-                    "max_tokens": 64,
+                    "max_tokens": getattr(client, "max_tokens", None),
                 }, 502)
                 return
             matched = isinstance(reply, str) and "JARVIS_LLM_OK" in reply
@@ -1659,7 +1734,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "connected" if matched else "unexpected_response",
                 "model": getattr(client, "model", "configured"),
                 "elapsed_ms": round((time.monotonic() - started) * 1000),
-                "max_tokens": 64,
+                "max_tokens": getattr(client, "max_tokens", None),
                 "marker_matched": matched,
                 "message": "LLM request succeeded." if matched else "The provider responded, but the smoke-test marker did not match.",
             }, 200 if matched else 502)
