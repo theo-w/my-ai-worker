@@ -130,18 +130,26 @@
     每台预设机器都和其他预设混编成局,每局 10 台(和页面上"开这一局"的台数一致),跑五批随机数各 400 轮,共 2000 局。
     基线阈值是"没有任何造法的胜率超过 15%";10 台同场,完全公平时每家就是 10%。
     <div class="kv">
-      <div>最高胜率:盾矛平衡车 14.6%(波动区间 13.2~16.1%)、锤子重卡 13.6%;最低是烟雾逃跑车 2.8%</div>
-      <div>9 个预设全部赢过场。赢法里 63% 是靠站进绿色余料点攒分,其余靠打掉对手</div>
-      <div>平均局长 25.9 秒,每局平均淘汰 6.9 台 —— 改了胜利条件以后战斗没有被改掉</div>
+      <div>最高胜率:锤子重卡 14.2%(波动区间 12.8~15.7%)、火焰长矛车 13.8%;最低是轻矛快刀车 6.0%</div>
+      <div>9 个预设全部赢过场。赢法里 62% 是靠站进绿色余料点攒分,其余靠打掉对手</div>
+      <div>平均局长 26.1 秒,每局平均淘汰 6.8 台 —— 加了额度规则以后战斗没有被改掉</div>
+      <div>这一版加了额度规则(质量 110、伤害 28、推力 260 各一条线,贴零件超了就拒绝),9 个预设按新额度重搭;这 2000 局用的是和之前所有调参都不重叠的随机数</div>
       <div>调参:96 组 + 72 组 + 24 组网格搜索,硬约束是局长不低于 18 秒、每局至少淘汰 1 台、占点赢占 20%~90%</div>
       <div>大样本复核:五批随机数各 400 局,批内最高胜率 17/17/15/15/15%,5 批里有 2 批超过 15%</div>
-      <div>再压差距:三批网格 56 组配置(两个新旋钮、每局中途换潮流、按重量算额度),最好仍是 15%~16%;筛出的最优参数换独立种子后与默认值只差 0.2 个百分点,所以这一版数值没有改</div>
+      <div>再压差距:三批网格 56 组配置(两个新旋钮、每局中途换潮流、按重量算额度),最好仍是 15%~16%;筛出的最优参数换独立种子后与默认值只差 0.2 个百分点,说明那是噪声,数值没改</div>
+      <div>额度规则改的是分布而不是最高值:最弱的造法从 2.2% 提到 6.0%,原来没有武器的烟雾逃跑车现在 9.9%,最强与最弱的差距从 5.2 倍收到 2.4 倍;最强造法是公平基线(10%)的约 1.4 倍</div>
+      <div>这一版读数用种子批号 50~54,5 批的批内最高胜率 16/14/14/15/16%,其中 2 批超过 15%。同一批种子上旧配置(没有额度)的可复现读数是最高 13.9%、最弱 2.2%</div>
+      <div>这一轮修了一个复现性错误:烟雾让机器乱转向时用的是浏览器自带的随机数,没走每局的固定随机数,同一套参数每次跑读数都不一样;改完连跑两遍读数逐字相同</div>
     </div>
     <b>读数结论:第 4 个问题从"失败"变成"勉强达标、没有余量"。</b>
     加上第二条赢法(站进余料点攒分)以后,最高胜率从 35% 掉到 14.6%,在阈值以内;但这条线不是稳稳通过——
     五批随机数的批内最高胜率是 17/17/15/15/15%,95% 波动区间上限 16.1%,也就是说区间跨过阈值。
     能说清楚的是垄断已经被打散:9 个预设全部赢过场,最强造法也只是公平基线(10%)的约 1.5 倍。
-    这 1.5 倍又调了三轮共 56 组配置(包括每局中途换余料潮流、按重量算额度),压不到 12%:剩下的差距来自预设本身 —— 重型机器同时拿到质量换血量和高伤害两个便宜,而不是某个系数没调对。
+    这 1.5 倍又调了三轮共 56 组配置(包括每局中途换余料潮流、按重量算额度),压不到 12%:剩下的差距来自预设本身 —— 一台重型机器同时拿到质量换血量和高伤害两个便宜,而不是某个系数没调对。
+    这一版因此把"不能同时占两个便宜"写成规则:质量、伤害、推力各一条额度线,贴零件超了就明确拒绝,9 个预设按新额度重搭。
+    同一批不重叠的随机数上,最高胜率没被压下去(额度版 14.2%,旧配置同批 13.9%,差 0.3 个百分点小于波动),但分布被压平:
+    最弱从 2.2% 到 6.0%,原来几乎赢不了的烟雾逃跑车现在 9.9%,最强与最弱的差距从 5.2 倍收到 2.4 倍,9 台全部赢过场。
+    加额度时第一次只加规则不动预设,系统把手工预设的零件削掉以后两台掉到转向力 0、一场都赢不了(每局最高胜率反而读到 19%~24%),那是零件被削坏了不是平衡,所以预设必须按额度重搭。
     改这一版时还翻出自己两个错,都记在这里:
     一是转向力原来带正负号,左右贴得对称的机器算出来是 0,压根不会转头,算出负数的只会原地绕圈 ——
     修成"最多能多快转头"的能力值以前,有 4 个预设根本赢不了,那不是设计不平衡,是仿真写错了。
@@ -197,6 +205,11 @@ const FUSE = (() => {
   const 半径折扣 = 0.3;   // 圈要容得下整台机器,这个系数决定"大机器在最后的圈里多吃亏"
   const 血量质量系数 = 0.8;// 质量换成血量
   const 灼烧每跳 = 3;
+  // 额度规则:质量、伤害、推力各有一条线,一台机器不能同时占三个便宜。
+  // 上一条结论是差距来自预设本身 —— 重型机器同时拿到质量换血量和高伤害,所以把这件事写成规则而不是继续调系数
+  const 质量额度 = 110;
+  const 伤害额度 = 28;
+  const 推力额度 = 260;
   // 占点计分:站进余料点攒分,攒满就赢。这是"只比谁能打"之外的第二条取胜路线
   const 点位半径 = 100;     // 站进这么近才算占着点(点越大,轻而快的造法越有第二条赢法)
   const 目标分 = 75;        // 先攒到这个分的人赢
@@ -227,6 +240,10 @@ const FUSE = (() => {
     const p = PARTS[key];
     if (!p) return { design, 拒绝:"没有这种零件" };
     if (design.零件.length >= BUDGET[design.局 || 0]) return { design, 拒绝:`这一局零件上限 ${BUDGET[design.局||0]} 个,已经贴满了(资源收紧)` };
+    const 已用 = (键) => design.零件.reduce((s, x) => s + (PARTS[x.件][键] || 0), 0) + (p[键] || 0);
+    if (已用("质量") > 质量额度) return { design, 拒绝:`质量额度 ${质量额度} 已经用完(想再加重量就得换掉别的零件)` };
+    if (已用("伤害") > 伤害额度) return { design, 拒绝:`伤害额度 ${伤害额度} 已经用完(想多一把武器就得换掉别的零件)` };
+    if (已用("推力") > 推力额度) return { design, 拒绝:`推力额度 ${推力额度} 已经用完(想多一套动力就得换掉别的零件)` };
     const parent = design.零件.find(x => x.id === attachId);
     if (!parent) return { design, 拒绝:"没找到要贴的那个零件" };
     const id = Math.max(...design.零件.map(x => x.id)) + 1;
@@ -305,18 +322,21 @@ const FUSE = (() => {
     cur.名称 = PRESET_NAMES[i];
     return cur;
   }
-  const PRESET_NAMES = ["双矛快刀车","重铁冲撞车","火焰长矛车","锤子重卡","烟雾逃跑车","三推猛冲车","盾矛平衡车","电刺快车","闪光长矛车"];
+  // 9 个预设按额度规则重搭过:每条都落在三条额度以内,而且都留出非 0 的转向能力
+  // 原来堆两把矛或三只推进器的造法现在贴不下,双矛快刀车改成轻矛快刀车、三推猛冲车改成单推猛冲车,
+  // 烟雾逃跑车补了一把长矛(它原来没有武器,几乎赢不了,那是预设设计问题不是平衡问题)
+  const PRESET_NAMES = ["轻矛快刀车","重铁冲撞车","火焰长矛车","锤子重卡","烟雾逃跑车","单推猛冲车","盾矛平衡车","电刺快车","闪光长矛车"];
   const PRESET_STEPS = [
-    [["wheel","front"],["wheel","front"],["spear","front"],["spear","left"],["lightwood","back"]],
-    [["wheel","front"],["iron","left"],["iron","back"],["hammer","front"]],   // 配重铁挪到左侧:这台的转向力不再是 0
+    [["wheel","front"],["wheel","left"],["spear","front"],["lightwood","back"]],   // 轻而快:两套动力一把矛,没有重量
+    [["wheel","front"],["iron","left"],["iron","back"],["hammer","front"]],   // 重钝:配重铁挪左侧是为了留出转向力
     [["wheel","front"],["spear","front"],["fire","left"],["fire","right"],["wheel","left"]],
-    [["wheel","front"],["iron","left"],["hammer","front"],["hammer","back"],["shield","front"]],
-    [["thruster","back"],["wheel","front"],["smoke","front"],["lightwood","left"],["shield","back"]],
-    [["thruster","front"],["thruster","left"],["iron","right"],["iron","front"],["spear","front"]],   // 右推进器换配重铁:三只推进器本来会把转向力抵消成 0
-    [["wheel","front"],["shield","front"],["spear","front"],["spear","left"],["bounce","back"],["iron","back"]],
-    [["wheel","front"],["wheel","left"],["spear","front"],["elec","front"],["lightwood","back"],["iron","right"]],   // 同上:右侧换配重铁,留出转向能力
-    [["thruster","front"],["spear","front"],["flash","back"],["shield","left"],["wheel","left"]],
-  ];
+    [["wheel","front"],["iron","left"],["hammer","front"],["hammer","back"],["shield","front"]],   // 伤害额度 28 刚好装下两把锤子
+    [["thruster","back"],["spear","front"],["smoke","front"],["lightwood","left"],["shield","back"]],   // 补了武器,不再是只能跑
+    [["thruster","front"],["iron","right"],["iron","front"],["spear","front"]],   // 推力额度装不下三只推进器,改成单推进加重量
+    [["wheel","front"],["wheel","left"],["shield","front"],["spear","front"],["bounce","back"],["iron","back"]],   // 去掉了第二把矛
+    [["wheel","front"],["wheel","left"],["spear","front"],["elec","front"],["lightwood","back"],["iron","right"]],
+    [["wheel","front"],["wheel","left"],["spear","front"],["flash","back"],["shield","left"]],   // 推进器换成轮子:推力额度装不下推进器加轮子
+  ];;
   function anyId(d) { const w = d.零件.filter(p => PARTS[p.件].类 !== "底盘"); return w.length ? w[w.length-1].id : d.零件[0].id; }
   function lastId(d, key) { const w = d.零件.filter(p => p.件 === key); return w.length ? w[w.length-1].id : d.零件[0].id; }
   function attachId(d, key) {
@@ -403,7 +423,8 @@ const FUSE = (() => {
       if (outside) target = { x:0, y:0 };
       if (!target) target = { x: 0, y: 0 };   // 圈里没有对手就在圈里等着,别跟着对手出圈
       let want = Math.atan2(target.y-a.y, target.x-a.x);
-      if (st.烟 > 0) { st.烟--; want += (Math.random()-0.5)*1.4; }
+      // 烟雾乱转向也必须走这一局的固定随机数,否则同一套参数每次跑出来的读数都不一样,报告里的读数就不可复现
+      if (st.烟 > 0) { st.烟--; want += (m.rnd()-0.5)*1.4; }
       let diff = ((want - a.朝向 + Math.PI) % (Math.PI*2)) - Math.PI;
       // 转向力在这里当"最多能多快把头转过去"的能力值用,不是被写死的自转速度。
       // 原来 turn 带正负号:左右贴得对称的机器算出来是 0,压根不会转头;算出负数的只会原地绕圈,永远瞄不准。
@@ -546,7 +567,7 @@ const FUSE = (() => {
     } catch (e) { return { 拒绝:"不是合法的一段造法文字" }; }
   }
 
-  return { PARTS, BUDGET, ARENA, LOOT, 潮流表, 点位半径, 目标分, 点移动周期, newDesign, addPart, removeLast, stats, traits, traitPath, stripWeapons,
+  return { PARTS, BUDGET, ARENA, LOOT, 潮流表, 点位半径, 目标分, 点移动周期, 质量额度, 伤害额度, 推力额度, newDesign, addPart, removeLast, stats, traits, traitPath, stripWeapons,
     applyLoot, preset, PRESET_NAMES, newMatch, step, burnTick, runAll, exportDesign, importDesign, place };
 })();
 
@@ -622,6 +643,9 @@ function render() {
   const budget = FUSE.BUDGET[S.design.局] || 12;
   document.getElementById("kvTop").innerHTML =
     `<b>这一局零件上限</b><span>${budget} 个(已用 ${st.零件数 - 1})</span>` +
+    `<b>质量额度</b><span>${st.质量} / ${FUSE.质量额度}</span>` +
+    `<b>伤害额度</b><span>${S.design.零件.reduce((s, p) => s + (FUSE.PARTS[p.件].伤害 || 0), 0)} / ${FUSE.伤害额度}</span>` +
+    `<b>推力额度</b><span>${st.推力} / ${FUSE.推力额度}</span>` +
     `<b>局数</b><span>第 ${S.design.局 + 1} 局(预算逐局收紧:12 → 10 → 8)</span>` +
     `<b>造法名称</b><span>${S.design.名称}</span>`;
   const rows = S.design.零件.map(p => {
@@ -750,8 +774,8 @@ const SCEN = [
     步骤:[["开一局:每人开局随机捡两块余料","看日志开头的捡料与潮流"],
           ["推进 1 秒","连点几次,看同一台机器这一局的读数"],
           ["开这一局","同一套造法再来一局,和上一局比读数"]] },
-  { 名:"应该被拒绝的操作", 说明:"边界情形:超过预算、拆到只剩底盘。这些必须明确拒绝并说明原因,否则预算收紧这个机制不存在。",
-    步骤:[["随机拼一台","凑到接近预算"],["拆掉最后贴的那个","连点直到只剩底盘","这时应该被拒绝"],["下一局(预算收紧)","预算从 12 降到 10"]] },
+  { 名:"应该被拒绝的操作", 说明:"边界情形:超过零件预算、超过三条额度、拆到只剩底盘。这些必须明确拒绝并说明原因,否则预算收紧和额度规则都不存在。",
+    步骤:[["随机拼一台","凑到接近预算或某条额度"],["拆掉最后贴的那个","连点直到只剩底盘","这时应该被拒绝"],["下一局(预算收紧)","预算从 12 降到 10"]] },
 ];
 const tabs = document.getElementById("tabs");
 SCEN.forEach((s,i) => {
