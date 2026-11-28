@@ -125,20 +125,26 @@
     </div>
   </div>
 
-  <h2>机器自动跑的 540 局(第 4 个问题的读数,不需要人工玩)</h2>
+  <h2>机器自动跑的 400 局(第 4 个问题的读数,不需要人工玩)</h2>
   <div class="card lead">
-    每台预设机器都和其他预设混编成局,每局 5 台,重复 60 轮。基线阈值是"没有任何造法的胜率超过 15%"。
+    每台预设机器都和其他预设混编成局,每局 10 台(和页面上"开这一局"的台数一致),跑两套随机种子各 200 轮。
+    基线阈值是"没有任何造法的胜率超过 15%";10 台同场,完全公平时每家就是 10%。
     <div class="kv">
-      <div>固定造法(不捡料):盾矛平衡车 38%、锤子重卡 35%、双矛快刀车 11%,平均局长 30 秒</div>
-      <div>每人开局随机捡两块余料:锤子重卡 35%、盾矛平衡车 30%、双矛快刀车 13%、闪光长矛车 12%,平均局长 32 秒</div>
-      <div>9 个预设里 7 个至少赢过一场;三推猛冲车与电刺快车一场没赢</div>
-      <div>调参过程:96 组数值网格搜索把最高胜率从 57% 压到 35%,但压不到 15%</div>
+      <div>最高胜率:锤子重卡 15%、盾矛平衡车 15%;最低是烟雾逃跑车 4%(两套种子分别读到 16% 和 14%)</div>
+      <div>9 个预设全部赢过场。赢法里 59%~68% 是靠站进绿色余料点攒分,其余靠打掉对手</div>
+      <div>平均局长 26~27 秒,每局平均淘汰 7 台 —— 改了胜利条件以后战斗没有被改掉</div>
+      <div>调参:96 组 + 72 组 + 24 组网格搜索,硬约束是局长不低于 18 秒、每局至少淘汰 1 台、占点赢占 20%~90%</div>
     </div>
-    <b>读数结论:第 4 个问题在现在这套规则里是失败的。</b>
-    原因是所有机器都冲向最近的对手,胜负只剩"单次伤害乘抗打"这一个量,堆质量加盾牌加高单次伤害的造法就是唯一正解。
-    缩圈、随机捡料、每局随机放大一类特性(余料潮流)都只是把垄断压低,没有把它打散。
-    要真正平衡,得让胜利条件不只是"打得赢"——比如占余料点、抢搬运、按得分判胜,
-    让轻而快的造法有别的赢法。这条要进下一版原型验证。
+    <b>读数结论:第 4 个问题从"失败"变成"勉强达标、没有余量"。</b>
+    加上第二条赢法(站进余料点攒分)以后,最高胜率从 35% 掉到 15%,正好压在阈值上;换一套随机种子会读到 16%,
+    所以不能说已经稳过,只能说这条路能把垄断打散。
+    改这一版时还翻出自己两个错,都记在这里:
+    一是转向力原来带正负号,左右贴得对称的机器算出来是 0,压根不会转头,算出负数的只会原地绕圈 ——
+    修成"最多能多快转头"的能力值以前,有 4 个预设根本赢不了,那不是设计不平衡,是仿真写错了。
+    二是原来那套自动对局每局只放 5 台,5 台公平混编的基线就是 20%,拿"不超过 15%"去卡它永远不可能通过;
+    阈值必须配上台数才能判断,现在按 10 台基线 10% 来看,15% 才算得出意义。
+    另外只调数值很容易把对局调死:不加约束时最好的那组参数局长只有 6~9 秒、每局一台都没打掉、
+    100% 靠占点赢,那是空转不是平衡,所以扫参数时必须把"战斗还活着"写成硬条件。
   </div>
 
   <h2>引导场景(每个场景跑固定步骤,便于比较不同人的反应)</h2>
@@ -181,12 +187,24 @@ const FUSE = (() => {
   const SIDE = { front:[1,0], back:[-1,0], left:[0,-1], right:[0,1] };
   const WEAPONS = ["spear","hammer"];
   const BUDGET = [12, 10, 8];   // 三局,零件预算逐局收紧(资源收紧)
-  const ARENA = 320, SAFE0 = 300, SHRINK = 8, DT = 0.1, K = 0.05;
+  const ARENA = 320, SAFE0 = 300, SHRINK = 8, DT = 0.1, K = 0.06;
   // 可调的仿真旋钮(原型阶段用网格搜索找的平衡值,不是设计定案)
   const 圈压 = 0.9;        // 圈外每跳扣血
   const 半径折扣 = 0.3;   // 圈要容得下整台机器,这个系数决定"大机器在最后的圈里多吃亏"
   const 血量质量系数 = 0.8;// 质量换成血量
   const 灼烧每跳 = 3;
+  // 占点计分:站进余料点攒分,攒满就赢。这是"只比谁能打"之外的第二条取胜路线
+  const 点位半径 = 100;     // 站进这么近才算占着点(点越大,轻而快的造法越有第二条赢法)
+  const 目标分 = 75;        // 先攒到这个分的人赢
+  const 占点每跳 = 1;       // 每 0.1 秒攒的分(满速)
+  const 点移动周期 = 240;   // 每 24 秒余料点换一次位置
+  const 打断跳 = 12;        // 被打到以后 1.2 秒内攒不了分
+  const 多人分摊 = 0;       // 0 = 点里挤了几台都各攒各的;调大就变成硬抢点
+  const 应战距离 = 180;     // 对手近到这个距离才停下来打,否则优先往余料点走
+  function 取点(rnd, 半径) {
+    const a = rnd() * Math.PI * 2, r = rnd() * 半径 * 0.55;
+    return [Math.cos(a) * r, Math.sin(a) * r];
+  }
   let 重系数 = 1;   // 潮流为"重"的时候由 newMatch 临时改成 1.5
 
   function newDesign(name) { return { 名称: name || "我的造法", 零件: [{ id:1, 件:"core", 贴到:null, 侧:null }] }; }
@@ -286,13 +304,13 @@ const FUSE = (() => {
   const PRESET_NAMES = ["双矛快刀车","重铁冲撞车","火焰长矛车","锤子重卡","烟雾逃跑车","三推猛冲车","盾矛平衡车","电刺快车","闪光长矛车"];
   const PRESET_STEPS = [
     [["wheel","front"],["wheel","front"],["spear","front"],["spear","left"],["lightwood","back"]],
-    [["wheel","front"],["iron","front"],["iron","back"],["hammer","front"]],
+    [["wheel","front"],["iron","left"],["iron","back"],["hammer","front"]],   // 配重铁挪到左侧:这台的转向力不再是 0
     [["wheel","front"],["spear","front"],["fire","left"],["fire","right"],["wheel","left"]],
     [["wheel","front"],["iron","left"],["hammer","front"],["hammer","back"],["shield","front"]],
     [["thruster","back"],["wheel","front"],["smoke","front"],["lightwood","left"],["shield","back"]],
-    [["thruster","front"],["thruster","left"],["thruster","right"],["iron","front"],["spear","front"]],
+    [["thruster","front"],["thruster","left"],["iron","right"],["iron","front"],["spear","front"]],   // 右推进器换配重铁:三只推进器本来会把转向力抵消成 0
     [["wheel","front"],["shield","front"],["spear","front"],["spear","left"],["bounce","back"],["iron","back"]],
-    [["wheel","front"],["wheel","left"],["spear","front"],["elec","front"],["lightwood","back"],["wheel","right"]],
+    [["wheel","front"],["wheel","left"],["spear","front"],["elec","front"],["lightwood","back"],["iron","right"]],   // 同上:右侧换配重铁,留出转向能力
     [["thruster","front"],["spear","front"],["flash","back"],["shield","left"],["wheel","left"]],
   ];
   function anyId(d) { const w = d.零件.filter(p => PARTS[p.件].类 !== "底盘"); return w.length ? w[w.length-1].id : d.零件[0].id; }
@@ -338,20 +356,22 @@ const FUSE = (() => {
       const st = stats(d);
       const a = (i / (1 + opponents.length)) * Math.PI * 2;
       return { i, 名称:mine ? "你的机器" : d.名称, 造法:d, 读数:st, x:Math.cos(a)*SAFE0*0.7, y:Math.sin(a)*SAFE0*0.7,
-        vx:0, vy:0, 朝向:a, hp:Math.round(70 + st.质量 * 血量质量系数 * (st.特性.includes("重") ? 重系数 : 1)), 活:true, 名次:null, 状态:{}, 冷却:0 };
+        vx:0, vy:0, 朝向:a, hp:Math.round(70 + st.质量 * 血量质量系数 * (st.特性.includes("重") ? 重系数 : 1)), 活:true, 名次:null, 状态:{}, 冷却:0, 分数:0, 打断:0 };
       };
     const m_日志 = [];
     const 潮流 = 潮流表[Math.floor(rnd() * 潮流表.length)];
     重系数 = 潮流 === "重" ? 1.5 : 1;
     m_日志.push(`这一局的余料潮流:${潮流}(这一类特性的效果本局 1.5 倍)`);
     const machines = [mk(design, 0, true)].concat(opponents.map((d,i) => mk(d, i+1, false)));
-    return { 局:round, 机器:machines, tick:0, 安全半径:SAFE0, 日志:m_日志, 结束:false, 淘汰顺序:[], 潮流 };
+    return { 局:round, 机器:machines, tick:0, 安全半径:SAFE0, 日志:m_日志, 结束:false, 淘汰顺序:[], 潮流,
+      点:取点(rnd, SAFE0), rnd };
   }
 
   function step(m) {
     if (m.结束) return m;
     m.tick++;
     if (m.tick % 25 === 0) { shrinkSafe(m); }
+    if (m.tick % 点移动周期 === 0) { m.点 = 取点(m.rnd, m.安全半径); m.日志.push(`第 ${m.tick/10} 秒:余料点挪到新的位置`); }
     const 重boost = 潮流系数(m, "重");
     if (m.机器.filter(x => x.活).length <= 1) { finish(m); return m; }
     for (const a of m.机器) {
@@ -372,12 +392,19 @@ const FUSE = (() => {
         if (dd < best) { best = dd; target = b; }
       }
       const outside = 圈外(a);
+      const 点距 = Math.hypot(m.点[0]-a.x, m.点[1]-a.y);
+      const 领先 = a.分数 >= 目标分 * 0.7;
+      // 占点优先:只有对手贴到脸上了才打,否则一律往余料点走。这样快而轻的造法有第二条赢法
+      if (!outside && !(best < 应战距离 && !领先)) target = { x:m.点[0], y:m.点[1] };
       if (outside) target = { x:0, y:0 };
       if (!target) target = { x: 0, y: 0 };   // 圈里没有对手就在圈里等着,别跟着对手出圈
       let want = Math.atan2(target.y-a.y, target.x-a.x);
       if (st.烟 > 0) { st.烟--; want += (Math.random()-0.5)*1.4; }
       let diff = ((want - a.朝向 + Math.PI) % (Math.PI*2)) - Math.PI;
-      const turn = Math.max(-0.06, Math.min(0.06, a.读数.转向力 / 2500));
+      // 转向力在这里当"最多能多快把头转过去"的能力值用,不是被写死的自转速度。
+      // 原来 turn 带正负号:左右贴得对称的机器算出来是 0,压根不会转头;算出负数的只会原地绕圈,永远瞄不准。
+      const 差速底 = 0.018;   // 完全没有转向力的机器,靠左右差速也能慢慢转头
+      const turn = Math.max(差速底, Math.min(0.06, Math.abs(a.读数.转向力) / 2500));
       a.朝向 += turn * Math.max(-1, Math.min(1, diff));
       a.vx += Math.cos(a.朝向) * thrust * K;
       a.vy += Math.sin(a.朝向) * thrust * K;
@@ -410,6 +437,15 @@ const FUSE = (() => {
         }
       }
     }
+    // 攒分:点里只有一台机器时全速攒分,多于一台就互相拖慢;被打到的人这段时间攒不了分
+    const 在点 = m.机器.filter(x => x.活 && Math.hypot(x.x-m.点[0], x.y-m.点[1]) <= 点位半径);
+    for (const a of m.机器) {
+      if (!a.活) continue;
+      if (a.打断 > 0) a.打断--;
+      if (在点.indexOf(a) >= 0) a.分数 += 占点每跳 * (在点.length > 1 ? 多人分摊 : 1);
+    }
+    const 先到 = m.机器.filter(x => x.活 && x.分数 >= 目标分).sort((x,y) => y.分数 - x.分数)[0];
+    if (先到) { m.胜因 = `${先到.名称} 攒满 ${目标分} 分`; finish(m); return m; }
     const still = m.机器.filter(x => x.活);
     if (still.length <= 1) { finish(m); }
     if (m.tick >= 400) finish(m);
@@ -450,6 +486,7 @@ const FUSE = (() => {
   }
   function hurt(m, who, n, why) {
     who.hp -= n;
+    who.打断 = 打断跳;
     if (who.hp <= 0 && who.活) {
       who.活 = false; who.hp = 0;
       who.名次 = m.机器.length - m.淘汰顺序.length;
@@ -464,10 +501,15 @@ const FUSE = (() => {
   }
   function finish(m) {
     m.结束 = true;
-    const alive = m.机器.filter(x => x.活).sort((a,b) => b.hp - a.hp);
-    alive.forEach((a, i) => { a.名次 = i + 1; });
-    m.冠军 = alive.length ? alive[0].名称 : "无人存活";
-    m.日志.push(`这一局结束:${m.冠军} 获胜(共 ${m.tick/10} 秒)`);
+    const rank = m.机器.slice().sort((a,b) => (b.分数 - a.分数) || (b.hp - a.hp));
+    rank.forEach((a, i) => { a.名次 = i + 1; });
+    m.冠军 = rank.length ? rank[0].名称 : "无人存活";
+    if (!m.胜因) {
+      m.胜因 = m.机器.filter(x => x.活).length <= 1
+        ? `${m.冠军} 是场上还站着的机器`
+        : `时间到,${m.冠军} 分数最高(${Math.round(rank[0].分数)} 分)`;
+    }
+    m.日志.push(`这一局结束:${m.冠军} 获胜(${m.胜因},共 ${m.tick/10} 秒)`);
   }
 
   function runAll(m, maxTicks) {
@@ -500,7 +542,7 @@ const FUSE = (() => {
     } catch (e) { return { 拒绝:"不是合法的一段造法文字" }; }
   }
 
-  return { PARTS, BUDGET, ARENA, LOOT, 潮流表, newDesign, addPart, removeLast, stats, traits, traitPath, stripWeapons,
+  return { PARTS, BUDGET, ARENA, LOOT, 潮流表, 点位半径, 目标分, 点移动周期, newDesign, addPart, removeLast, stats, traits, traitPath, stripWeapons,
     applyLoot, preset, PRESET_NAMES, newMatch, step, burnTick, runAll, exportDesign, importDesign, place };
 })();
 
@@ -546,6 +588,14 @@ function draw() {
       g.fillStyle = "#1c1a17"; g.font = "11px sans-serif";
       g.fillText(m.名称 + " " + Math.round(m.hp), x + 12, y - 8);
     }
+    const 点 = S.match.点;
+    if (点) {
+      g.strokeStyle = "#2f6b4f"; g.lineWidth = 2; g.beginPath();
+      g.arc(cx + 点[0]*k, cy + 点[1]*k, FUSE.点位半径*k, 0, Math.PI*2); g.stroke();
+      g.fillStyle = "#2f6b4f"; g.font = "11px sans-serif";
+      g.fillText("余料点(站进去攒分)", cx + 点[0]*k - 44, cy + 点[1]*k - FUSE.点位半径*k - 5);
+      g.lineWidth = 1;
+    }
   } else {
     const st = FUSE.stats(S.design);
     g.fillStyle = "#b4531f"; g.beginPath(); g.arc(cx, cy, Math.max(10, st.半径*k*0.7), 0, Math.PI*2); g.fill();
@@ -586,7 +636,7 @@ function render() {
   if (!S.match) { board.innerHTML = `<p class="note">还没开局。点了"开这一局"以后这里会显示 10 台机器的血量与名次。</p>`; }
   else {
     board.innerHTML = S.match.机器.map(m =>
-      `<div class="row" style="justify-content:space-between"><span>${m.名称}${m.名次 && !m.活 ? " · 第 " + m.名次 + " 名" : ""}</span>` +
+      `<div class="row" style="justify-content:space-between"><span>${m.名称}${m.名次 && !m.活 ? " · 第 " + m.名次 + " 名" : ""} · 分 ${Math.round(m.分数)}/${FUSE.目标分}</span>` +
       `<span style="width:120px"><div class="hp"><i style="width:${m.hp}%"></i></div></span></div>`).join("");
     document.getElementById("log").innerHTML = S.match.日志.slice(-40).map(l => `<div>${l}</div>`).join("");
   }
@@ -594,7 +644,7 @@ function render() {
   for (const k in S.胜率) bal.push(`<div>${k}:胜 ${S.胜率[k]} / ${S.总局} 局(${Math.round(S.胜率[k]/S.总局*100)}%)</div>`);
   const over = Object.values(S.胜率).some(v => S.总局 && v/S.总局 > 0.15);
   document.getElementById("balance").innerHTML = (bal.join("") || "<div>还没有打完一局</div>") +
-    `<div class="note">阈值:没有任何造法的胜率超过 15%。${over ? "<b>现在超了</b>,说明某个组合压过了其他所有组合。" : S.总局 ? "目前没超。" : ""}</div>`;
+    `<div class="note">阈值:没有任何造法的胜率超过 15%。10 台同场的公平基线是 10%。${over ? "<b>现在超了</b>,说明某个组合压过了其他所有组合。" : S.总局 ? "目前没超。" : ""}</div>`;
   draw();
   renderScenario();
 }
@@ -651,7 +701,7 @@ document.getElementById("btnNoWeapon").onclick = () => {
 document.getElementById("btnMatch").onclick = () => {
   const opp = FUSE.PRESET_NAMES.map((_, i) => FUSE.preset(i));
   S.match = FUSE.newMatch(S.design, opp, 7 + S.总局, S.design.局);
-  say(`开局:你的机器对 ${opp.length} 个预设造法。安全区域每 2.5 秒收缩,圈外的机器整台要被圈磨。`);
+  say(`开局:你的机器对 ${opp.length} 个预设造法。这一局有两条赢法:把别人打掉,或者站进绿色余料点攒满 ${FUSE.目标分} 分(每 24 秒换位置,挨打会打断攒分)。安全区域每 2.5 秒收缩,圈外的机器整台要被圈磨。`);
   render();
 };
 document.getElementById("btnLoot").onclick = () => {
