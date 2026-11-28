@@ -98,6 +98,8 @@
 
 记录表落成了 CSV,表头与每列允许的取值在 [playtest/recruit-kit.md](playtest/recruit-kit.md);原型页面上的「复制本局记录(给引导者)」按钮会把零件清单、三条额度已用、开局捡到的余料、余料潮流、胜负与胜因、局长、本局淘汰台数、我的名次与分数、拼装用时、造法文字一次性填进文本框,引导者整段粘进记录表。
 跑完以后用 `python3 docs/playtest/tally.py docs/playtest/playtest-rows.csv` 出判定:它按下面那张判定表逐条打印读数与波动区间,剔除没有录像的行,样本不足 10 人时每条判定都标"只算方向"。
+当天怎么落地(在哪开页面、按哪个按钮、记录粘去哪)写在 [playtest/run-sheet.md](playtest/run-sheet.md);
+`python3 docs/playtest/rowtool.py docs/playtest/raw/场次01.txt --场次 1 --组别 A` 会把那三段记录文字变成记录表的一行,并列出还缺哪几列要你当场问。
 
 ## 成本与时间
 
