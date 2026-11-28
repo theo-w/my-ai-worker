@@ -145,6 +145,8 @@
 
 原型文件 `prototypes/fuse-royale-prototype.html`(单文件,双击或 `python3 -m http.server 8766` 后打开 `/prototypes/fuse-royale-prototype.html`),纯逻辑模块与页面壳分开,逻辑模块可以整段搬进真实代码。已作为一手资料提交在一次性分支 `prototype/fuse-royale`(从 main 切出),主分支只保留下面写明的结论。
 
+同一分支上另有一份**演示用的逐帧回放**:`prototypes/fuse-replay.html`(自动播放、可切 0.5~4 倍速、可拖进度条)与 `prototypes/fuse-replay.gif`(16.9 秒),用同一个逻辑模块、固定随机数种子 203 跑一局并录下每一帧的位置、朝向、血量、攒分与安全圈变化,给没读过代码的人看清两条赢法和缩圈是怎么发生的(那一局靠余料点攒满 75 分赢,局长 33.8 秒、淘汰 8 台)。它是演示物料,不是新增读数,平衡结论仍以上面的 2000 局为准。
+
 原型覆盖的内容与它要回答的四个问题:
 
 | 原型里的机制 | 对应问题 | 跑出来的结果 |
