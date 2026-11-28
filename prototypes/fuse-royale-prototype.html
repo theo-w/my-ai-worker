@@ -98,12 +98,15 @@
           <button id="btnLoot">开一局:每人开局随机捡两块余料</button>
           <button id="btnStep">推进 1 秒</button>
           <button id="btnNext">下一局(零件预算收紧)</button>
+          <button id="btnRecord">复制本局记录(给引导者)</button>
         </div>
       </div>
       <div>
         <label>场地与这台机器现在长什么样</label>
         <canvas id="cv" width="640" height="420"></canvas>
         <p class="note" id="whatChanged"></p>
+        <label>本局记录(点「复制本局记录」自动填在这里,引导者直接整段复制走)</label>
+        <textarea id="recordBox" rows="9" spellcheck="false" style="width:100%;font-family:monospace;font-size:12px" placeholder="还没记。开完一局以后点「复制本局记录」。"></textarea>
       </div>
     </div>
   </div>
@@ -574,7 +577,8 @@ const FUSE = (() => {
 /* =====================================================================
    页面壳(只负责显示与按钮)
    ===================================================================== */
-const S = { design:FUSE.newDesign(), 局:0, match:null, 胜率:{}, 总局:0, 场景:-1, 步骤:0, 说明:"" };
+const S = { design:FUSE.newDesign(), 局:0, match:null, 胜率:{}, 总局:0, 场景:-1, 步骤:0, 说明:"",
+  起点:Date.now(), 拼装起点:Date.now(), 首次开局秒:null, 本局拼装秒:null, 贴零件:0, 本局种子:null, 本局开局次数:0 };
 S.design.局 = 0;
 
 const partSel = document.getElementById("partSel");
@@ -680,7 +684,7 @@ function render() {
 /* ---------- 按钮 ---------- */
 document.getElementById("btnAdd").onclick = () => {
   const r = FUSE.addPart(S.design, partSel.value, Number(attachSel.value), document.getElementById("sideSel").value);
-  if (r.拒绝) say("不行:" + r.拒绝); else { S.design = r.design; S.design.局 = S.design.局 ?? S.局; say(r.说明 + "。右边读数已经变了。"); }
+  if (r.拒绝) say("不行:" + r.拒绝); else { S.design = r.design; S.design.局 = S.design.局 ?? S.局; S.贴零件++; say(r.说明 + "。右边读数已经变了。"); }
   render();
 };
 document.getElementById("btnRemove").onclick = () => {
@@ -723,18 +727,29 @@ document.getElementById("btnImport").onclick = () => {
 document.getElementById("btnNoWeapon").onclick = () => {
   const opp = FUSE.PRESET_NAMES.map((_, i) => FUSE.stripWeapons(FUSE.preset(i)));
   S.match = FUSE.newMatch(S.design, opp, 7 + S.总局, S.design.局);
+  markMatchStart();
   say("这一局 10 台机器都没有武器,只能互相顶着。这就是纯数值组合的失败模式:谁都不够不着谁,最后靠圈外扣血分出胜负。");
   render();
 };
+// 试玩记录用的计时与计数:只写进记录面板,不进对局仿真,对局随机数仍走每局固定种子
+function markMatchStart() {
+  S.本局种子 = 7 + S.总局;
+  S.本局开局次数++;
+  S.本局拼装秒 = Math.round((Date.now() - S.拼装起点) / 1000);
+  S.拼装起点 = Date.now();
+  if (S.首次开局秒 === null) S.首次开局秒 = Math.round((Date.now() - S.起点) / 1000);
+}
 document.getElementById("btnMatch").onclick = () => {
   const opp = FUSE.PRESET_NAMES.map((_, i) => FUSE.preset(i));
   S.match = FUSE.newMatch(S.design, opp, 7 + S.总局, S.design.局);
+  markMatchStart();
   say(`开局:你的机器对 ${opp.length} 个预设造法。这一局有两条赢法:把别人打掉,或者站进绿色余料点攒满 ${FUSE.目标分} 分(每 24 秒换位置,挨打会打断攒分)。安全区域每 2.5 秒收缩,圈外的机器整台要被圈磨。`);
   render();
 };
 document.getElementById("btnLoot").onclick = () => {
   const opp = FUSE.PRESET_NAMES.map((_, i) => FUSE.preset(i));
   S.match = FUSE.newMatch(S.design, opp, 7 + S.总局, S.design.局, 2);
+  markMatchStart();
   say("这一局每台机器开局随机多两块余料(落地捡料)。同一套造法每局的读数都不一样,这是压制单一组合长期占优的手段之一。");
   render();
 };
@@ -748,9 +763,48 @@ document.getElementById("btnNext").onclick = () => {
   S.局 = Math.min(2, S.局 + 1);
   S.design.局 = S.局;
   S.match = null;
+  S.拼装起点 = Date.now();
+  S.本局开局次数 = 0;
   say(`进入第 ${S.局+1} 局:零件预算收紧到 ${FUSE.BUDGET[S.局]} 个。你要么用更少的零件保住强度,要么换思路。`);
   render();
 };
+document.getElementById("btnRecord").onclick = () => {
+  const st = FUSE.stats(S.design);
+  const 伤害已用 = S.design.零件.reduce((s, x) => s + (FUSE.PARTS[x.件].伤害 || 0), 0);
+  const 侧名 = { front:"前方", back:"后方", left:"左侧", right:"右侧" };
+  const 清单 = S.design.零件.map(x => {
+    const pa = x.贴到 ? S.design.零件.find(y => y.id === x.贴到) : null;
+    return `#${x.id} ${FUSE.PARTS[x.件].名称}` + (pa ? `(贴在 #${pa.id} ${FUSE.PARTS[pa.件].名称} 的${侧名[x.侧]})` : "(核心)");
+  }).join(" / ");
+  const m = S.match;
+  let 局内 = "本局还没开。先点「开这一局」再记。";
+  if (m) {
+    const me = m.机器[0];
+    const 捡到 = m.日志.filter(x => /开局捡到/.test(x))[0] || "这一局没有捡料(用的是「开这一局」按钮)";
+    局内 =
+      `开局捡到(我的机器):${捡到}\n` +
+      `本局余料潮流:${m.潮流}\n` +
+      `本局结果:${m.结束 ? m.冠军 + " 获胜(" + m.胜因 + ")" : "还没打完"}\n` +
+      `局长:${(m.tick / 10).toFixed(1)} 秒 | 本局淘汰:${m.淘汰顺序.length} 台\n` +
+      `我的机器:第 ${me.名次 || "未定"} 名 | 攒分 ${Math.round(me.分数)}/${FUSE.目标分} | 血量 ${Math.round(me.hp)} | ${me.活 ? "还活着" : "已出局"}`;
+  }
+  const t =
+    `【试玩记录】第 ${S.局 + 1} 局(本页面第 ${S.本局开局次数} 次开局)` +
+    `\n开局种子:${S.本局种子 === null ? "未开局" : S.本局种子}(规则 = 7 + 已完局数)` +
+    `\n本局拼装用时:${S.本局拼装秒 === null ? "未计" : S.本局拼装秒} 秒(从上一次点「下一局」或打开页面算起)` +
+    `\n从打开页面到第一次开局:${S.首次开局秒 === null ? "未计" : S.首次开局秒} 秒(全程没有教程)` +
+    `\n成功贴零件次数:${S.贴零件}` +
+    `\n我的造法名称:${S.design.名称}` +
+    `\n零件清单:${清单}` +
+    `\n额度已用:质量 ${st.质量}/${FUSE.质量额度} | 伤害 ${伤害已用}/${FUSE.伤害额度} | 推力 ${st.推力}/${FUSE.推力额度}` +
+    `\n整机读数:质量 ${st.质量} · 推力 ${st.推力} · 加速度 ${st.加速度} · 转向力 ${st.转向力} · 半径 ${st.半径} · 够得着 ${st.够得着} · 攻击力 ${st.攻击力} · 护甲 ${st.护甲} · 特性 ${st.特性.join("/") || "无"}` +
+    `\n` + 局内 +
+    `\n造法文字(发给别人就能复用):${FUSE.exportDesign(S.design)}`;
+  document.getElementById("recordBox").value = t;
+  navigator.clipboard && navigator.clipboard.writeText(t).catch(() => {});
+  say("记录已经填进下面这个框(也尝试复制到剪贴板了)。引导者把它整段贴进记录表。");
+};
+
 function record() {
   if (!S.match.冠军) return;
   S.总局++;
