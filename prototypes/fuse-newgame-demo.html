@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>余料 Royale · 改完以后的玩法(动态演示)</title>
+<style>
+  body{margin:0;background:#12161d;color:#e8eef6;font-family:-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 44px}
+  h1{font-size:20px;margin:0 0 6px}
+  .tag{font-size:13px;color:#9fb0c4;line-height:1.7;margin:0 0 14px}
+  .tag b{color:#ffd27a}
+  .tag a{color:#8fc3ff}
+  .stage{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  canvas{background:#1b2230;border:1px solid #2b3648;border-radius:8px}
+  #panel{min-width:250px;flex:1;font-size:13px;line-height:1.5}
+  .机{border:1px solid #2b3648;border-radius:8px;padding:8px 10px;margin-bottom:8px}
+  .机 h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  .bar{height:7px;background:#2b3648;border-radius:4px;overflow:hidden;margin:4px 0}
+  .bar i{display:block;height:100%}
+  .hp i{background:#63c07a}.sc i{background:#e6c068}
+  .slot{display:inline-block;border:1px solid #3a4760;border-radius:5px;padding:1px 6px;margin:3px 4px 0 0;font-size:12px;color:#cfe0f2}
+  .slot.dev{border-color:#7d5c96;color:#e6c8f5}
+  .st{color:#ffb0a0;font-size:12px}
+  .dead{color:#7b8a9c}
+  #cap{margin-top:12px;background:#1b2230;border:1px solid #2b3648;border-radius:8px;padding:10px 12px;min-height:86px;font-size:14px;line-height:1.75}
+  #cap div{color:#c7d6e8}
+  #cap div.hot{color:#ffd27a}
+  .ctrl{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button{background:#263141;color:#e8eef6;border:1px solid #3a4760;border-radius:6px;padding:5px 10px;font-size:13px;cursor:pointer}
+  button.on{background:#3d5a86}
+  input[type=range]{flex:1;min-width:160px}
+  #时{font-size:12px;color:#9fb0c4;min-width:96px}
+  #legend{margin-top:12px;font-size:12.5px;color:#93a6ba;line-height:1.9}
+  #why{margin:14px 0 0;padding-left:20px;font-size:13.5px;line-height:1.85;color:#c7d6e8}
+  #why li{margin-bottom:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>改完以后的玩法长什么样(动态演示)</h1>
+  <p class="tag">
+    这一段动画演示的是<b>脑爆里那套改法</b>:点位分成三种收益、走过去才捡到东西、道具靠近对手时自己触发、从背面打中伤害翻倍。
+    <b>它是演示物料,不是新读数,也不是可玩原型</b>——黄圈那台机器走哪条路是我写死的一段剧本,不是平衡对局。
+    现有版本的真实机器回放见 <a href="fuse-replay.html">fuse-replay.html</a>,改法的完整设计见
+    <a href="../docs/jarvis-item-variety-brainstorm.md">点位与道具多样性的改法</a>。
+  </p>
+  <div class="stage">
+    <canvas id="cv" width="600" height="600"></canvas>
+    <div id="panel"></div>
+  </div>
+  <div id="cap"></div>
+  <div class="ctrl">
+    <button id="bPlay">暂停</button>
+    <button id="bS05">0.5×</button><button id="bS1" class="on">1×</button><button id="bS2">2×</button><button id="bS4">4×</button>
+    <button id="bTop">从头重播</button>
+    <input type="range" id="bar" min="0" max="1" step="0.001" value="0">
+    <span id="时"></span>
+  </div>
+  <div id="legend"></div>
+  <ul id="why"></ul>
+</div>
+<script>
+const SIM = (() => {
+  const 世界 = 400, 目标分 = 55, DT = 0.1, 跳数上限 = 520, 速度 = 3.4;
+  const 点种 = {
+    分:{名:'攒分点', 色:'#5cc46a', 半径:90},
+    料:{名:'料点',   色:'#5aa8ff', 半径:70},
+    装:{名:'装置点', 色:'#c07be0', 半径:70},
+  };
+  const 余料 = ['火焰余料','电余料','冰冷果','弹跳垫','轻木','配重铁'];
+  const 装置表 = {
+    烟:{名:'烟雾罐',     距离:150, 说:'糊住对手转向 1.5 秒'},
+    眼:{名:'眼珠追踪弹', 距离:220, 说:'弹头自己追着对手飞'},
+    冰:{名:'冰冷果',     距离:120, 说:'让对手停 1.5 秒'},
+    箭:{名:'火箭',       距离:170, 说:'一发 26 伤害'},
+  };
+  const 剧本 = [
+    {做:'去点', 类:'料', 说:'先去蓝圈捡一块余料(现有版本是开局自动发两块,没有这一步)'},
+    {做:'去点', 类:'装', 说:'再去紫圈拿一个主动道具'},
+    {做:'靠近', 说:'贴住对手,让道具自动触发'},
+    {做:'绕后', 说:'绕到他背后:从背面打中伤害 1.5 倍'},
+    {做:'去点', 类:'分', 说:'最后去绿圈攒分'},
+  ];
+
+  function 取位(rnd, 半径) {
+    const a = rnd() * Math.PI * 2, r = rnd() * 半径 * 0.6;
+    return [Math.cos(a) * r, Math.sin(a) * r];
+  }
+  function 新机(名, 色, x, y, 朝向, hp, 半径, 武器) {
+    return {名, 色, x, y, 朝向, hp, 上限:hp, 分:0, 半径, 武器, 背包:[], 装置:[],
+            状态:{停:0, 烟:0, 灼:0, 电:0}, 冷却:0, 装冷:0, 活:true, 剧本:0, 拿过装:false};
+  }
+  function 最近对手(a, 机们) {
+    let 最 = null, 近 = 1e9;
+    for (const b of 机们) {
+      if (b === a || !b.活) continue;
+      const d = Math.hypot(b.x - a.x, b.y - a.y);
+      if (d < 近) { 近 = d; 最 = b; }
+    }
+    return 最;
+  }
+  function 背面(from, to) {
+    return Math.cos(Math.atan2(from.y - to.y, from.x - to.x) - to.朝向) < -0.15;
+  }
+
+  function 跑一遍(种子) {
+    let s = (种子 * 2654435761) % 4294967296;
+    const rnd = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+    const 事 = [];
+    const 记 = (t, 文, hot) => 事.push({t, 文, hot: !!hot});
+
+    const mk点 = (类, x, y) => ({类, 半径:点种[类].半径, x, y, 冷:0, 给:0});
+    const 点们 = [mk点('分', 0, -120), mk点('料', -140, -40), mk点('装', 110, 90)];
+    const 机们 = [
+      新机('你的机器(演示)', '#ffd27a', -260, 150, -0.5, 130, 26, {伤害:17, 伸出:28}),
+      新机('锤子重卡',       '#e2795f',  200, -70,  2.6, 265, 34, {伤害:14, 伸出:16}),
+      新机('轻矛快车',       '#7fb6ff',   70, 230,  3.1, 105, 22, {伤害:15, 伸出:26}),
+    ];
+    const 弹 = [], 闪 = [], 帧们 = [];
+    let tick = 0, 结束 = false, 冠军 = null, 胜因 = '';
+
+    记(0, '三种点位同时开:绿圈攒分、蓝圈捡余料、紫圈拿道具。背包 2 格、道具栏 2 格,拿到什么自己挑。', true);
+
+    function 出局(a, t, 因) {
+      if (!a.活) return;
+      a.活 = false; a.hp = 0;
+      记(t, `${a.名} 出局(${因})`, true);
+    }
+    function 打中(from, to, t) {
+      const 后 = 背面(from, to);
+      const 伤 = Math.round(from.武器.伤害 * (后 ? 1.5 : 1));
+      to.hp -= 伤;
+      if (from.背包.includes('火焰余料') && to.活) { to.状态.灼 = 16; 记(t, `${to.名} 被点着,开始持续灼烧`); }
+      if (from.背包.includes('电余料') && to.活) { to.状态.电 = 8; 记(t, `${to.名} 被电到,推力减半`); }
+      记(t, 后 ? `${from.名} 从背面打中 ${to.名}:${伤} 伤害(背面 ×1.5)`
+               : `${from.名} 正面打中 ${to.名}:${伤} 伤害`, 后);
+      if (后) 闪.push({x:to.x, y:to.y, 生命:16, 文:'背面 ×1.5'});
+      if (to.hp <= 0) 出局(to, t, `被 ${from.名} 打掉`);
+    }
+    function 剧本目标(a, t) {
+      const 步 = 剧本[a.剧本];
+      if (!步) return 点们[0];
+      const 敌 = 最近对手(a, 机们);
+      const d = 敌 ? Math.hypot(敌.x - a.x, 敌.y - a.y) : 1e9;
+      let 完成 = false;
+      if (步.做 === '去点' && 步.类 === '料') 完成 = a.背包.length > 0;
+      if (步.做 === '去点' && 步.类 === '装') 完成 = a.拿过装;
+      if (步.做 === '去点' && 步.类 === '分') 完成 = a.分 >= 目标分;
+      if (步.做 === '靠近') 完成 = 敌 && d < 145;
+      if (步.做 === '绕后') 完成 = 敌 && d < 80 && 背面(a, 敌);
+      if (完成) {
+        a.剧本++;
+        if (a.剧本 < 剧本.length) 记(t, `下一步:${剧本[a.剧本].说}`);
+        return null;
+      }
+      if (步.做 === '去点') return 点们.find(p => p.类 === 步.类);
+      if (步.做 === '靠近' && 敌) return 敌;
+      if (步.做 === '绕后' && 敌) return {x:敌.x - Math.cos(敌.朝向) * 92, y:敌.y - Math.sin(敌.朝向) * 92};
+      return null;
+    }
+
+    while (!结束 && tick < 跳数上限) {
+      tick++;
+      const t = +(tick * DT).toFixed(1);
+      if (tick % 240 === 0) {
+        const np = 取位(rnd, 250);
+        点们[0].x = np[0]; 点们[0].y = np[1];
+        记(t, '攒分点挪到新位置(每 24 秒挪一次,蹲在一个点不是稳赢)');
+      }
+      for (const a of 机们) {
+        if (!a.活) continue;
+        const st = a.状态;
+        if (st.停 > 0) st.停--;
+        if (st.烟 > 0) st.烟--;
+        if (st.电 > 0) st.电--;
+        if (st.灼 > 0) { st.灼--; a.hp -= 0.3; if (a.hp <= 0) 出局(a, t, '灼烧'); }
+        if (!a.活) continue;
+
+        const 目标 = a === 机们[0] ? 剧本目标(a, t) : 最近对手(a, 机们);
+        if (目标 && st.停 <= 0) {
+          let want = Math.atan2(目标.y - a.y, 目标.x - a.x);
+          if (st.烟 > 0) want += (rnd() - 0.5) * 1.6;
+          const diff = ((want - a.朝向 + Math.PI) % (Math.PI * 2)) - Math.PI;
+          a.朝向 += Math.max(-0.1, Math.min(0.1, diff));
+          const 速 = 速度 * (st.电 > 0 ? 0.5 : 1) * (a.背包.includes('轻木') ? 1.25 : 1);
+          a.x += Math.cos(a.朝向) * 速; a.y += Math.sin(a.朝向) * 速;
+        }
+
+        for (const p of 点们) {
+          if (p.冷 > 0) { p.冷--; continue; }
+          if (Math.hypot(p.x - a.x, p.y - a.y) > p.半径) continue;
+          if (p.类 === '料' && a.背包.length < 2) {
+            const 货 = p.给 === 0 ? '火焰余料' : 余料[Math.floor(rnd() * 余料.length)];
+            a.背包.push(货); p.冷 = 120; p.给++;
+            记(t, `${a.名} 走到料点,捡到「${货}」——焊上以后打中就带这个效果(背包 ${a.背包.length}/2)`, p.给 === 1);
+          }
+          if (p.类 === '装' && a.装置.length < 2) {
+            const 货 = p.给 === 0 ? '烟' : ['眼','冰','箭'][Math.floor(rnd() * 3)];
+            a.装置.push(货); a.拿过装 = true; p.冷 = 160; p.给++;
+            记(t, `${a.名} 走到装置点,拿到「${装置表[货].名}」:${装置表[货].说}(代价见下方说明)`, p.给 === 1);
+          }
+        }
+
+        a.冷却--; a.装冷--;
+        if (a.装冷 <= 0 && a.装置.length) {
+          const b = 最近对手(a, 机们);
+          if (b) {
+            const d = Math.hypot(b.x - a.x, b.y - a.y);
+            for (const k of a.装置.slice()) {
+              if (d > 装置表[k].距离) continue;
+              a.装置.splice(a.装置.indexOf(k), 1);
+              a.装冷 = 40;
+              if (k === '烟') { b.状态.烟 = 15; a.状态.烟 = 4; 记(t, `${a.名} 甩出烟雾罐:${b.名} 转向乱掉 1.5 秒(烟也挡了自己 0.4 秒)`, true); }
+              if (k === '冰') { b.状态.停 = 15; a.状态.停 = 5; 记(t, `${a.名} 捏碎冰冷果:${b.名} 停 1.5 秒(自己也慢 0.5 秒)`, true); }
+              if (k === '眼') { 弹.push({名:'眼珠追踪弹', 色:'#c9a2ff', x:a.x, y:a.y, 追:b, 伤害:12, 生命:80}); 记(t, `${a.名} 放出眼珠追踪弹:弹头自己追着 ${b.名} 飞`, true); }
+              if (k === '箭') {
+                弹.push({名:'火箭', 色:'#ff9d5c', x:a.x, y:a.y, vx:Math.cos(a.朝向) * 9, vy:Math.sin(a.朝向) * 9, 伤害:26, 生命:40});
+                a.装冷 = 50; 记(t, `${a.名} 打出火箭:一发 26 伤害,打完自己转向慢 1 秒`, true);
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      for (let i = 0; i < 机们.length; i++) for (let j = i + 1; j < 机们.length; j++) {
+        const A = 机们[i], B = 机们[j];
+        if (!A.活 || !B.活) continue;
+        const dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 0.001;
+        const 接触 = A.半径 + B.半径;
+        if (d < 接触) {
+          const 推 = (接触 - d) * 0.5;
+          A.x -= dx / d * 推; A.y -= dy / d * 推;
+          B.x += dx / d * 推; B.y += dy / d * 推;
+          if (d < 接触 + 6 && A.冷却 <= 0 && B.冷却 <= 0) {
+            A.冷却 = 20; B.冷却 = 24;
+            打中(A, B, t); 打中(B, A, t);
+          }
+        }
+      }
+
+      for (const p of 弹.slice()) {
+        p.生命--;
+        const 标 = p.追 && p.追.活 ? p.追 : null;
+        if (标) {
+          const want = Math.atan2(标.y - p.y, 标.x - p.x);
+          p.vx = Math.cos(want) * 7; p.vy = Math.sin(want) * 7;
+        }
+        p.x += p.vx; p.y += p.vy;
+        if (标 && Math.hypot(标.x - p.x, 标.y - p.y) < 标.半径 + 10) {
+          标.hp -= p.伤害;
+          闪.push({x:标.x, y:标.y, 生命:14, 文:`${p.名} ${p.伤害}`});
+          记(t, `${p.名} 打中 ${标.名}:${p.伤害} 伤害`, true);
+          if (标.hp <= 0) 出局(标, t, `被 ${p.名} 打掉`);
+          弹.splice(弹.indexOf(p), 1);
+          continue;
+        }
+        if (p.生命 <= 0) 弹.splice(弹.indexOf(p), 1);
+      }
+      for (const f of 闪.slice()) { f.生命--; if (f.生命 <= 0) 闪.splice(闪.indexOf(f), 1); }
+
+      const 在点 = 机们.filter(a => a.活 && Math.hypot(a.x - 点们[0].x, a.y - 点们[0].y) <= 点们[0].半径);
+      for (const a of 在点) a.分 += 1;
+
+      const 领先 = 机们.filter(a => a.活).sort((x, y) => y.分 - x.分)[0];
+      if (领先 && 领先.分 >= 目标分) {
+        结束 = true; 冠军 = 领先.名; 胜因 = `攒满 ${目标分} 分`;
+        记(t, `这一局结束:${领先.名} 靠攒分赢——道具让它敢绕开正面打架,不用一路硬碰`, true);
+      }
+      const 活 = 机们.filter(a => a.活);
+      if (!结束 && 活.length <= 1) {
+        结束 = true; 冠军 = 活[0] ? 活[0].名 : '同归于尽'; 胜因 = '场上只剩一台还站着';
+        记(t, `这一局结束:${冠军} 是场上还站着的机器`, true);
+      }
+      if (!结束 && tick >= 跳数上限) {
+        结束 = true; 冠军 = 领先 ? 领先.名 : '无人'; 胜因 = `时间到,分数最高(${Math.round(领先 ? 领先.分 : 0)} 分)`;
+        记(t, `这一局结束:${冠军}(${胜因})`, true);
+      }
+
+      帧们.push({
+        t,
+        点: 点们.map(p => ({类:p.类, x:p.x, y:p.y, 冷:p.冷})),
+        机: 机们.map(a => ({名:a.名, 色:a.色, x:a.x, y:a.y, 朝向:a.朝向, hp:Math.max(0, a.hp), 上限:a.上限,
+                            分:a.分, 半径:a.半径, 伸出:a.武器.伸出, 背包:a.背包.slice(), 装置:a.装置.slice(),
+                            状态:{停:a.状态.停, 烟:a.状态.烟, 灼:a.状态.灼, 电:a.状态.电}, 活:a.活})),
+        弹: 弹.map(p => ({名:p.名, 色:p.色, x:p.x, y:p.y})),
+        闪: 闪.map(f => ({x:f.x, y:f.y, 文:f.文})),
+      });
+    }
+    return {帧们, 事, 冠军, 胜因, 目标分, 局长: tick * DT};
+  }
+
+  return {跑一遍, 点种, 装置表, 剧本, 目标分};
+})();
+
+/* ---------- 播放与画面 ---------- */
+const D = SIM.跑一遍(12);   // 种子 12 这一局两条赢法都露到了:先绕后打掉一台,再靠攒满分赢
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const AX = 30, AY = 30, AS = 540, SC = AS / 800;
+const 位 = (p) => [AX + (p.x + 400) * SC, AY + (p.y + 400) * SC];
+let i = 0, 倍速 = 1, 播着 = true, 上次 = 0, 累 = 0;
+
+function 文字(g, s, x, y, 色, 字号, 居中) {
+  g.fillStyle = 色; g.font = (字号 || 12) + 'px "Hiragino Sans GB","PingFang SC",sans-serif';
+  g.textAlign = 居中 ? 'center' : 'left'; g.fillText(s, x, y);
+}
+function 画(f) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#1b2230'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.strokeStyle = '#2f3b4e'; ctx.strokeRect(AX, AY, AS, AS);
+  ctx.fillStyle = '#9fb0c4'; ctx.font = '12px "Hiragino Sans GB",sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('改完以后的三种点位 · 一局演示(机器照剧本走,不是平衡对局)', AX, 20);
+
+  for (const p of f.点) {
+    const c = SIM.点种[p.类], [x, y] = 位(p);
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = c.色; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(x, y, c.半径 * SC, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    文字(ctx, c.名, x, y - c.半径 * SC - 6, c.色, 12, true);
+    if (p.冷 > 0) 文字(ctx, '刚给过,等刷新', x, y + 4, '#6d7f95', 10, true);
+  }
+  for (const p of f.弹) {
+    const [x, y] = 位(p);
+    ctx.fillStyle = p.色; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    文字(ctx, p.名, x + 8, y - 6, p.色, 10);
+  }
+  for (const m of f.机) {
+    const [x, y] = 位(m), r = m.半径 * SC;
+    if (m.伸出 > 0) {
+      ctx.strokeStyle = 'rgba(200,215,232,.22)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y, (m.半径 + m.伸出) * SC, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (!m.活) {
+      ctx.strokeStyle = '#5b6a7c'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - 9, y - 9); ctx.lineTo(x + 9, y + 9);
+      ctx.moveTo(x + 9, y - 9); ctx.lineTo(x - 9, y + 9); ctx.stroke();
+      文字(ctx, m.名 + ' 已出局', x, y + 24, '#6d7f95', 11, true);
+      continue;
+    }
+    if (m.状态.烟 > 0) {
+      ctx.fillStyle = 'rgba(190,200,215,.28)';
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x + k * 9 - 9, y - 12 - k * 5, 9, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.fillStyle = m.色; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#12161d'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(m.朝向) * (r + 12), y + Math.sin(m.朝向) * (r + 12)); ctx.stroke();
+    const w = 46;
+    ctx.fillStyle = '#2b3648'; ctx.fillRect(x - w / 2, y - r - 22, w, 5);
+    ctx.fillStyle = '#63c07a'; ctx.fillRect(x - w / 2, y - r - 22, w * (m.hp / m.上限), 5);
+    ctx.fillStyle = '#2b3648'; ctx.fillRect(x - w / 2, y - r - 15, w, 4);
+    ctx.fillStyle = '#e6c068'; ctx.fillRect(x - w / 2, y - r - 15, w * Math.min(1, m.分 / SIM.目标分), 4);
+    文字(ctx, m.名, x, y - r - 27, m.色, 11, true);
+    const 标 = [];
+    if (m.状态.停 > 0) 标.push('❄ 停住');
+    if (m.状态.烟 > 0) 标.push('💨 转向乱');
+    if (m.状态.灼 > 0) 标.push('🔥 灼烧');
+    if (m.状态.电 > 0) 标.push('⚡ 推力减半');
+    if (标.length) 文字(ctx, 标.join(' '), x, y + r + 16, '#ffb0a0', 11, true);
+  }
+  for (const s of f.闪) {
+    const [x, y] = 位(s);
+    ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(x, y, 26, 0, Math.PI * 2); ctx.stroke();
+    文字(ctx, s.文, x, y - 32, '#ff8a76', 12, true);
+  }
+}
+function 面板(f) {
+  let h = '';
+  for (const m of f.机) {
+    const 态 = [];
+    if (m.状态.停 > 0) 态.push('停住'); if (m.状态.烟 > 0) 态.push('转向乱');
+    if (m.状态.灼 > 0) 态.push('灼烧'); if (m.状态.电 > 0) 态.push('推力减半');
+    h += `<div class="机"><h3 style="color:${m.色}">${m.名}${m.活 ? '' : '(已出局)'}</h3>` +
+      `<div class="bar hp"><i style="width:${(m.hp / m.上限 * 100).toFixed(1)}%"></i></div>` +
+      `<div class="bar sc"><i style="width:${(Math.min(1, m.分 / SIM.目标分) * 100).toFixed(1)}%"></i></div>` +
+      `<div style="font-size:12px;color:#9fb0c4">血量 ${Math.round(m.hp)} · 攒分 ${Math.round(m.分)}/${SIM.目标分}</div>` +
+      `<div>${m.背包.map(b => `<span class="slot">${b}</span>`).join('') || '<span class="slot">背包空</span>'}` +
+      `${m.装置.map(b => `<span class="slot dev">${SIM.装置表[b].名}</span>`).join('')}</div>` +
+      (态.length ? `<div class="st">状态:${态.join('、')}</div>` : (m.活 ? '' : '<div class="dead">出局</div>')) +
+      '</div>';
+  }
+  document.getElementById('panel').innerHTML = h;
+}
+function 说明(f) {
+  const 到 = D.事.filter(e => e.t <= f.t).slice(-3);
+  const 尾 = f.t >= D.局长 ? `<div class="hot">本局结束:${D.冠军}(${D.胜因})</div>` : '';
+  document.getElementById('cap').innerHTML =
+    (到.length ? 到.map(e => `<div class="${e.hot ? 'hot' : ''}">第 ${e.t} 秒:${e.文}</div>`).join('') : '<div>这一秒没有新事件</div>') + 尾;
+  document.getElementById('时').textContent = `第 ${f.t} 秒 / ${D.局长.toFixed(1)} 秒`;
+  document.getElementById('bar').value = String(i / (D.帧们.length - 1));
+}
+function 刷(k) { i = Math.max(0, Math.min(D.帧们.length - 1, k)); const f = D.帧们[i]; 画(f); 面板(f); 说明(f); }
+
+document.getElementById('bPlay').onclick = () => {
+  播着 = !播着; document.getElementById('bPlay').textContent = 播着 ? '暂停' : '播放';
+};
+[['bS05', 0.5], ['bS1', 1], ['bS2', 2], ['bS4', 4]].forEach(([id, v]) => {
+  document.getElementById(id).onclick = () => {
+    倍速 = v;
+    ['bS05', 'bS1', 'bS2', 'bS4'].forEach(x => document.getElementById(x).classList.toggle('on', x === id));
+  };
+});
+document.getElementById('bTop').onclick = () => { 刷(0); 播着 = true; document.getElementById('bPlay').textContent = '暂停'; };
+document.getElementById('bar').oninput = (e) => { 播着 = false; document.getElementById('bPlay').textContent = '播放'; 刷(Math.round(Number(e.target.value) * (D.帧们.length - 1))); };
+
+document.getElementById('legend').innerHTML =
+  '图上怎么看:<b>绿圈</b> 攒分点(站进去攒分,攒满 ' + SIM.目标分 + ' 就赢,每 24 秒挪一次位置)、' +
+  '<b>蓝圈</b> 料点(走进去才捡到余料,背包 2 格)、<b>紫圈</b> 装置点(走进去拿主动道具,靠近对手时自动触发)、' +
+  '<b>从圆心伸出的短线</b> = 机器朝向、<b>外圈细线</b> = 武器够得着、<b>红圈</b> = 刚被打中(背面时写 ×1.5)、' +
+  '<b>灰雾 / ❄ / 🔥 / ⚡</b> = 烟雾、冰冻、灼烧、电。' +
+  '<br>这段演示没有做的:缩圈、三条额度、多人抢同一个点的分摊、手动按键(真人版会改成自己按)。';
+document.getElementById('why').innerHTML = [
+  '它想说明的第一件事:三种点位给的是三种收益,不是三个长得不一样的加分圈——所以「去哪个点」变成一个选择。',
+  '第二件事:捡到东西要走到那儿去,背包只有 2 格,拿了这块就放不下那块,拾取本身成了策略。',
+  '第三件事:道具在靠近对手时自动触发,是为了让机器自动对局也能跑;真人版可以改成自己按。每个道具都带一条代价(烟也挡自己、火箭打完转向慢 1 秒)。',
+  '第四件事:从背面打中伤害 1.5 倍,把「绕后」变成一个真的决定,而不是撞上了就打。',
+].map(s => '<li>' + s + '</li>').join('');
+
+function 循环(now) {
+  if (!上次) 上次 = now;
+  const dt = now - 上次; 上次 = now;
+  if (播着) {
+    累 += dt * 倍速;
+    while (累 >= 100) { 累 -= 100; 刷(i + 1 >= D.帧们.length ? 0 : i + 1); }
+  }
+  requestAnimationFrame(循环);
+}
+刷(0);
+requestAnimationFrame(循环);
+</script>
+</body>
+</html>
