@@ -25,9 +25,13 @@ function wilson(k, n, z) {
 }
 
 const N = F.PRESET_NAMES.length;
-const 批号 = [50, 51, 52, 53, 54], 每批 = 400;
+// 默认跑官方那五批(50~54);第三个参数可以换成别的批号做独立验证,例如
+// node docs/playtest/winner-rule-baseline.js prototypes/fuse-royale-prototype.html 80,81,82,83,84
+const 批号 = process.argv[3] ? process.argv[3].split(',').map(Number) : [50, 51, 52, 53, 54];
+const 每批 = 400;
 const 上场 = {}, 夺冠 = {}, 批内最高 = [];
 let 局 = 0, 占点胜 = 0, 站着胜 = 0, 同归于尽 = 0, 死人冠军 = 0, 局长和 = 0, 淘汰和 = 0;
+let 杀分合计 = 0, 总分合计 = 0, 冠军有杀 = 0, 纯点冠军 = 0, 冠军局 = 0;   // 冠军这 75 分里,击杀与站点的各占多少
 const 每批占点 = [];
 
 for (const 批 of 批号) {
@@ -49,6 +53,8 @@ for (const 批 of 批号) {
     else if (!mt.胜因.includes('同归于尽')) 站着胜++;
     if (mt.冠军 !== "无人存活") {
       夺冠[mt.冠军] = (夺冠[mt.冠军] || 0) + 1;
+      const c = mt.机器.find(x => x.名称 === mt.冠军 && x.活);
+      if (c) { 冠军局++; 杀分合计 += c.分杀; 总分合计 += c.分杀 + c.分点; if (c.击杀 > 0) 冠军有杀++; if (c.分杀 === 0) 纯点冠军++; }
       本批夺冠[mt.冠军] = (本批夺冠[mt.冠军] || 0) + 1;
     }
   }
@@ -59,9 +65,10 @@ for (const 批 of 批号) {
 
 const 行 = Object.keys(上场).map(nm => ({ 名: nm, 台: 上场[nm], 赢: 夺冠[nm] || 0, 率: (夺冠[nm] || 0) / 上场[nm] }))
   .sort((a, b) => b.率 - a.率);
-console.log(`文件:${path}`);
+console.log(`文件:${path} | 击杀分参数 ${F.参数.击杀分}(打掉一台拿这么多分,和站点攒的分进同一个数)`);
 console.log(`2000 局(每局 10 台,种子批号 ${批号.join('~')})| 平均局长 ${(局长和 / 局).toFixed(1)} 秒 | 每局平均淘汰 ${(淘汰和 / 局).toFixed(1)} 台`);
 console.log(`靠攒满分赢 ${(占点胜 / 局 * 100).toFixed(0)}% | 靠场上只剩一台赢 ${(站着胜 / 局 * 100).toFixed(0)}% | 同归于尽 ${同归于尽} 局(${(同归于尽 / 局 * 100).toFixed(1)}%) | 冠军已出局 ${死人冠军} 局`);
+console.log(`冠军的分里来自击杀 ${(杀分合计 / Math.max(1, 总分合计) * 100).toFixed(0)}% | 冠军至少打掉一台 ${(冠军有杀 / Math.max(1, 冠军局) * 100).toFixed(0)}% | 冠军完全没打掉人(纯靠站点攒满) ${(纯点冠军 / Math.max(1, 冠军局) * 100).toFixed(0)}%`);
 console.log(`每个预设都赢过场:${行.every(r => r.赢 > 0) ? '是' : '否(赢过 0 场的:' + 行.filter(r => !r.赢).map(r => r.名).join(',') + ')'}`);
 console.log('');
 for (const r of 行) {
