@@ -97,6 +97,7 @@
           <button id="btnNoWeapon">开一局:对手也没有武器</button>
           <button id="btnLoot">开一局:每人开局随机捡两块余料</button>
           <button id="btnStep">推进 1 秒</button>
+          <button id="btnRunAll">跑完这一局(自动推进到结束)</button>
           <button id="btnNext">下一局(零件预算收紧)</button>
           <button id="btnRecord">复制本局记录(给引导者)</button>
         </div>
@@ -757,6 +758,17 @@ document.getElementById("btnStep").onclick = () => {
   if (!S.match) { say("先点「开这一局」。"); return; }
   FUSE.step(S.match); FUSE.burnTick(S.match);
   if (S.match.结束) record();
+  render();
+};
+// 试玩一场要开三局,每局约 300 跳;让人手点「推进 1 秒」点不完,所以给一个整局跑完的按钮。
+// 仿真本身没改:还是同一套 step/burnTick,还是每局固定种子。
+document.getElementById("btnRunAll").onclick = () => {
+  if (!S.match) { say("先点「开这一局」或「开一局:每人开局随机捡两块余料」。"); return; }
+  const 起跳 = S.match.tick;
+  let n = 0;
+  while (!S.match.结束 && n < 420) { FUSE.step(S.match); FUSE.burnTick(S.match); n++; }
+  if (S.match.结束) record();
+  say(`整局跑完:从 ${(起跳/10).toFixed(1)} 秒到 ${(S.match.tick/10).toFixed(1)} 秒,共推进 ${n} 跳。想逐秒看过程可以退回「推进 1 秒」。`);
   render();
 };
 document.getElementById("btnNext").onclick = () => {
